@@ -47,7 +47,7 @@ def assign_keys(infos):
         else:
             keys[i] = f"{name}#{seen.get(name, 0)}"
             seen[name] = seen.get(name, 0) + 1
-    return [{**info, "key": key} for info, key in zip(infos, keys)]
+    return [{**info, "key": key} for info, key in zip(infos, keys, strict=True)]
 
 
 class MonitorInfo:

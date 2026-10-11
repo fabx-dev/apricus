@@ -116,7 +116,7 @@ class ControlPanel(Gtk.Application):
         self.contextMenu_monitors = Gtk.Menu()
         self.contextMenu_monitors.show_all()
 
-        for monitor_key, monitor in self.monitors.get_monitors().items():
+        for monitor in self.monitors.get_monitors().values():
             item = Gtk.MenuItem(label=_("Set For {monitor}").format(monitor=monitor.name))
             item.connect("activate", self.on_set_as, monitor)
             self.contextMenu_monitors.append(item)

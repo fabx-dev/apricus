@@ -483,7 +483,7 @@ class VideoPlayer(BasePlayer):
                     for m in self.windows
                 ]
             )
-            for gdk_monitor, info in zip(self.windows, keyed):
+            for gdk_monitor, info in zip(self.windows, keyed, strict=True):
                 key_of[id(gdk_monitor)] = info["key"]
 
         if self.mode == MODE_VIDEO:
