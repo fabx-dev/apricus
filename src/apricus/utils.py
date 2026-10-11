@@ -218,9 +218,10 @@ def get_video_paths(video_dir=None):
     if not os.path.isdir(directory):
         logger.warning(f"[Utils] Video folder missing: {directory}")
         return []
-    for root, _dirs, files in os.walk(directory):
-        for filename in files:
-            filepath = os.path.join(root, filename)
+    # Flat scan only: subdirectories are ignored on purpose, so choosing a
+    # parent folder shows exactly its own videos and nothing else.
+    for filename in os.listdir(directory):
+        filepath = os.path.join(directory, filename)
         file = Gio.file_new_for_path(filepath)
         info = file.query_info("standard::content-type", Gio.FileQueryInfoFlags.NONE, None)
         mime_type = info.get_content_type()

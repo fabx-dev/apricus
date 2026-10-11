@@ -53,14 +53,13 @@ def test_get_video_paths_uses_given_dir(tmp_path):
     assert get_video_paths(str(tmp_path)) == []
 
 
-def test_get_video_paths_is_recursive(tmp_path):
+def test_get_video_paths_is_flat(tmp_path):
     from unittest.mock import patch
 
     sub = tmp_path / "sub"
     sub.mkdir()
     (tmp_path / "top.mp4").write_bytes(b"fake")
     (sub / "nested.mp4").write_bytes(b"fake")
-    (sub / "note.txt").write_text("not video")
 
     class FakeInfo:
         def __init__(self, path):
@@ -78,7 +77,7 @@ def test_get_video_paths_is_recursive(tmp_path):
 
     with patch("apricus.utils.Gio.file_new_for_path", side_effect=FakeFile):
         paths = get_video_paths(str(tmp_path))
-    assert sorted(paths) == sorted([str(tmp_path / "top.mp4"), str(sub / "nested.mp4")])
+    assert paths == [str(tmp_path / "top.mp4")]
 
 
 def test_get_video_paths_missing_dir_returns_empty(tmp_path):
