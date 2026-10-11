@@ -26,8 +26,10 @@ path to Wayland and multi-desktop support**.
 - I'm feeling lucky (random video)
 - Hardware accelerated decoding via VLC <sup>3</sup>
 - Multi-monitor support, per-monitor video <sup>4</sup>
-- Streaming URL support via yt-dlp <sup>5</sup>
-- Webpage as wallpaper <sup>6</sup>
+- Video library folder of your choice, shown in the panel <sup>5</sup>
+- Streaming URL support via yt-dlp <sup>6</sup>
+- Webpage as wallpaper <sup>7</sup>
+- Interface in English, Italian, German, French, Spanish and Japanese <sup>8</sup>
 
 <sup>1</sup> Currently GNOME only.
 <sup>2</sup> Window-state detection is currently X11 only. On Wayland the video
@@ -36,24 +38,43 @@ companion, which is on the roadmap.
 <sup>3</sup> VLC backend; HW acceleration varies by driver (NVIDIA + Wayland is fragile).
 <sup>4</sup> Duplicate monitor models get stable `Model#i` config keys, so two
 identical screens no longer overwrite each other.
-<sup>5</sup> Tested with YouTube.
-<sup>6</sup> Anything from a plain page to WebGL content.
+<sup>5</sup> Flat scan: each folder shows its own videos. Defaults to the
+Hidamari folder for compatibility.
+<sup>6</sup> Tested with YouTube.
+<sup>7</sup> Anything from a plain page to WebGL content.
+<sup>8</sup> Selected automatically from the system locale.
 
 ## What changed vs upstream
 
-- Startup: shared process clock with `[Perf]` marks, persistent static-frame
-  cache + background refresh, `ffprobe` sidecar cache, `--fast` mode and a
-  user systemd unit — login-to-first-frame went from ~1.7s to ~1.4s (1080p)
-- Player: no redundant seeks on startup, single-shot monitor sync, logging
-  that actually works in forked children
-- Config: legacy Hidamari setup is imported automatically on first run;
-  videos stay in the existing `~/Video(s)/Hidamari` folder
-- Correct dark-mode wallpaper restore, `feeling_lucky` fixed on empty
-  libraries, `ffprobe` timeouts, headless-safe imports
-- Desktop-environment backends (`apricus.backends`): GNOME vs generic
-  wallpaper handling and X11 vs Wayland window-state selection in one place
-- Full rebrand: `io.github.fabx_dev.Apricus` app ID, D-Bus names, icon, docs
-- CI (lint + format check + pytest) and a headless-safe test suite
+**Startup & performance**
+- Login-to-first-frame from ~1.7s to ~1.4s (1080p): shared process clock with
+  `[Perf]` marks, persistent static-frame cache applied instantly and refreshed
+  in background, `ffprobe` sidecar cache, no redundant seeks on the startup path
+- `--fast` mode and a user systemd unit (`apricus --systemd-enable`) for
+  low-contention login startup
+
+**Player**
+- Thumbnail loading marshalled to the GTK main thread (fixes intermittent
+  native crashes of the control panel)
+- VLC widget cleanup, single-shot monitor sync, logging that works in forked
+  children, `ffprobe` timeouts, headless-safe imports
+
+**Correctness**
+- Stable per-monitor config keys with legacy migration
+- Correct dark-mode wallpaper restore; `feeling_lucky` no longer crashes on an
+  empty library (upstream #272)
+- Old configs are migrated, never wiped (video folder default, blur key
+  removal, Hidamari import on first run)
+
+**Desktop integration**
+- Desktop-environment backends in one place (`apricus.backends`): GNOME vs
+  generic wallpaper handling, X11 vs Wayland window-state selection
+- Full rebrand: `io.github.fabx_dev.Apricus` app ID, D-Bus names, original icon
+- Flatpak builds and plays video (`make flatpak`; Flathub publishing planned)
+
+**Removed vs upstream**
+- Static-wallpaper blur: it only added startup cost for a wallpaper that sits
+  underneath the video — frames are now saved sharp and Pillow is gone
 
 ## Installation (from source)
 
@@ -74,11 +95,12 @@ Run it (via the dev env, in debug mode):
 make run
 ```
 
-Put videos in the video folder (`~/Video/Hidamari` or `~/Videos/Hidamari`
-depending on distro, kept from Hidamari for compatibility) and pick them from the GUI.
-You can point Apricus at any folder with the *Choose video folder* button in the control panel.
+Pick videos from the GUI. The default library is `~/Video/Hidamari` (or
+`~/Videos/Hidamari`, kept from Hidamari for compatibility); point Apricus at
+any folder with the *Choose* button in the control panel.
 
-A Flatpak (`io.github.fabx_dev.Apricus`) builds locally with `make flatpak`; Flathub publishing is planned.
+A Flatpak (`io.github.fabx_dev.Apricus`) builds locally with `make flatpak`;
+Flathub publishing is planned.
 
 Optional login autostart via systemd (instead of the `.desktop` file):
 
@@ -94,7 +116,9 @@ make format   # ruff format
 uv run pytest tests/ -q
 ```
 
-Issues and pull requests are welcome.
+Translatable strings live in `po/` (`make pot` / `make update-po`;
+`po/gen_lang.py` regenerates the catalogs). Issues and pull requests are
+welcome.
 
 ## Credits
 
