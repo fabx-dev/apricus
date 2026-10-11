@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <component type="desktop-application">
   <!--Created with jdAppStreamEdit 9.2-->
-  <id>io.github.fabx-dev.Apricus</id>
+  <id>io.github.fabx_dev.Apricus</id>
   <name>Apricus</name>
   <summary>Live wallpaper for Linux</summary>
   <developer id="io.github.fabx-dev">
@@ -130,7 +130,7 @@
     <control>keyboard</control>
   </recommends>
   <content_rating type="oars-1.1"/>
-  <launchable type="desktop-id">io.github.fabx-dev.Apricus.desktop</launchable>
+  <launchable type="desktop-id">io.github.fabx_dev.Apricus.desktop</launchable>
   <keywords>
     <keyword>Live Wallpaper</keyword>
     <keyword>Video Wallpaper</keyword>

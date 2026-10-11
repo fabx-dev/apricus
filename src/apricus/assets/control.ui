@@ -13,7 +13,7 @@
     <property name="authors">fabx-dev https://github.com/fabx-dev
 Based on Hidamari by Jeff Shee https://github.com/jeffshee/hidamari</property>
     <property name="artists">Apricus icon: original</property>
-    <property name="logo-icon-name">io.github.fabx-dev.Apricus</property>
+    <property name="logo-icon-name">io.github.fabx_dev.Apricus</property>
     <child internal-child="vbox">
       <object class="GtkBox">
         <property name="can-focus">False</property>
@@ -310,7 +310,7 @@ Based on Hidamari by Jeff Shee https://github.com/jeffshee/hidamari</property>
     <property name="can-focus">False</property>
     <property name="default-width">1024</property>
     <property name="default-height">576</property>
-    <property name="icon-name">io.github.fabx-dev.Apricus</property>
+    <property name="icon-name">io.github.fabx_dev.Apricus</property>
     <child>
       <object class="GtkStack" id="stack1">
         <property name="visible">True</property>

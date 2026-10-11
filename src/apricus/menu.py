@@ -18,7 +18,7 @@ from apricus.utils import init_translations, setup_logging
 logger = logging.getLogger(LOGGER_NAME)
 
 APP_INDICATOR_ID = PROJECT
-APP_INDICATOR_ICON = "io.github.fabx-dev.Apricus"
+APP_INDICATOR_ICON = "io.github.fabx_dev.Apricus"
 
 # Reuse SessionBus instance to avoid creating multiple connections
 _session_bus = None

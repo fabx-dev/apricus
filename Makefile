@@ -4,7 +4,7 @@
 BUILDDIR    ?= _build
 PREFIX      ?= $(HOME)/.local
 FLATPAK_DIR ?= build-flatpak
-MANIFEST    := pkgs/flatpak/io.github.fabx-dev.Apricus.json
+MANIFEST    := pkgs/flatpak/io.github.fabx_dev.Apricus.json
 
 .DEFAULT_GOAL := help
 

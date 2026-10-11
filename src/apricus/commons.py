@@ -3,11 +3,11 @@ import subprocess
 
 LOGGER_NAME = "Apricus"
 
-PROJECT = "io.github.fabx-dev.Apricus"
-# D-Bus domain identifiers (bus names, interfaces, Gtk app IDs, GSettings
-# schema) forbid dashes, so they use the underscore variant. Everything
-# user-facing (desktop file, icon, Flatpak) keeps PROJECT.
-DBUS_PROJECT = "io.github.fabx_dev.Apricus"
+PROJECT = "io.github.fabx_dev.Apricus"
+# Flatpak allows dashes only in the last ID segment, and D-Bus domain
+# identifiers (bus names, interfaces, Gtk app IDs, GSettings schema) forbid
+# them entirely: the underscore variant is used for every formal ID.
+DBUS_PROJECT = PROJECT
 DBUS_NAME_SERVER = f"{DBUS_PROJECT}.server"
 DBUS_NAME_PLAYER = f"{DBUS_PROJECT}.player"
 
@@ -31,7 +31,7 @@ AUTOSTART_DESKTOP_PATH = os.path.join(AUTOSTART_DIR, f"{PROJECT}.desktop")
 AUTOSTART_DESKTOP_CONTENT = """[Desktop Entry]
 Name=Apricus
 Exec=apricus -b
-Icon=io.github.fabx-dev.Apricus
+Icon=io.github.fabx_dev.Apricus
 Terminal=false
 Type=Application
 Categories=GTK;Utility;
@@ -39,13 +39,13 @@ StartupNotify=true
 """
 AUTOSTART_DESKTOP_CONTENT_FLATPAK = """[Desktop Entry]
 Name=Apricus
-Exec=/usr/bin/flatpak run --command=apricus io.github.fabx-dev.Apricus -b
-Icon=io.github.fabx-dev.Apricus
+Exec=/usr/bin/flatpak run --command=apricus io.github.fabx_dev.Apricus -b
+Icon=io.github.fabx_dev.Apricus
 Terminal=false
 Type=Application
 Categories=GTK;Utility;
 StartupNotify=true
-X-Flatpak=io.github.fabx-dev.Apricus
+X-Flatpak=io.github.fabx_dev.Apricus
 """
 
 CONFIG_DIR = os.path.join(xdg_config_home, "apricus")

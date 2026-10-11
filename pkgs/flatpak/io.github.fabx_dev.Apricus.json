@@ -1,5 +1,5 @@
 {
-    "app-id": "io.github.fabx-dev.Apricus",
+    "app-id": "io.github.fabx_dev.Apricus",
     "runtime": "org.gnome.Platform",
     "runtime-version": "50",
     "sdk": "org.gnome.Sdk",

@@ -1,4 +1,4 @@
-application_id = 'io.github.fabx-dev.Apricus'
+application_id = 'io.github.fabx_dev.Apricus'
 
 scalable_dir = join_paths('hicolor', 'scalable', 'apps')
 install_data(

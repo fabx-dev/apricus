@@ -55,7 +55,7 @@ logger = logging.getLogger(LOGGER_NAME)
 
 APP_ID = f"{DBUS_PROJECT}.gui"
 APP_TITLE = "Apricus"
-APP_UI_RESOURCE_PATH = "/io/github/fabx-dev/Apricus/control.ui"
+APP_UI_RESOURCE_PATH = "/io/github/fabx_dev/Apricus/control.ui"
 
 
 class ControlPanel(Gtk.Application):
@@ -559,7 +559,7 @@ def main(version="devel", pkgdatadir="/usr/share/apricus", localedir="/usr/share
         logger.error("[GUI] Couldn't find apricus.gresource. Is Apricus installed?")
         return
     Gio.Resource.load(gresource)._register()
-    Gtk.IconTheme.get_default().add_resource_path("/io/github/fabx-dev/Apricus/icons")
+    Gtk.IconTheme.get_default().add_resource_path("/io/github/fabx_dev/Apricus/icons")
 
     app = ControlPanel(version)
     app.run(sys.argv)
