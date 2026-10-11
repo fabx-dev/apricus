@@ -18,7 +18,7 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = ["ruff>=0.14"]
+dev = ["ruff>=0.14", "pytest>=8"]
 
 [tool.uv]
 # uv only manages the dev env; Meson/Flatpak build the actual package.
@@ -38,3 +38,7 @@ ignore = [
 
 [tool.ruff.lint.isort]
 known-first-party = ["hidamari"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

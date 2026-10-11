@@ -37,7 +37,9 @@ def assign_keys(infos):
     counts = {}
     for info in infos:
         counts[info["name"]] = counts.get(info["name"], 0) + 1
-    order = sorted(range(len(infos)), key=lambda i: (infos[i]["name"], infos[i]["x"], infos[i]["y"]))
+    order = sorted(
+        range(len(infos)), key=lambda i: (infos[i]["name"], infos[i]["x"], infos[i]["y"])
+    )
     keys = [None] * len(infos)
     seen = {}
     for i in order:
