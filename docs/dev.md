@@ -1,11 +1,11 @@
 # Development Note
 
-Hidamari can be built using two methods: "Build and Install" and "Build as Flatpak."
+Apricus can be built using two methods: "Build and Install" and "Build as Flatpak."
 
 1. **Build and Install**
    - This method requires you to have dependencies installed on your system.
    - It installs all components, including scripts, icons, and a desktop file, into a prefix (`~/.local` by default).
-   - If your distro has the necessary packages, "Build and Install" is the quickest Hidamari setup.
+   - If your distro has the necessary packages, "Build and Install" is the quickest Apricus setup.
 
 2. **Build as Flatpak**
    - This method doesn't require you to have dependencies installed on your system.
@@ -100,7 +100,7 @@ All Flatpak packaging files live under [`pkgs/flatpak`](../pkgs/flatpak/), inclu
 ### Environment Setup
 For Flatpak development, VSCode with the Flatpak extension (`bilelmoussaoui.flatpak-vscode`) is recommended. Alternatively, GNOME Builder is also useful when building Flatpak applications.
 
-When cloning the Hidamari repo, you should also pull the submodules (`shared-modules`), as they are required for building the Flatpak.
+When cloning the Apricus repo, you should also pull the submodules (`shared-modules`), as they are required for building the Flatpak.
 
 To do so, use `--recurse-submodules` when cloning:
 ```bash
