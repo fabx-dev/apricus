@@ -140,12 +140,7 @@ class ControlPanel(Gtk.Application):
         Gtk.Application.do_startup(self)
 
         actions = [
-            (
-                "local_video_dir",
-                lambda *_: subprocess.run(
-                    ["xdg-open", os.path.realpath(resolve_video_dir(self.config))]
-                ),
-            ),
+            ("local_video_dir", self.on_open_video_dir),
             ("local_video_choose_dir", self.on_choose_video_dir),
             ("local_video_refresh", self._reload_icon_view),
             ("local_video_apply", self.on_local_video_apply),
@@ -252,10 +247,19 @@ class ControlPanel(Gtk.Application):
         dialog.run()
         dialog.destroy()
 
+    def on_open_video_dir(self, *_args):
+        video_dir = resolve_video_dir(self.config)
+        if video_dir is None:
+            self.on_choose_video_dir()
+            return
+        subprocess.run(["xdg-open", os.path.realpath(video_dir)])
+
     def on_choose_video_dir(self, *_args):
         current = resolve_video_dir(self.config)
         dialog = Gtk.FileChooserDialog(
-            title=_("Choose video folder (current: {folder})").format(folder=current),
+            title=_("Choose video folder (current: {folder})").format(
+                folder=current or _("none chosen yet")
+            ),
             parent=self.window,
             action=Gtk.FileChooserAction.SELECT_FOLDER,
         )
@@ -265,7 +269,7 @@ class ControlPanel(Gtk.Application):
             _("Choose"),
             Gtk.ResponseType.OK,
         )
-        dialog.set_current_folder(resolve_video_dir(self.config))
+        dialog.set_current_folder(current or os.path.expanduser("~"))
         if dialog.run() == Gtk.ResponseType.OK:
             chosen = dialog.get_filename()
             logger.info(f"[GUI] Video folder: {chosen}")
@@ -528,17 +532,18 @@ class ControlPanel(Gtk.Application):
         self.video_paths = get_video_paths(video_dir)
         label = self.builder.get_object("LabelVideoFolder")
         if label is not None:
-            folder = os.path.basename(video_dir)
-            if self.video_paths:
+            if video_dir is None:
+                text = _("Choose a video folder to begin")
+            elif self.video_paths:
                 text = _("Videos in {folder} ({count})").format(
-                    folder=folder, count=len(self.video_paths)
+                    folder=os.path.basename(video_dir), count=len(self.video_paths)
                 )
             else:
-                text = _("No videos in {folder}").format(folder=folder)
+                text = _("No videos in {folder}").format(folder=os.path.basename(video_dir))
             label.set_markup(
                 '<span size="x-large"><b>Local Video</b></span>\n' + GLib.markup_escape_text(text)
             )
-            label.set_tooltip_text(video_dir)
+            label.set_tooltip_text(video_dir or "")
         list_store = Gtk.ListStore(GdkPixbuf.Pixbuf, str)
         self.icon_view: Gtk.IconView = self.builder.get_object("IconView")
         self.icon_view.set_pixbuf_column(0)

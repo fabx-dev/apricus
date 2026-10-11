@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: apricus\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-12 00:55+0200\n"
+"POT-Creation-Date: 2026-10-12 01:05+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -27,15 +27,15 @@ msgstr ""
 msgid "Set For All"
 msgstr ""
 
-#: src/apricus/gui/control.py:214
+#: src/apricus/gui/control.py:209
 msgid "Couldn't connect to server"
 msgstr ""
 
-#: src/apricus/gui/control.py:227
+#: src/apricus/gui/control.py:222
 msgid "Welcome to Apricus 🤗"
 msgstr ""
 
-#: src/apricus/gui/control.py:231
+#: src/apricus/gui/control.py:226
 msgid ""
 "Quickstart for adding local videos:\n"
 " ・Click the folder icon to open your video folder\n"
@@ -43,62 +43,70 @@ msgid ""
 " ・Click the refresh button"
 msgstr ""
 
-#: src/apricus/gui/control.py:247
+#: src/apricus/gui/control.py:242
 msgid "Oops!"
 msgstr ""
 
-#: src/apricus/gui/control.py:258
+#: src/apricus/gui/control.py:260
 #, python-brace-format
 msgid "Choose video folder (current: {folder})"
 msgstr ""
 
-#: src/apricus/gui/control.py:263
+#: src/apricus/gui/control.py:261
+msgid "none chosen yet"
+msgstr ""
+
+#: src/apricus/gui/control.py:267
 msgid "Cancel"
 msgstr ""
 
-#: src/apricus/gui/control.py:265
+#: src/apricus/gui/control.py:269
 msgid "Choose"
 msgstr ""
 
-#: src/apricus/gui/control.py:288
+#: src/apricus/gui/control.py:292
 msgid "No Video Selected"
 msgstr ""
 
-#: src/apricus/gui/control.py:290
+#: src/apricus/gui/control.py:294
 msgid ""
 "There are no video selected.\n"
 "Please choose one first."
 msgstr ""
 
-#: src/apricus/gui/control.py:326
+#: src/apricus/gui/control.py:330
 msgid "Please choose a HTML file"
 msgstr ""
 
-#: src/apricus/gui/control.py:434
+#: src/apricus/gui/control.py:438
 #, python-brace-format
 msgid ""
 "Failed to access {url}. Error:\n"
 "{error}"
 msgstr ""
 
-#: src/apricus/gui/control.py:439
+#: src/apricus/gui/control.py:443
 #, python-brace-format
 msgid "Failed to access {url}. Error code: {code}"
 msgstr ""
 
-#: src/apricus/gui/control.py:455
+#: src/apricus/gui/control.py:459
 #, python-brace-format
 msgid ""
 "Failed to stream {url}. Error:\n"
 "{error}"
 msgstr ""
 
-#: src/apricus/gui/control.py:533
+#: src/apricus/gui/control.py:536
+msgid "Choose a video folder to begin"
+msgstr ""
+
+#: src/apricus/gui/control.py:538
 #, python-brace-format
 msgid "Videos in {folder} ({count})"
 msgstr ""
 
-#: src/apricus/gui/control.py:537
+#: src/apricus/gui/control.py:542
 #, python-brace-format
 msgid "No videos in {folder}"
 msgstr ""

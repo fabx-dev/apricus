@@ -112,16 +112,15 @@ CONFIG_TEMPLATE[CONFIG_KEY_DATA_SOURCE] = _default_data_sources()
 
 
 def resolve_video_dir(config=None):
-    """Return the effective video library folder, creating it if needed.
+    """Return the effective video library folder, or None if none chosen.
 
-    Uses config["video_dir"] when set to an existing directory, otherwise
-    the default location. Never raises: falls back to the default.
+    Priority: the user-configured folder, then the legacy Hidamari folder
+    (compatibility for existing libraries). New users with neither get
+    None and the GUI asks them to choose. Never creates directories.
     """
     configured = (config or {}).get(CONFIG_KEY_VIDEO_DIR)
     if configured and os.path.isdir(configured):
         return os.path.abspath(configured)
-    try:
-        os.makedirs(VIDEO_WALLPAPER_DIR, exist_ok=True)
-    except OSError:
-        pass
-    return VIDEO_WALLPAPER_DIR
+    if os.path.isdir(VIDEO_WALLPAPER_DIR):
+        return VIDEO_WALLPAPER_DIR
+    return None

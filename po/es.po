@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: apricus\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-12 00:55+0200\n"
+"POT-Creation-Date: 2026-10-12 01:05+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: Fabrizio <fabx-dev>\n"
 "Language-Team: Spanish\n"
@@ -18,103 +18,136 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 
 #: src/apricus/gui/control.py:120
+#, python-brace-format
 msgid "Set For {monitor}"
 msgstr "Establecer para {monitor}"
 
+#. add all option
 #: src/apricus/gui/control.py:125
 msgid "Set For All"
 msgstr "Establecer para todos"
 
-#: src/apricus/gui/control.py:214
+#: src/apricus/gui/control.py:209
 msgid "Couldn't connect to server"
 msgstr "No se pudo conectar con el servidor"
 
-#: src/apricus/gui/control.py:227
+#: src/apricus/gui/control.py:222
 msgid "Welcome to Apricus 🤗"
 msgstr "Bienvenido a Apricus 🤗"
 
-#: src/apricus/gui/control.py:231
-msgid "Quickstart for adding local videos:\n ・Click the folder icon to open your video folder\n ・Put your videos there\n ・Click the refresh button"
+#: src/apricus/gui/control.py:226
+msgid ""
+"Quickstart for adding local videos:\n"
+" ・Click the folder icon to open your video folder\n"
+" ・Put your videos there\n"
+" ・Click the refresh button"
 msgstr ""
 "Guía rápida para añadir vídeos locales:\n"
 " • Haz clic en el icono de la carpeta para abrir tu carpeta de vídeos\n"
 " • Pon allí tus vídeos\n"
 " • Haz clic en el botón de actualizar"
 
-#: src/apricus/gui/control.py:247
+#: src/apricus/gui/control.py:242
 msgid "Oops!"
 msgstr "¡Ups!"
 
-#: src/apricus/gui/control.py:258
+#: src/apricus/gui/control.py:260
+#, python-brace-format
 msgid "Choose video folder (current: {folder})"
 msgstr "Elegir la carpeta de vídeos (actual: {folder})"
 
-#: src/apricus/gui/control.py:263
+#: src/apricus/gui/control.py:261
+msgid "none chosen yet"
+msgstr ""
+
+#: src/apricus/gui/control.py:267
 msgid "Cancel"
 msgstr "Cancelar"
 
-#: src/apricus/gui/control.py:265
+#: src/apricus/gui/control.py:269
 msgid "Choose"
 msgstr "Elegir"
 
-#: src/apricus/gui/control.py:288
+#: src/apricus/gui/control.py:292
 msgid "No Video Selected"
 msgstr "Ningún vídeo seleccionado"
 
-#: src/apricus/gui/control.py:290
-msgid "There are no video selected.\nPlease choose one first."
+#: src/apricus/gui/control.py:294
+msgid ""
+"There are no video selected.\n"
+"Please choose one first."
 msgstr ""
 "No hay ningún vídeo seleccionado.\n"
 "Elige uno primero."
 
-#: src/apricus/gui/control.py:326
+#: src/apricus/gui/control.py:330
 msgid "Please choose a HTML file"
 msgstr "Elige un archivo HTML"
 
-#: src/apricus/gui/control.py:434
-msgid "Failed to access {url}. Error:\n{error}"
+#: src/apricus/gui/control.py:438
+#, python-brace-format
+msgid ""
+"Failed to access {url}. Error:\n"
+"{error}"
 msgstr ""
 "No se pudo acceder a {url}. Error:\n"
 "{error}"
 
-#: src/apricus/gui/control.py:439
+#: src/apricus/gui/control.py:443
+#, python-brace-format
 msgid "Failed to access {url}. Error code: {code}"
 msgstr "No se pudo acceder a {url}. Código de error: {code}"
 
-#: src/apricus/gui/control.py:455
-msgid "Failed to stream {url}. Error:\n{error}"
+#: src/apricus/gui/control.py:459
+#, python-brace-format
+msgid ""
+"Failed to stream {url}. Error:\n"
+"{error}"
 msgstr ""
 "No se pudo reproducir {url} en continuo. Error:\n"
 "{error}"
 
-#: src/apricus/gui/control.py:533
+#: src/apricus/gui/control.py:536
+#, fuzzy
+msgid "Choose a video folder to begin"
+msgstr "Elegir la carpeta de vídeos"
+
+#: src/apricus/gui/control.py:538
+#, python-brace-format
 msgid "Videos in {folder} ({count})"
 msgstr "Vídeos en {folder} ({count})"
 
-#: src/apricus/gui/control.py:537
+#: src/apricus/gui/control.py:542
+#, python-brace-format
 msgid "No videos in {folder}"
 msgstr "Ningún vídeo en {folder}"
 
+#.
 #: src/apricus/menu.py:97
 msgid "Show Apricus"
 msgstr "Mostrar Apricus"
 
+#.
 #: src/apricus/menu.py:100
 msgid "Toggle Mute Audio"
 msgstr "Activar/silenciar audio"
 
+#.
 #: src/apricus/menu.py:103 src/apricus/assets/control.ui:818
 msgid "Toggle Play/Pause"
 msgstr "Reproducir/Pausar"
 
+#.
 #: src/apricus/menu.py:106
 msgid "Reload"
 msgstr "Recargar"
 
+#.
 #: src/apricus/menu.py:109 src/apricus/assets/control.ui:837
 msgid "I'm Feeling Lucky"
 msgstr "Voy a tener suerte"
 
+#.
 #: src/apricus/menu.py:112 src/apricus/assets/control.ui:255
 msgid "Quit Apricus"
 msgstr "Salir de Apricus"
@@ -133,23 +166,33 @@ msgstr "Inicio automático al iniciar sesión"
 
 #: src/apricus/assets/control.ui:98
 msgid "Video frame can be applied as system wallpaper, look great in GNOME"
-msgstr "Un fotograma del vídeo puede usarse como fondo del sistema, queda genial en GNOME"
+msgstr ""
+"Un fotograma del vídeo puede usarse como fondo del sistema, queda genial en "
+"GNOME"
 
 #: src/apricus/assets/control.ui:100
 msgid "Apply static wallpaper"
 msgstr "Aplicar fondo estático"
 
 #: src/apricus/assets/control.ui:113
-msgid "Automatically pauses playback when maximized window or full screen mode is detected"
-msgstr "Pausa automáticamente cuando se detecta una ventana maximizada o a pantalla completa"
+msgid ""
+"Automatically pauses playback when maximized window or full screen mode is "
+"detected"
+msgstr ""
+"Pausa automáticamente cuando se detecta una ventana maximizada o a pantalla "
+"completa"
 
 #: src/apricus/assets/control.ui:115
 msgid "Pause when maximized window"
 msgstr "Pausar si hay ventana maximizada"
 
 #: src/apricus/assets/control.ui:128
-msgid "Automatically mutes playback when maximized window or full screen mode is detected"
-msgstr "Silencia automáticamente cuando se detecta una ventana maximizada o a pantalla completa"
+msgid ""
+"Automatically mutes playback when maximized window or full screen mode is "
+"detected"
+msgstr ""
+"Silencia automáticamente cuando se detecta una ventana maximizada o a "
+"pantalla completa"
 
 #: src/apricus/assets/control.ui:130
 msgid "Mute when maximized window"
@@ -168,7 +211,9 @@ msgid "About Apricus"
 msgstr "Acerca de Apricus"
 
 #: src/apricus/assets/control.ui:300
-msgid "<span size=\"x-large\"><b>Local Video</b></span>\nVideos located in the video folder"
+msgid ""
+"<span size=\"x-large\"><b>Local Video</b></span>\n"
+"Videos located in the video folder"
 msgstr ""
 "<span size=\"x-large\"><b>Vídeo local</b></span>\n"
 "Vídeos en la carpeta de vídeos"
@@ -194,7 +239,9 @@ msgid "Local Video"
 msgstr "Vídeo local"
 
 #: src/apricus/assets/control.ui:451
-msgid "<span size=\"x-large\"><b>Streaming</b></span>\nVideos from streaming services"
+msgid ""
+"<span size=\"x-large\"><b>Streaming</b></span>\n"
+"Videos from streaming services"
 msgstr ""
 "<span size=\"x-large\"><b>Streaming</b></span>\n"
 "Vídeos de servicios de streaming"
@@ -204,12 +251,16 @@ msgid "<b>Streaming URL</b>"
 msgstr "<b>URL de streaming</b>"
 
 #: src/apricus/assets/control.ui:527
-msgid "💡	This feature uses <i>yt-dlp</i> as backend"
-msgstr "💡	Esta función usa <i>yt-dlp</i> como motor"
+msgid "💡\tThis feature uses <i>yt-dlp</i> as backend"
+msgstr "💡\tEsta función usa <i>yt-dlp</i> como motor"
 
 #: src/apricus/assets/control.ui:541
-msgid "😉	Try playing any YouTube video! <a href=\"https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md\">Supported sites (yt-dlp)</a>"
-msgstr "😉	¡Prueba con cualquier vídeo de YouTube! <a href=\"https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md\">Sitios compatibles (yt-dlp)</a>"
+msgid ""
+"😉\tTry playing any YouTube video! <a href=\"https://github.com/yt-dlp/yt-"
+"dlp/blob/master/supportedsites.md\">Supported sites (yt-dlp)</a>"
+msgstr ""
+"😉\t¡Prueba con cualquier vídeo de YouTube! <a href=\"https://github.com/yt-"
+"dlp/yt-dlp/blob/master/supportedsites.md\">Sitios compatibles (yt-dlp)</a>"
 
 #: src/apricus/assets/control.ui:556 src/apricus/assets/control.ui:683
 msgid "Hint"
@@ -220,7 +271,9 @@ msgid "Streaming"
 msgstr "Streaming"
 
 #: src/apricus/assets/control.ui:591
-msgid "<span size=\"x-large\"><b>Web Page</b></span>\nSet a web page as wallpaper"
+msgid ""
+"<span size=\"x-large\"><b>Web Page</b></span>\n"
+"Set a web page as wallpaper"
 msgstr ""
 "<span size=\"x-large\"><b>Página web</b></span>\n"
 "Establecer una página web como fondo"
@@ -230,10 +283,12 @@ msgid "<b>Web Page URL</b>"
 msgstr "<b>URL de página web</b>"
 
 #: src/apricus/assets/control.ui:667
-msgid "💡	Check this website for some really amazing examples!\n	<a href=\"https://alteredqualia.com/\">https://alteredqualia.com/</a>"
+msgid ""
+"💡\tCheck this website for some really amazing examples!\n"
+"\t<a href=\"https://alteredqualia.com/\">https://alteredqualia.com/</a>"
 msgstr ""
-"💡	¡Mira este sitio para ver ejemplos increíbles!\n"
-"	<a href=\"https://alteredqualia.com/\">https://alteredqualia.com/</a>"
+"💡\t¡Mira este sitio para ver ejemplos increíbles!\n"
+"\t<a href=\"https://alteredqualia.com/\">https://alteredqualia.com/</a>"
 
 #: src/apricus/assets/control.ui:699
 msgid "<b>Local Web Page</b>"

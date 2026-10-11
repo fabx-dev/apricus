@@ -4,7 +4,7 @@ import os
 import sys
 
 from apricus import perf, server  # perf first: import captures process-start T0
-from apricus.commons import LOGGER_NAME, VIDEO_WALLPAPER_DIR
+from apricus.commons import LOGGER_NAME
 from apricus.utils import (
     is_flatpak,
     is_gnome,
@@ -81,9 +81,6 @@ def main(version="devel", pkgdatadir="/usr/share/apricus", localedir="/usr/share
     logger.info(f"Apricus v{version}\n{sys_info_str}")
     logger.info(f"[Args] {vars(args)}")
     perf.mark("main: imports done")
-
-    # Make video folder if not exist
-    os.makedirs(VIDEO_WALLPAPER_DIR, exist_ok=True)
 
     # Clear sys.argv as it has influence to the Gtk.Application
     sys.argv = [sys.argv[0]]

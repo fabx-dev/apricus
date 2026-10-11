@@ -9,6 +9,7 @@ from apricus.utils import ConfigUtil, get_video_paths
 
 def test_resolve_default_when_unset(tmp_path, monkeypatch):
     monkeypatch.setattr(commons, "VIDEO_WALLPAPER_DIR", str(tmp_path))
+    # legacy folder exists -> compatibility fallback
     assert resolve_video_dir({}) == str(tmp_path)
     assert resolve_video_dir({CONFIG_KEY_VIDEO_DIR: None}) == str(tmp_path)
 
@@ -23,6 +24,17 @@ def test_resolve_falls_back_when_custom_missing(tmp_path, monkeypatch):
     monkeypatch.setattr(commons, "VIDEO_WALLPAPER_DIR", str(tmp_path))
     missing = tmp_path / "gone"
     assert resolve_video_dir({CONFIG_KEY_VIDEO_DIR: str(missing)}) == str(tmp_path)
+
+
+def test_resolve_none_when_nothing_chosen(tmp_path, monkeypatch):
+    monkeypatch.setattr(commons, "VIDEO_WALLPAPER_DIR", str(tmp_path / "nope"))
+    assert resolve_video_dir({}) is None
+    assert resolve_video_dir({CONFIG_KEY_VIDEO_DIR: None}) is None
+    assert resolve_video_dir({CONFIG_KEY_VIDEO_DIR: str(tmp_path / "gone")}) is None
+
+
+def test_get_video_paths_none_returns_empty():
+    assert get_video_paths(None) == []
 
 
 def test_old_config_without_key_is_not_wiped(tmp_path, monkeypatch):

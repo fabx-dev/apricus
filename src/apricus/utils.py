@@ -31,7 +31,6 @@ from apricus.commons import (
     LOGGER_NAME,
     MODE_VIDEO,
     TRANSLATION_DOMAIN,
-    VIDEO_WALLPAPER_DIR,
 )
 
 logger = logging.getLogger(LOGGER_NAME)
@@ -213,11 +212,12 @@ def setup_systemd_autostart(enable):
 
 
 def get_video_paths(video_dir=None):
-    directory = video_dir or VIDEO_WALLPAPER_DIR
     file_list = []
-    if not os.path.isdir(directory):
-        logger.warning(f"[Utils] Video folder missing: {directory}")
+    if not video_dir or not os.path.isdir(video_dir):
+        if video_dir:
+            logger.warning(f"[Utils] Video folder missing: {video_dir}")
         return []
+    directory = video_dir
     # Flat scan only: subdirectories are ignored on purpose, so choosing a
     # parent folder shows exactly its own videos and nothing else.
     for filename in os.listdir(directory):
