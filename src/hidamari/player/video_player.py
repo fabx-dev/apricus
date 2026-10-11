@@ -687,7 +687,8 @@ class VideoPlayer(BasePlayer):
             duration = 0
         # Find the golden ratio
         ss = time.strftime("%H:%M:%S", time.gmtime(duration / 3.14))
-        tmp_path = f"{cached}.tmp-{os.getpid()}"
+        # Keep a proper image extension so ffmpeg infers the muxer.
+        tmp_path = f"{cached}.tmp.png"
         ret = subprocess.run(
             [
                 "ffmpeg",
