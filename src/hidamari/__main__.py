@@ -36,6 +36,8 @@ def main(version="devel", pkgdatadir="/usr/share/hidamari", localedir="/usr/shar
     # Setup logger
     if args.debug:
         logging.basicConfig(level=logging.DEBUG)
+        # Propagate to forkserver children (they are fresh interpreters).
+        os.environ["HIDAMARI_DEBUG"] = "1"
 
     # Log system information
     sys_info = []

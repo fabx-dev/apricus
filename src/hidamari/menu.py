@@ -13,7 +13,7 @@ from gi.repository import GLib, Gtk
 from pydbus import SessionBus
 
 from hidamari.commons import DBUS_NAME_SERVER, LOGGER_NAME, MODE_VIDEO, MODE_WEBPAGE, PROJECT
-from hidamari.utils import init_translations
+from hidamari.utils import init_translations, setup_logging
 
 logger = logging.getLogger(LOGGER_NAME)
 
@@ -125,6 +125,7 @@ def build_menu(mode):
 
 def show_systray_icon(mode, localedir="/usr/share/locale"):
     setproctitle.setproctitle(mp.current_process().name)
+    setup_logging()
     init_translations(localedir)
 
     menu = build_menu(mode)

@@ -23,7 +23,7 @@ from hidamari.commons import (
 )
 from hidamari.menu import build_menu
 from hidamari.player.base_player import BasePlayer
-from hidamari.utils import ConfigUtil
+from hidamari.utils import ConfigUtil, setup_logging
 
 logger = logging.getLogger(LOGGER_NAME)
 
@@ -179,6 +179,7 @@ class WebPlayer(BasePlayer):
 
 
 def main():
+    setup_logging()
     setup_render_device()
     bus = SessionBus()
     app = WebPlayer()

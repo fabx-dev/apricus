@@ -43,6 +43,7 @@ from hidamari.utils import (
     is_flatpak,
     is_gnome,
     is_wayland,
+    setup_logging,
 )
 from hidamari.yt_utils import get_best_audio, get_formats, get_optimal_video
 
@@ -794,6 +795,7 @@ def main():
     import os
 
     faulthandler.enable()
+    setup_logging()
     logger.info(f"[Player] pid={os.getpid()}")
     bus = SessionBus()
     app = VideoPlayer()

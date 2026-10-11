@@ -47,6 +47,7 @@ from hidamari.utils import (
     is_gnome,
     is_wayland,
     setup_autostart,
+    setup_logging,
 )
 
 logging.basicConfig(level=logging.DEBUG)
@@ -551,6 +552,7 @@ def _find_gresource(pkgdatadir):
 
 
 def main(version="devel", pkgdatadir="/usr/share/hidamari", localedir="/usr/share/locale"):
+    setup_logging()
     init_translations(localedir)
     gresource = _find_gresource(pkgdatadir)
     if gresource is None:

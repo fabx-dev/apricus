@@ -31,6 +31,18 @@ from hidamari.commons import (
 logger = logging.getLogger(LOGGER_NAME)
 
 
+def setup_logging():
+    """Configure logging in forkserver-spawned children (player/gui/systray).
+
+    The parent configures logging in `__main__`, but forkserver children are
+    fresh interpreters: without this, all their INFO/DEBUG logs are silently
+    dropped and only WARNING+ surfaces via the last-resort handler. Debug
+    mode propagates through the HIDAMARI_DEBUG env var (see `__main__`).
+    """
+    level = logging.DEBUG if os.environ.get("HIDAMARI_DEBUG") == "1" else logging.INFO
+    logging.basicConfig(level=level)
+
+
 def init_translations(localedir):
     """Bind the gettext text domain for the current process.
 
