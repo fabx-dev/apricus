@@ -19,7 +19,7 @@ from gi.repository import Gdk, Gio, GLib, Gtk
 from PIL import Image, ImageFilter
 from pydbus import SessionBus
 
-from hidamari import perf
+from hidamari import mediacache, perf
 from hidamari.commons import (
     CONFIG_DIR,
     CONFIG_KEY_DATA_SOURCE,
@@ -489,37 +489,16 @@ class VideoPlayer(BasePlayer):
                 key_of[id(gdk_monitor)] = info["key"]
 
         if self.mode == MODE_VIDEO:
-            # Get the dimension of the video
+            # Video dimensions come from the sidecar cache: a stat() on hit,
+            # a single ffprobe per new/changed video on miss.
             video_width, video_height = {}, {}
-            try:
-                for monitor, video in data_source.items():
-                    # fallback to Default video
-                    if len(video) == 0:
-                        video = data_source["Default"]
-                    dimension = subprocess.check_output(
-                        [
-                            "ffprobe",
-                            "-v",
-                            "error",
-                            "-select_streams",
-                            "v:0",
-                            "-show_entries",
-                            "stream=width,height",
-                            "-of",
-                            "csv=s=x:p=0",
-                            video,
-                        ],
-                        shell=False,
-                        encoding="UTF-8",
-                        timeout=20,
-                    ).replace("\n", "")
-                    dimension = dimension.split("x")
-                    video_width[monitor] = int(dimension[0])
-                    video_height[monitor] = int(dimension[1])
-            except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
-                for monitor, _video in data_source.items():
-                    video_width.setdefault(monitor, None)
-                    video_height.setdefault(monitor, None)
+            for monitor, video in data_source.items():
+                # fallback to Default video
+                if len(video) == 0:
+                    video = data_source["Default"]
+                width, height, _duration = mediacache.probe_video(video)
+                video_width[monitor] = width
+                video_height[monitor] = height
 
             for monitor, window in self.windows.items():
                 mkey = key_of.get(id(monitor), monitor.get_model())
@@ -666,24 +645,8 @@ class VideoPlayer(BasePlayer):
         thread.start()
 
     def _generate_static_wallpaper(self, video, cached, blur_radius, token):
-        try:
-            duration = float(
-                subprocess.check_output(
-                    [
-                        "ffprobe",
-                        "-v",
-                        "error",
-                        "-show_entries",
-                        "format=duration",
-                        "-of",
-                        "default=noprint_wrappers=1:nokey=1",
-                        video,
-                    ],
-                    shell=False,
-                    timeout=20,
-                )
-            )
-        except (subprocess.CalledProcessError, subprocess.TimeoutExpired, ValueError):
+        _width, _height, duration = mediacache.probe_video(video)
+        if duration is None:
             duration = 0
         # Find the golden ratio
         ss = time.strftime("%H:%M:%S", time.gmtime(duration / 3.14))
