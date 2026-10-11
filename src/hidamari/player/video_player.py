@@ -515,7 +515,8 @@ class VideoPlayer(BasePlayer):
                 if not monitor.is_primary():
                     media.add_option("no-audio")
                 window.set_media(media)
-                window.set_position(0.0)
+                # No set_position(0.0): a freshly set media starts at 0, and the
+                # extra seek costs a demuxer round-trip on the startup path.
                 dims = (video_width.get(srckey), video_height.get(srckey))
                 if dims == (None, None):
                     dims = (video_width.get("Default"), video_height.get("Default"))
@@ -539,7 +540,6 @@ class VideoPlayer(BasePlayer):
                 else:
                     # `get_optimal_video` now might return video with audio.
                     media.add_option("no-audio")
-                window.set_position(0.0)
                 window.centercrop(video_width, video_height)
         else:
             raise ValueError("Invalid mode")
@@ -609,13 +609,17 @@ class VideoPlayer(BasePlayer):
                 primary_monitor = monitor
                 break
         if primary_monitor:
+            primary_window = self.windows[primary_monitor]
+            primary_pos = primary_window.get_position()
+            primary_playing = primary_window.is_playing()
             for monitor, window in self.windows.items():
                 if monitor == primary_monitor:
                     continue
-                # `set_position()` method require the playback to be enabled before calling
+                # `set_position()` requires the playback to be enabled before calling.
                 window.play()
-                window.set_position(self.windows[primary_monitor].get_position())
-                window.play() if self.windows[primary_monitor].is_playing() else window.pause()
+                window.set_position(primary_pos)
+                if not primary_playing:
+                    window.pause()
 
     @staticmethod
     def _static_cache_path(video_path):
