@@ -83,12 +83,19 @@ CONFIG_TEMPLATE = {
 
 from hidamari.monitor import MonitorInfo
 
-# initialize config according to monitors
-info = MonitorInfo()
-monitors = info.monitors()
-data_sources = {}
-for monitor in monitors:
-    data_sources[monitor["key"]] = ""
-data_sources["Default"] = ""
 
-CONFIG_TEMPLATE[CONFIG_KEY_DATA_SOURCE] = data_sources
+# initialize config according to monitors.
+# Must not require a display at import time (headless tools/tests import
+# this module); missing monitors are backfilled by _checkMissingMonitors.
+def _default_data_sources():
+    data_sources = {}
+    try:
+        for monitor in MonitorInfo().monitors():
+            data_sources[monitor["key"]] = ""
+    except Exception:
+        pass
+    data_sources["Default"] = ""
+    return data_sources
+
+
+CONFIG_TEMPLATE[CONFIG_KEY_DATA_SOURCE] = _default_data_sources()

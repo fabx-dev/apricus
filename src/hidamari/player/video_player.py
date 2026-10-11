@@ -509,11 +509,12 @@ class VideoPlayer(BasePlayer):
                         ],
                         shell=False,
                         encoding="UTF-8",
+                        timeout=20,
                     ).replace("\n", "")
                     dimension = dimension.split("x")
                     video_width[monitor] = int(dimension[0])
                     video_height[monitor] = int(dimension[1])
-            except subprocess.CalledProcessError:
+            except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
                 for monitor, _video in data_source.items():
                     video_width.setdefault(monitor, None)
                     video_height.setdefault(monitor, None)
@@ -654,9 +655,10 @@ class VideoPlayer(BasePlayer):
                         self.data_source["Default"],
                     ],
                     shell=False,
+                    timeout=20,
                 )
             )
-        except subprocess.CalledProcessError:
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
             duration = 0
         # Find the golden ratio
         ss = time.strftime("%H:%M:%S", time.gmtime(duration / 3.14))
