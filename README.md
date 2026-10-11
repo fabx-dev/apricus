@@ -95,9 +95,9 @@ Run it (via the dev env, in debug mode):
 make run
 ```
 
-Pick videos from the GUI. The default library is `~/Video/Hidamari` (or
-`~/Videos/Hidamari`, kept from Hidamari for compatibility); point Apricus at
-any folder with the *Choose* button in the control panel.
+Pick videos from the GUI. On first run Apricus asks you to choose a video
+library folder — nothing is assumed or auto-created. (An existing Hidamari
+library is reused automatically for compatibility.)
 
 A Flatpak (`io.github.fabx_dev.Apricus`) builds locally with `make flatpak`;
 Flathub publishing is planned.
