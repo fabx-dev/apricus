@@ -6,6 +6,8 @@ import sys
 import time
 
 from hidamari import perf
+from hidamari.commons import CONFIG_DIR
+from hidamari.player.video_player import VideoPlayer
 
 
 def test_start_time_is_process_start():
@@ -29,3 +31,10 @@ def test_t0_propagates_via_env_to_children():
     ).stdout.split()
     assert abs(float(out[0]) - t0) < 0.001
     assert abs(float(out[1]) - 42.0) < 5.0
+
+
+def test_static_cache_path_is_stable_and_distinct():
+    a = VideoPlayer._static_cache_path("/v/a.mp4")
+    assert a == VideoPlayer._static_cache_path("/v/a.mp4")
+    assert a != VideoPlayer._static_cache_path("/v/b.mp4")
+    assert a.startswith(CONFIG_DIR) and a.endswith(".png")

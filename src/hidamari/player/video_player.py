@@ -1,11 +1,12 @@
 import ctypes
 import glob
+import hashlib
 import logging
 import os
 import pathlib
-import random
 import subprocess
 import sys
+import threading
 import time
 from threading import Timer
 
@@ -14,7 +15,7 @@ import gi
 gi.require_version("Gtk", "3.0")
 gi.require_version("Gdk", "3.0")
 import vlc
-from gi.repository import Gdk, Gio, Gtk
+from gi.repository import Gdk, Gio, GLib, Gtk
 from PIL import Image, ImageFilter
 from pydbus import SessionBus
 
@@ -637,11 +638,34 @@ class VideoPlayer(BasePlayer):
                 window.set_position(self.windows[primary_monitor].get_position())
                 window.play() if self.windows[primary_monitor].is_playing() else window.pause()
 
+    @staticmethod
+    def _static_cache_path(video_path):
+        """Deterministic cache file for a video (stable across restarts)."""
+        digest = hashlib.sha1(os.path.abspath(video_path).encode()).hexdigest()[:16]
+        return os.path.join(CONFIG_DIR, f"static-{digest}.png")
+
     def set_static_wallpaper(self):
         # Currently for GNOME only
         if not is_gnome():
             return
-        # Get the duration of the video
+        video = self.data_source["Default"]
+        cached = self._static_cache_path(video)
+        if os.path.isfile(cached):
+            # Instant path: show last frame immediately, no ffmpeg involved.
+            perf.mark("player: static cache hit")
+            self._apply_static_wallpaper(cached)
+        else:
+            perf.mark("player: static cache miss")
+        # Refresh the frame in background; applied on completion if still current.
+        self._static_token = getattr(self, "_static_token", 0) + 1
+        thread = threading.Thread(
+            target=self._generate_static_wallpaper,
+            args=(video, cached, self.config["static_wallpaper_blur_radius"], self._static_token),
+            daemon=True,
+        )
+        thread.start()
+
+    def _generate_static_wallpaper(self, video, cached, blur_radius, token):
         try:
             duration = float(
                 subprocess.check_output(
@@ -653,20 +677,17 @@ class VideoPlayer(BasePlayer):
                         "format=duration",
                         "-of",
                         "default=noprint_wrappers=1:nokey=1",
-                        self.data_source["Default"],
+                        video,
                     ],
                     shell=False,
                     timeout=20,
                 )
             )
-        except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired, ValueError):
             duration = 0
         # Find the golden ratio
         ss = time.strftime("%H:%M:%S", time.gmtime(duration / 3.14))
-        # Extract the frame
-        static_wallpaper_path = os.path.join(
-            CONFIG_DIR, f"static-{random.randint(0, 999999):06d}.png"
-        )
+        tmp_path = f"{cached}.tmp-{os.getpid()}"
         ret = subprocess.run(
             [
                 "ffmpeg",
@@ -674,54 +695,71 @@ class VideoPlayer(BasePlayer):
                 "-ss",
                 ss,
                 "-i",
-                self.data_source["Default"],
+                video,
                 "-vframes",
                 "1",
-                static_wallpaper_path,
+                tmp_path,
             ],
             shell=False,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.STDOUT,
         )
-        if ret.returncode == 0 and os.path.isfile(static_wallpaper_path):
-            blur_wallpaper = Image.open(static_wallpaper_path)
-            blur_wallpaper = blur_wallpaper.filter(
-                ImageFilter.GaussianBlur(self.config["static_wallpaper_blur_radius"])
-            )
-            blur_wallpaper.save(static_wallpaper_path)
-            static_wallpaper_uri = pathlib.Path(static_wallpaper_path).resolve().as_uri()
-            if is_flatpak():
+        if ret.returncode != 0 or not os.path.isfile(tmp_path):
+            logger.warning("[StaticWallpaper] frame extraction failed")
+            return
+        try:
+            blur_wallpaper = Image.open(tmp_path)
+            blur_wallpaper = blur_wallpaper.filter(ImageFilter.GaussianBlur(blur_radius))
+            blur_wallpaper.save(tmp_path)
+            os.replace(tmp_path, cached)
+        except OSError as e:
+            logger.warning(f"[StaticWallpaper] {e}")
+            return
+        finally:
+            if os.path.isfile(tmp_path) and tmp_path != cached:
                 try:
-                    subprocess.run(
-                        [
-                            "flatpak-spawn",
-                            "--host",
-                            "gsettings",
-                            "set",
-                            "org.gnome.desktop.background",
-                            "picture-uri",
-                            static_wallpaper_uri,
-                        ],
-                        shell=False,
-                    )
-                    subprocess.run(
-                        [
-                            "flatpak-spawn",
-                            "--host",
-                            "gsettings",
-                            "set",
-                            "org.gnome.desktop.background",
-                            "picture-uri-dark",
-                            static_wallpaper_uri,
-                        ],
-                        shell=False,
-                    )
-                except subprocess.CalledProcessError as e:
-                    logger.error(f"[StaticWallpaper] {e}")
-            else:
-                gso = Gio.Settings.new("org.gnome.desktop.background")
-                gso.set_string("picture-uri", static_wallpaper_uri)
-                gso.set_string("picture-uri-dark", static_wallpaper_uri)
+                    os.remove(tmp_path)
+                except OSError:
+                    pass
+        perf.mark("player: static cache refreshed")
+        if token == getattr(self, "_static_token", None):
+            GLib.idle_add(self._apply_static_wallpaper, cached)
+
+    def _apply_static_wallpaper(self, static_wallpaper_path):
+        static_wallpaper_uri = pathlib.Path(static_wallpaper_path).resolve().as_uri()
+        if is_flatpak():
+            try:
+                subprocess.run(
+                    [
+                        "flatpak-spawn",
+                        "--host",
+                        "gsettings",
+                        "set",
+                        "org.gnome.desktop.background",
+                        "picture-uri",
+                        static_wallpaper_uri,
+                    ],
+                    shell=False,
+                )
+                subprocess.run(
+                    [
+                        "flatpak-spawn",
+                        "--host",
+                        "gsettings",
+                        "set",
+                        "org.gnome.desktop.background",
+                        "picture-uri-dark",
+                        static_wallpaper_uri,
+                    ],
+                    shell=False,
+                )
+            except subprocess.CalledProcessError as e:
+                logger.error(f"[StaticWallpaper] {e}")
+        else:
+            gso = Gio.Settings.new("org.gnome.desktop.background")
+            gso.set_string("picture-uri", static_wallpaper_uri)
+            gso.set_string("picture-uri-dark", static_wallpaper_uri)
+        return False
 
     def set_original_wallpaper(self):
         # Currently for GNOME only
@@ -761,9 +799,22 @@ class VideoPlayer(BasePlayer):
             gso = Gio.Settings.new("org.gnome.desktop.background")
             gso.set_string("picture-uri", self.original_wallpaper_uri)
             gso.set_string("picture-uri-dark", self.original_wallpaper_uri_dark)
-        # Purge the generated static wallpaper (and leftover if any)
+        # Prune stale static-wallpaper caches, keeping the ones for the
+        # currently configured videos (instant wallpaper on next login).
+        # Legacy random-named caches (static-XXXXXX.png) match nothing and go.
+        keep = set()
+        try:
+            for video in self.data_source.values():
+                if video:
+                    keep.add(os.path.abspath(self._static_cache_path(video)))
+        except AttributeError:
+            pass
         for f in glob.glob(os.path.join(CONFIG_DIR, "static-*.png")):
-            os.remove(f)
+            if os.path.abspath(f) not in keep:
+                try:
+                    os.remove(f)
+                except OSError as e:
+                    logger.warning(f"[StaticWallpaper] {e}")
 
     def reload_config(self):
         self.config = ConfigUtil().load()
