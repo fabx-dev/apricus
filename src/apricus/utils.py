@@ -22,6 +22,7 @@ from apricus.commons import (
     CONFIG_DIR,
     CONFIG_KEY_DATA_SOURCE,
     CONFIG_KEY_MUTE_WHEN_MAXIMIZED,
+    CONFIG_KEY_VIDEO_DIR,
     CONFIG_PATH,
     CONFIG_TEMPLATE,
     CONFIG_VERSION,
@@ -210,10 +211,16 @@ def setup_systemd_autostart(enable):
         return False
 
 
-def get_video_paths():
+def get_video_paths(video_dir=None):
+    directory = video_dir or VIDEO_WALLPAPER_DIR
     file_list = []
-    for filename in os.listdir(VIDEO_WALLPAPER_DIR):
-        filepath = os.path.join(VIDEO_WALLPAPER_DIR, filename)
+    try:
+        entries = os.listdir(directory)
+    except OSError as e:
+        logger.warning(f"[Utils] Cannot list {directory}: {e}")
+        return []
+    for filename in entries:
+        filepath = os.path.join(directory, filename)
         file = Gio.file_new_for_path(filepath)
         info = file.query_info("standard::content-type", Gio.FileQueryInfoFlags.NONE, None)
         mime_type = info.get_content_type()
@@ -569,6 +576,9 @@ class ConfigUtil:
                     # migration to version 4 for data_source type change
                     if config.get("version") <= 3 and CONFIG_VERSION >= 4:
                         self._migrateV3To4(config)
+                    # video_dir was added after v4 without a version bump:
+                    # default it instead of wiping the whole config.
+                    config.setdefault(CONFIG_KEY_VIDEO_DIR, None)
                     self._migrateLegacyMonitorKeys(config)
                     self._checkDefaultSource(config)
                     self._checkMissingMonitors(config, CONFIG_TEMPLATE)

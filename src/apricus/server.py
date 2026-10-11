@@ -28,6 +28,7 @@ from apricus.commons import (
     MODE_STREAM,
     MODE_VIDEO,
     MODE_WEBPAGE,
+    resolve_video_dir,
 )
 from apricus.gui.control import main as gui_main
 from apricus.menu import show_systray_icon
@@ -225,8 +226,9 @@ class ApricusServer:
     def feeling_lucky(self):
         """Random play a video from the directory"""
         monitors = Monitors().get_monitors()
+        video_dir = resolve_video_dir(self.config)
         for monitor in monitors:
-            file_list = get_video_paths()
+            file_list = get_video_paths(video_dir)
             # Remove current data source from the random selection
             current = self.config[CONFIG_KEY_DATA_SOURCE].get(monitor)
             if current in file_list:

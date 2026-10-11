@@ -72,6 +72,7 @@ CONFIG_KEY_FADE_DURATION_SEC = "fade_duration_sec"
 CONFIG_KEY_FADE_INTERVAL = "fade_interval"
 CONFIG_KEY_SYSTRAY = "is_show_systray"
 CONFIG_KEY_FIRST_TIME = "is_first_time"
+CONFIG_KEY_VIDEO_DIR = "video_dir"
 CONFIG_TEMPLATE = {
     CONFIG_KEY_VERSION: CONFIG_VERSION,
     CONFIG_KEY_MODE: MODE_NULL,
@@ -86,6 +87,9 @@ CONFIG_TEMPLATE = {
     CONFIG_KEY_FADE_INTERVAL: 0.1,
     CONFIG_KEY_SYSTRAY: False,
     CONFIG_KEY_FIRST_TIME: True,
+    # Custom video library folder chosen by the user. None means the default
+    # location (~/Video(s)/Hidamari, kept from Hidamari for compatibility).
+    CONFIG_KEY_VIDEO_DIR: None,
 }
 
 from apricus.monitor import MonitorInfo
@@ -106,3 +110,19 @@ def _default_data_sources():
 
 
 CONFIG_TEMPLATE[CONFIG_KEY_DATA_SOURCE] = _default_data_sources()
+
+
+def resolve_video_dir(config=None):
+    """Return the effective video library folder, creating it if needed.
+
+    Uses config["video_dir"] when set to an existing directory, otherwise
+    the default location. Never raises: falls back to the default.
+    """
+    configured = (config or {}).get(CONFIG_KEY_VIDEO_DIR)
+    if configured and os.path.isdir(configured):
+        return os.path.abspath(configured)
+    try:
+        os.makedirs(VIDEO_WALLPAPER_DIR, exist_ok=True)
+    except OSError:
+        pass
+    return VIDEO_WALLPAPER_DIR

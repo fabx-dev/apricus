@@ -27,6 +27,7 @@ from apricus.commons import (
     CONFIG_KEY_MUTE_WHEN_MAXIMIZED,
     CONFIG_KEY_PAUSE_WHEN_MAXIMIZED,
     CONFIG_KEY_STATIC_WALLPAPER,
+    CONFIG_KEY_VIDEO_DIR,
     CONFIG_KEY_VOLUME,
     CONFIG_PATH,
     DBUS_NAME_SERVER,
@@ -36,7 +37,7 @@ from apricus.commons import (
     MODE_VIDEO,
     MODE_WEBPAGE,
     TRANSLATION_DOMAIN,
-    VIDEO_WALLPAPER_DIR,
+    resolve_video_dir,
 )
 from apricus.gui.gui_utils import debounce, get_thumbnail
 from apricus.monitor import Monitors
@@ -143,8 +144,11 @@ class ControlPanel(Gtk.Application):
         actions = [
             (
                 "local_video_dir",
-                lambda *_: subprocess.run(["xdg-open", os.path.realpath(VIDEO_WALLPAPER_DIR)]),
+                lambda *_: subprocess.run(
+                    ["xdg-open", os.path.realpath(resolve_video_dir(self.config))]
+                ),
             ),
+            ("local_video_choose_dir", self.on_choose_video_dir),
             ("local_video_refresh", self._reload_icon_view),
             ("local_video_apply", self.on_local_video_apply),
             ("local_web_page_apply", self.on_local_web_page_apply),
@@ -250,6 +254,27 @@ class ControlPanel(Gtk.Application):
             buttons=Gtk.ButtonsType.OK,
         )
         dialog.run()
+        dialog.destroy()
+
+    def on_choose_video_dir(self, *_args):
+        dialog = Gtk.FileChooserDialog(
+            title=_("Choose video folder"),
+            parent=self.window,
+            action=Gtk.FileChooserAction.SELECT_FOLDER,
+        )
+        dialog.add_buttons(
+            _("Cancel"),
+            Gtk.ResponseType.CANCEL,
+            _("Choose"),
+            Gtk.ResponseType.OK,
+        )
+        dialog.set_current_folder(resolve_video_dir(self.config))
+        if dialog.run() == Gtk.ResponseType.OK:
+            chosen = dialog.get_filename()
+            logger.info(f"[GUI] Video folder: {chosen}")
+            self.config[CONFIG_KEY_VIDEO_DIR] = chosen
+            self._save_config()
+            self._reload_icon_view()
         dialog.destroy()
 
     def on_local_video_apply(self, *_args):
@@ -525,7 +550,7 @@ class ControlPanel(Gtk.Application):
         toggle_mute.set_state = self.is_autostart
 
     def _reload_icon_view(self, *_):
-        self.video_paths = get_video_paths()
+        self.video_paths = get_video_paths(resolve_video_dir(self.config))
         list_store = Gtk.ListStore(GdkPixbuf.Pixbuf, str)
         self.icon_view: Gtk.IconView = self.builder.get_object("IconView")
         self.icon_view.set_pixbuf_column(0)
