@@ -404,6 +404,7 @@ Videos located in the video folder</property>
                     <property name="row-spacing">8</property>
                     <property name="column-spacing">8</property>
                     <property name="item-padding">8</property>
+                    <property name="selection-mode">multiple</property>
                   </object>
                 </child>
               </object>
@@ -414,22 +415,106 @@ Videos located in the video folder</property>
               </packing>
             </child>
             <child>
-              <object class="GtkButton" id="ButtonApply">
-                <property name="label" translatable="yes">Apply</property>
+              <object class="GtkBox">
                 <property name="visible">True</property>
-                <property name="can-focus">True</property>
-                <property name="receives-default">True</property>
-                <property name="halign">end</property>
-                <property name="action-name">app.local_video_apply</property>
-                <style>
-                  <class name="suggested-action"/>
-                </style>
+                <property name="can-focus">False</property>
+                <property name="spacing">6</property>
+                <child>
+                  <object class="GtkButton" id="ButtonApply">
+                    <property name="label" translatable="yes">Apply selected</property>
+                    <property name="visible">True</property>
+                    <property name="can-focus">True</property>
+                    <property name="receives-default">True</property>
+                    <property name="action-name">app.local_video_apply</property>
+                    <style>
+                      <class name="suggested-action"/>
+                    </style>
+                  </object>
+                  <packing>
+                    <property name="expand">False</property>
+                    <property name="fill">True</property>
+                    <property name="position">0</property>
+                  </packing>
+                </child>
+                <child>
+                  <object class="GtkButton" id="ButtonPlaylistAdd">
+                    <property name="visible">True</property>
+                    <property name="can-focus">True</property>
+                    <property name="label" translatable="yes">Add to playlist</property>
+                    <property name="tooltip-text" translatable="yes">Add the selected videos to the playlist queue</property>
+                    <property name="action-name">app.playlist_add_selected</property>
+                  </object>
+                  <packing>
+                    <property name="expand">False</property>
+                    <property name="fill">True</property>
+                    <property name="position">1</property>
+                  </packing>
+                </child>
+                <child>
+                  <object class="GtkButton" id="ButtonPlaylistAddAll">
+                    <property name="visible">True</property>
+                    <property name="can-focus">True</property>
+                    <property name="label" translatable="yes">Add all to playlist</property>
+                    <property name="tooltip-text" translatable="yes">Add every video in the library to the playlist queue</property>
+                    <property name="action-name">app.playlist_add_all</property>
+                  </object>
+                  <packing>
+                    <property name="expand">False</property>
+                    <property name="fill">True</property>
+                    <property name="position">2</property>
+                  </packing>
+                </child>
               </object>
               <packing>
                 <property name="expand">False</property>
                 <property name="fill">True</property>
-                <property name="pack-type">end</property>
                 <property name="position">2</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkRevealer" id="PlaylistRevealer">
+                <property name="visible">True</property>
+                <property name="can-focus">False</property>
+                <property name="transition-type">slide-down</property>
+                <property name="reveal-child">False</property>
+                <child>
+                  <object class="GtkBox">
+                    <property name="visible">True</property>
+                    <property name="can-focus">False</property>
+                    <property name="spacing">8</property>
+                    <child>
+                      <object class="GtkLabel" id="PlaylistConfirmLabel">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="label">Added to queue</property>
+                        <property name="xalign">0</property>
+                      </object>
+                      <packing>
+                        <property name="expand">True</property>
+                        <property name="fill">True</property>
+                        <property name="position">0</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="GtkButton" id="ButtonPlaylistShow">
+                        <property name="visible">True</property>
+                        <property name="can-focus">True</property>
+                        <property name="label" translatable="yes">View queue</property>
+                        <property name="action-name">app.playlist_show</property>
+                      </object>
+                      <packing>
+                        <property name="expand">False</property>
+                        <property name="fill">True</property>
+                        <property name="position">1</property>
+                      </packing>
+                    </child>
+                  </object>
+                </child>
+              </object>
+              <packing>
+                <property name="expand">False</property>
+                <property name="fill">True</property>
+                <property name="position">3</property>
               </packing>
             </child>
           </object>
@@ -778,7 +863,7 @@ Set a web page as wallpaper</property>
           </packing>
         </child>
         <child>
-          <object class="GtkBox">
+          <object class="GtkBox" id="PlaylistBox">
             <property name="visible">True</property>
             <property name="can-focus">False</property>
             <property name="orientation">vertical</property>
@@ -830,35 +915,7 @@ Muted loop over your videos</property>
                 <property name="visible">True</property>
                 <property name="can-focus">False</property>
                 <property name="spacing">6</property>
-                <child>
-                  <object class="GtkButton">
-                    <property name="visible">True</property>
-                    <property name="can-focus">True</property>
-                    <property name="label" translatable="yes">Add selected</property>
-                    <property name="tooltip-text" translatable="yes">Add the video selected in Local Video</property>
-                    <property name="action-name">app.playlist_add_selected</property>
-                  </object>
-                  <packing>
-                    <property name="expand">False</property>
-                    <property name="fill">True</property>
-                    <property name="position">0</property>
-                  </packing>
-                </child>
-                <child>
-                  <object class="GtkButton">
-                    <property name="visible">True</property>
-                    <property name="can-focus">True</property>
-                    <property name="label" translatable="yes">Add all</property>
-                    <property name="tooltip-text" translatable="yes">Add every video in the library</property>
-                    <property name="action-name">app.playlist_add_all</property>
-                  </object>
-                  <packing>
-                    <property name="expand">False</property>
-                    <property name="fill">True</property>
-                    <property name="position">1</property>
-                  </packing>
-                </child>
-                <child>
+                                                <child>
                   <object class="GtkButton">
                     <property name="visible">True</property>
                     <property name="can-focus">True</property>

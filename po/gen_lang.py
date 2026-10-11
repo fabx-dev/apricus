@@ -82,6 +82,16 @@ T["it"] = {
     "Shuffle": "Casuale",
     "Apply playlist": "Applica playlist",
     "Disabled in playlist mode (muted by design)": "Disabilitato in modalità playlist (muta per scelta)",
+    "Apply selected": "Applica selezionato",
+    "Add to playlist": "Aggiungi alla playlist",
+    "Add to playlist ({n})": "Aggiungi alla playlist ({n})",
+    "Add all to playlist": "Aggiungi tutti alla playlist",
+    "Add the selected videos to the playlist queue": "Aggiungi i video selezionati alla coda playlist",
+    "Add every video in the library to the playlist queue": "Aggiungi tutti i video della libreria alla coda playlist",
+    "View queue": "Vedi coda",
+    "Added {a} to queue (total {n})": "Aggiunti {a} alla coda (totale {n})",
+    "Added {a}, {d} already in queue (total {n})": "Aggiunti {a}, {d} già in coda (totale {n})",
+    "Already in queue (total {n})": "Già in coda (totale {n})",
 }
 T["de"] = {
     "Set For {monitor}": "Für {monitor} festlegen",
@@ -154,6 +164,16 @@ T["de"] = {
     "Shuffle": "Zufällig",
     "Apply playlist": "Playlist anwenden",
     "Disabled in playlist mode (muted by design)": "Im Playlist-Modus deaktiviert (absichtlich stumm)",
+    "Apply selected": "Auswahl anwenden",
+    "Add to playlist": "Zur Playlist hinzufügen",
+    "Add to playlist ({n})": "Zur Playlist hinzufügen ({n})",
+    "Add all to playlist": "Alle zur Playlist hinzufügen",
+    "Add the selected videos to the playlist queue": "Die gewählten Videos zur Playlist-Warteschlange hinzufügen",
+    "Add every video in the library to the playlist queue": "Alle Videos der Bibliothek zur Playlist-Warteschlange hinzufügen",
+    "View queue": "Warteschlange ansehen",
+    "Added {a} to queue (total {n})": "{a} zur Warteschlange hinzugefügt (gesamt {n})",
+    "Added {a}, {d} already in queue (total {n})": "{a} hinzugefügt, {d} bereits in der Warteschlange (gesamt {n})",
+    "Already in queue (total {n})": "Bereits in der Warteschlange (gesamt {n})",
 }
 T["fr"] = {
     "Set For {monitor}": "Définir pour {monitor}",
@@ -226,6 +246,16 @@ T["fr"] = {
     "Shuffle": "Aléatoire",
     "Apply playlist": "Appliquer la playlist",
     "Disabled in playlist mode (muted by design)": "Désactivé en mode playlist (muet par choix)",
+    "Apply selected": "Appliquer la sélection",
+    "Add to playlist": "Ajouter à la playlist",
+    "Add to playlist ({n})": "Ajouter à la playlist ({n})",
+    "Add all to playlist": "Tout ajouter à la playlist",
+    "Add the selected videos to the playlist queue": "Ajouter les vidéos sélectionnées à la file de la playlist",
+    "Add every video in the library to the playlist queue": "Ajouter toutes les vidéos de la bibliothèque à la file de la playlist",
+    "View queue": "Voir la file",
+    "Added {a} to queue (total {n})": "{a} ajoutés à la file (total {n})",
+    "Added {a}, {d} already in queue (total {n})": "{a} ajoutés, {d} déjà dans la file (total {n})",
+    "Already in queue (total {n})": "Déjà dans la file (total {n})",
 }
 T["es"] = {
     "Set For {monitor}": "Establecer para {monitor}",
@@ -298,6 +328,16 @@ T["es"] = {
     "Shuffle": "Aleatorio",
     "Apply playlist": "Aplicar playlist",
     "Disabled in playlist mode (muted by design)": "Desactivado en modo playlist (silencioso por diseño)",
+    "Apply selected": "Aplicar selección",
+    "Add to playlist": "Añadir a la playlist",
+    "Add to playlist ({n})": "Añadir a la playlist ({n})",
+    "Add all to playlist": "Añadir todos a la playlist",
+    "Add the selected videos to the playlist queue": "Añadir los vídeos seleccionados a la cola de la playlist",
+    "Add every video in the library to the playlist queue": "Añadir todos los vídeos de la biblioteca a la cola de la playlist",
+    "View queue": "Ver la cola",
+    "Added {a} to queue (total {n})": "{a} añadidos a la cola (total {n})",
+    "Added {a}, {d} already in queue (total {n})": "{a} añadidos, {d} ya en la cola (total {n})",
+    "Already in queue (total {n})": "Ya en la cola (total {n})",
 }
 
 

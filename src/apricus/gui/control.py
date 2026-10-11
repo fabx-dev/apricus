@@ -158,6 +158,7 @@ class ControlPanel(Gtk.Application):
             ("playlist_remove", self.on_playlist_remove),
             ("playlist_clear", self.on_playlist_clear),
             ("playlist_apply", self.on_playlist_apply),
+            ("playlist_show", self.on_playlist_show),
             ("play_pause", self.on_play_pause),
             ("feeling_lucky", self.on_feeling_lucky),
             (
@@ -383,22 +384,73 @@ class ControlPanel(Gtk.Application):
         for pos, path in enumerate(self.playlist_paths, start=1):
             store.append([pos, os.path.basename(path)])
         view.set_model(store)
+        stack = self.builder.get_object("stack1")
+        box = self.builder.get_object("PlaylistBox")
+        if stack is not None and box is not None:
+            n = len(self.playlist_paths)
+            stack.child_set_property(box, "title", f"Playlist ({n})" if n else "Playlist")
+
+    def _show_playlist_confirm(self, added, dupes):
+        label = self.builder.get_object("PlaylistConfirmLabel")
+        revealer = self.builder.get_object("PlaylistRevealer")
+        if label is None or revealer is None:
+            return
+        if added and dupes:
+            text = _("Added {a}, {d} already in queue (total {n})").format(
+                a=added, d=dupes, n=len(self.playlist_paths)
+            )
+        elif added:
+            text = _("Added {a} to queue (total {n})").format(a=added, n=len(self.playlist_paths))
+        else:
+            text = _("Already in queue (total {n})").format(n=len(self.playlist_paths))
+        label.set_text(text)
+        revealer.set_reveal_child(True)
+        GLib.timeout_add_seconds(5, revealer.set_reveal_child, False)
+
+    def _on_gallery_selection_changed(self, *_args):
+        self._update_playlist_add_label()
+        apply_button = self.builder.get_object("ButtonApply")
+        if apply_button is not None and self.icon_view is not None:
+            # Monitor assignment applies to a single video.
+            apply_button.set_sensitive(len(self.icon_view.get_selected_items()) == 1)
+
+    def _update_playlist_add_label(self):
+        button = self.builder.get_object("ButtonPlaylistAdd")
+        if button is None:
+            return
+        n = len(self.icon_view.get_selected_items()) if self.icon_view else 0
+        button.set_label(_("Add to playlist ({n})").format(n=n) if n else _("Add to playlist"))
+
+    def on_playlist_show(self, *_args):
+        stack = self.builder.get_object("stack1")
+        if stack is not None:
+            stack.set_visible_child_name("playlist")
 
     def on_playlist_add_selected(self, *_args):
         selected = self.icon_view.get_selected_items()
         if not selected:
             return
+        added = dupes = 0
         for item in selected:
             path = self.video_paths[item.get_indices()[0]]
             if path not in self.playlist_paths:
                 self.playlist_paths.append(path)
+                added += 1
+            else:
+                dupes += 1
         self._refresh_playlist_view()
+        self._show_playlist_confirm(added, dupes)
 
     def on_playlist_add_all(self, *_args):
+        added = dupes = 0
         for path in self.video_paths or []:
             if path not in self.playlist_paths:
                 self.playlist_paths.append(path)
+                added += 1
+            else:
+                dupes += 1
         self._refresh_playlist_view()
+        self._show_playlist_confirm(added, dupes)
 
     def _playlist_selected_index(self):
         view = self.builder.get_object("PlaylistView")
@@ -627,7 +679,12 @@ class ControlPanel(Gtk.Application):
             if path_info is not None:
                 tree_path = Gtk.TreePath(path_info[0])
                 self.icon_view.grab_focus()
-                widget.select_path(tree_path)
+                # Non-destructive: keep a multi-selection when right-clicking
+                # inside it; only reset when clicking outside of it.
+                selected = {p.get_indices()[0] for p in widget.get_selected_items()}
+                if tree_path.get_indices()[0] not in selected:
+                    widget.unselect_all()
+                    widget.select_path(tree_path)
                 self.contextMenu_monitors.show_all()
                 self.contextMenu_monitors.popup(
                     None, None, None, None, 0, Gtk.get_current_event_time()
@@ -689,7 +746,11 @@ class ControlPanel(Gtk.Application):
         self.icon_view.set_pixbuf_column(0)
         self.icon_view.set_text_column(1)
         self.icon_view.set_model(list_store)
-        self.icon_view.connect("button-press-event", self.on_icon_view_button_press)
+        if not getattr(self, "_icon_view_signals_wired", False):
+            self.icon_view.connect("button-press-event", self.on_icon_view_button_press)
+            self.icon_view.connect("selection-changed", self._on_gallery_selection_changed)
+            self._icon_view_signals_wired = True
+        self._on_gallery_selection_changed()
         for idx, video_path in enumerate(self.video_paths):
             pixbuf = Gtk.IconTheme().get_default().load_icon("video-x-generic", 96, 0)
             list_store.append([pixbuf, os.path.basename(video_path)])

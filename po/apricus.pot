@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: apricus\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-12 01:21+0200\n"
+"POT-Creation-Date: 2026-10-12 01:38+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -27,15 +27,15 @@ msgstr ""
 msgid "Set For All"
 msgstr ""
 
-#: src/apricus/gui/control.py:226
+#: src/apricus/gui/control.py:227
 msgid "Couldn't connect to server"
 msgstr ""
 
-#: src/apricus/gui/control.py:239
+#: src/apricus/gui/control.py:240
 msgid "Welcome to Apricus 🤗"
 msgstr ""
 
-#: src/apricus/gui/control.py:243
+#: src/apricus/gui/control.py:244
 msgid ""
 "Quickstart for adding local videos:\n"
 " ・Click the folder icon to open your video folder\n"
@@ -43,86 +43,110 @@ msgid ""
 " ・Click the refresh button"
 msgstr ""
 
-#: src/apricus/gui/control.py:259
+#: src/apricus/gui/control.py:260
 msgid "Oops!"
 msgstr ""
 
-#: src/apricus/gui/control.py:277
+#: src/apricus/gui/control.py:278
 #, python-brace-format
 msgid "Choose video folder (current: {folder})"
 msgstr ""
 
-#: src/apricus/gui/control.py:278
+#: src/apricus/gui/control.py:279
 msgid "none chosen yet"
 msgstr ""
 
-#: src/apricus/gui/control.py:284
+#: src/apricus/gui/control.py:285
 msgid "Cancel"
 msgstr ""
 
-#: src/apricus/gui/control.py:286
+#: src/apricus/gui/control.py:287
 msgid "Choose"
 msgstr ""
 
-#: src/apricus/gui/control.py:309
+#: src/apricus/gui/control.py:310
 msgid "No Video Selected"
 msgstr ""
 
-#: src/apricus/gui/control.py:311
+#: src/apricus/gui/control.py:312
 msgid ""
 "There are no video selected.\n"
 "Please choose one first."
 msgstr ""
 
-#: src/apricus/gui/control.py:347
+#: src/apricus/gui/control.py:348
 msgid "Please choose a HTML file"
 msgstr ""
 
-#: src/apricus/gui/control.py:378
+#: src/apricus/gui/control.py:379
 msgid "#"
 msgstr ""
 
-#: src/apricus/gui/control.py:378
+#: src/apricus/gui/control.py:379
 msgid "Video"
 msgstr ""
 
-#: src/apricus/gui/control.py:479
+#: src/apricus/gui/control.py:399
+#, python-brace-format
+msgid "Added {a}, {d} already in queue (total {n})"
+msgstr ""
+
+#: src/apricus/gui/control.py:403
+#, python-brace-format
+msgid "Added {a} to queue (total {n})"
+msgstr ""
+
+#: src/apricus/gui/control.py:405
+#, python-brace-format
+msgid "Already in queue (total {n})"
+msgstr ""
+
+#: src/apricus/gui/control.py:422
+#, python-brace-format
+msgid "Add to playlist ({n})"
+msgstr ""
+
+#: src/apricus/gui/control.py:422 src/apricus/assets/control.ui:443
+msgid "Add to playlist"
+msgstr ""
+
+#: src/apricus/gui/control.py:531
 msgid "Disabled in playlist mode (muted by design)"
 msgstr ""
 
-#: src/apricus/gui/control.py:481 src/apricus/assets/control.ui:154
+#: src/apricus/gui/control.py:533 src/apricus/assets/control.ui:154
 msgid "Volume control"
 msgstr ""
 
-#: src/apricus/gui/control.py:572
+#: src/apricus/gui/control.py:624
 #, python-brace-format
 msgid ""
 "Failed to access {url}. Error:\n"
 "{error}"
 msgstr ""
 
-#: src/apricus/gui/control.py:577
+#: src/apricus/gui/control.py:629
 #, python-brace-format
 msgid "Failed to access {url}. Error code: {code}"
 msgstr ""
 
-#: src/apricus/gui/control.py:593
+#: src/apricus/gui/control.py:645
 #, python-brace-format
 msgid ""
 "Failed to stream {url}. Error:\n"
 "{error}"
 msgstr ""
 
-#: src/apricus/gui/control.py:676
+#: src/apricus/gui/control.py:733
 msgid "Choose a video folder to begin"
 msgstr ""
 
-#: src/apricus/gui/control.py:678
+#: src/apricus/gui/control.py:735
 #, python-brace-format
 msgid "Videos in {folder} ({count})"
 msgstr ""
 
-#: src/apricus/gui/control.py:682
+#: src/apricus/gui/control.py:739
 #, python-brace-format
 msgid "No videos in {folder}"
 msgstr ""
@@ -138,7 +162,7 @@ msgid "Toggle Mute Audio"
 msgstr ""
 
 #.
-#: src/apricus/menu.py:103 src/apricus/assets/control.ui:995
+#: src/apricus/menu.py:103 src/apricus/assets/control.ui:1052
 msgid "Toggle Play/Pause"
 msgstr ""
 
@@ -148,7 +172,7 @@ msgid "Reload"
 msgstr ""
 
 #.
-#: src/apricus/menu.py:109 src/apricus/assets/control.ui:1014
+#: src/apricus/menu.py:109 src/apricus/assets/control.ui:1071
 msgid "I'm Feeling Lucky"
 msgstr ""
 
@@ -223,116 +247,120 @@ msgstr ""
 msgid "Choose video folder"
 msgstr ""
 
-#: src/apricus/assets/control.ui:418 src/apricus/assets/control.ui:741
-msgid "Apply"
+#: src/apricus/assets/control.ui:424
+msgid "Apply selected"
 msgstr ""
 
-#: src/apricus/assets/control.ui:438
+#: src/apricus/assets/control.ui:444
+msgid "Add the selected videos to the playlist queue"
+msgstr ""
+
+#: src/apricus/assets/control.ui:457
+msgid "Add all to playlist"
+msgstr ""
+
+#: src/apricus/assets/control.ui:458
+msgid "Add every video in the library to the playlist queue"
+msgstr ""
+
+#: src/apricus/assets/control.ui:502
+msgid "View queue"
+msgstr ""
+
+#: src/apricus/assets/control.ui:523
 msgid "Local Video"
 msgstr ""
 
-#: src/apricus/assets/control.ui:451
+#: src/apricus/assets/control.ui:536
 msgid ""
 "<span size=\"x-large\"><b>Streaming</b></span>\n"
 "Videos from streaming services"
 msgstr ""
 
-#: src/apricus/assets/control.ui:486
+#: src/apricus/assets/control.ui:571
 msgid "<b>Streaming URL</b>"
 msgstr ""
 
-#: src/apricus/assets/control.ui:527
+#: src/apricus/assets/control.ui:612
 msgid "💡\tThis feature uses <i>yt-dlp</i> as backend"
 msgstr ""
 
-#: src/apricus/assets/control.ui:541
+#: src/apricus/assets/control.ui:626
 msgid ""
 "😉\tTry playing any YouTube video! <a href=\"https://github.com/yt-dlp/yt-"
 "dlp/blob/master/supportedsites.md\">Supported sites (yt-dlp)</a>"
 msgstr ""
 
-#: src/apricus/assets/control.ui:556 src/apricus/assets/control.ui:683
+#: src/apricus/assets/control.ui:641 src/apricus/assets/control.ui:768
 msgid "Hint"
 msgstr ""
 
-#: src/apricus/assets/control.ui:577
+#: src/apricus/assets/control.ui:662
 msgid "Streaming"
 msgstr ""
 
-#: src/apricus/assets/control.ui:591
+#: src/apricus/assets/control.ui:676
 msgid ""
 "<span size=\"x-large\"><b>Web Page</b></span>\n"
 "Set a web page as wallpaper"
 msgstr ""
 
-#: src/apricus/assets/control.ui:626
+#: src/apricus/assets/control.ui:711
 msgid "<b>Web Page URL</b>"
 msgstr ""
 
-#: src/apricus/assets/control.ui:667
+#: src/apricus/assets/control.ui:752
 msgid ""
 "💡\tCheck this website for some really amazing examples!\n"
 "\t<a href=\"https://alteredqualia.com/\">https://alteredqualia.com/</a>"
 msgstr ""
 
-#: src/apricus/assets/control.ui:699
+#: src/apricus/assets/control.ui:784
 msgid "<b>Local Web Page</b>"
 msgstr ""
 
-#: src/apricus/assets/control.ui:713
+#: src/apricus/assets/control.ui:798
 msgid "Alternately, you can choose a HTML file on your PC"
 msgstr ""
 
-#: src/apricus/assets/control.ui:776
+#: src/apricus/assets/control.ui:826
+msgid "Apply"
+msgstr ""
+
+#: src/apricus/assets/control.ui:861
 msgid "Web Page"
 msgstr ""
 
-#: src/apricus/assets/control.ui:790
+#: src/apricus/assets/control.ui:875
 msgid ""
 "<span size=\"x-large\"><b>Playlist</b></span>\n"
 "Muted loop over your videos"
 msgstr ""
 
-#: src/apricus/assets/control.ui:837
-msgid "Add selected"
-msgstr ""
-
-#: src/apricus/assets/control.ui:838
-msgid "Add the video selected in Local Video"
-msgstr ""
-
-#: src/apricus/assets/control.ui:851
-msgid "Add all"
-msgstr ""
-
-#: src/apricus/assets/control.ui:852
-msgid "Add every video in the library"
-msgstr ""
-
-#: src/apricus/assets/control.ui:865
+#: src/apricus/assets/control.ui:922
 msgid "Up"
 msgstr ""
 
-#: src/apricus/assets/control.ui:878
+#: src/apricus/assets/control.ui:935
 msgid "Down"
 msgstr ""
 
-#: src/apricus/assets/control.ui:891
+#: src/apricus/assets/control.ui:948
 msgid "Remove"
 msgstr ""
 
-#: src/apricus/assets/control.ui:904
+#: src/apricus/assets/control.ui:961
 msgid "Clear"
 msgstr ""
 
-#: src/apricus/assets/control.ui:917
+#: src/apricus/assets/control.ui:974
 msgid "Shuffle"
 msgstr ""
 
-#: src/apricus/assets/control.ui:930
+#: src/apricus/assets/control.ui:987
 msgid "Apply playlist"
 msgstr ""
 
-#: src/apricus/assets/control.ui:953
+#: src/apricus/assets/control.ui:1010
 msgid "Playlist"
 msgstr ""
