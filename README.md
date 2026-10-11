@@ -76,6 +76,7 @@ make run
 
 Put videos in the video folder (`~/Video/Hidamari` or `~/Videos/Hidamari`
 depending on distro, kept from Hidamari for compatibility) and pick them from the GUI.
+You can point Apricus at any folder with the *Choose video folder* button in the control panel.
 
 A Flatpak (`io.github.fabx_dev.Apricus`) builds locally with `make flatpak`; Flathub publishing is planned.
 
