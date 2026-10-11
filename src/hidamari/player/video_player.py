@@ -18,6 +18,7 @@ from gi.repository import Gdk, Gio, Gtk
 from PIL import Image, ImageFilter
 from pydbus import SessionBus
 
+from hidamari import perf
 from hidamari.commons import (
     CONFIG_DIR,
     CONFIG_KEY_DATA_SOURCE,
@@ -168,6 +169,13 @@ class PlayerWindow(Gtk.ApplicationWindow):
         # A timer that handling fade-in/out
         self.fade = Fade()
 
+        # One-shot first-frame timing (Fase 1b baseline). The same media
+        # player instance survives media changes, so attach once here.
+        self._first_frame_reported = False
+        self.__vlc_widget.player.event_manager().event_attach(
+            vlc.EventType.MediaPlayerTimeChanged, self._on_first_time_changed
+        )
+
         self.menu = None
         self.connect("button-press-event", self._on_button_press_event)
 
@@ -279,6 +287,18 @@ class PlayerWindow(Gtk.ApplicationWindow):
 
     def add_audio_track(self, audio):
         self.__vlc_widget.player.add_slave(vlc.MediaSlaveType(1), audio, True)
+
+    def _on_first_time_changed(self, _event):
+        if self._first_frame_reported:
+            return
+        self._first_frame_reported = True
+        try:
+            self.__vlc_widget.player.event_manager().event_detach(
+                vlc.EventType.MediaPlayerTimeChanged
+            )
+        except Exception as e:
+            logger.warning(f"[Perf] event_detach failed: {e}")
+        perf.mark(f"player: first frame [{self.name}]")
 
     def _on_button_press_event(self, widget, event):
         if event.type == Gdk.EventType.BUTTON_PRESS and event.button == 3:

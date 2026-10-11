@@ -9,6 +9,7 @@ import setproctitle
 from gi.repository import GLib
 from pydbus import SessionBus
 
+from hidamari import perf
 from hidamari.commons import (
     CONFIG_KEY_BLUR_RADIUS,
     CONFIG_KEY_DATA_SOURCE,
@@ -101,9 +102,11 @@ class HidamariServer:
         if args.reset:
             ConfigUtil().generate_template()
         self._load_config()
+        perf.mark("server: config loaded")
 
         # Player process
         self.reload()
+        perf.mark("server: player spawn requested")
 
         # Show main GUI
         if not args.background:
@@ -155,6 +158,7 @@ class HidamariServer:
         if self.player_process is not None:
             self.player_process.start()
             self._player_count += 1
+            perf.mark(f"server: player process started [{mode}]")
 
         # Refresh systray icon if the mode changed
         if self.config[CONFIG_KEY_SYSTRAY]:

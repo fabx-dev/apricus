@@ -3,7 +3,7 @@ import logging
 import os
 import sys
 
-from hidamari import server
+from hidamari import perf, server  # perf first: import captures process-start T0
 from hidamari.commons import LOGGER_NAME, VIDEO_WALLPAPER_DIR
 from hidamari.utils import is_flatpak, is_gnome, is_wayland
 
@@ -47,12 +47,14 @@ def main(version="devel", pkgdatadir="/usr/share/hidamari", localedir="/usr/shar
     sys_info_str = "\n".join(sys_info)
     logger.info(f"Hidamari v{version}\n{sys_info_str}")
     logger.info(f"[Args] {vars(args)}")
+    perf.mark("main: imports done")
 
     # Make Hidamari folder if not exist
     os.makedirs(VIDEO_WALLPAPER_DIR, exist_ok=True)
 
     # Clear sys.argv as it has influence to the Gtk.Application
     sys.argv = [sys.argv[0]]
+    perf.mark("main: starting server")
     server.main(version, pkgdatadir, localedir, args)
 
 
