@@ -12,7 +12,6 @@ from pydbus import SessionBus
 
 from apricus import perf
 from apricus.commons import (
-    CONFIG_KEY_BLUR_RADIUS,
     CONFIG_KEY_DATA_SOURCE,
     CONFIG_KEY_MODE,
     CONFIG_KEY_MUTE,
@@ -64,7 +63,6 @@ class ApricusServer:
         <method name='quit'/>
         <property name="mode" type="s" access="read"/>
         <property name="volume" type="i" access="readwrite"/>
-        <property name="blur_radius" type="i" access="readwrite"/>
         <property name="is_mute" type="b" access="readwrite"/>
         <property name="is_playing" type="b" access="read"/>
         <property name="is_paused_by_user" type="b" access="readwrite"/>
@@ -288,17 +286,6 @@ class ApricusServer:
         player = get_instance(DBUS_NAME_PLAYER)
         if player is not None:
             player.volume = volume
-
-    @property
-    def blur_radius(self):
-        return self.config[CONFIG_KEY_BLUR_RADIUS]
-
-    @blur_radius.setter
-    def blur_radius(self, blur_radius):
-        self.config[CONFIG_KEY_BLUR_RADIUS] = blur_radius
-        player = get_instance(DBUS_NAME_PLAYER)
-        if player is not None:
-            player.reload_config()
 
     @property
     def is_mute(self):

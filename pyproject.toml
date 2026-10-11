@@ -9,7 +9,6 @@ requires-python = ">=3.10"
 # PyGObject (gi) is omitted on purpose: it comes from the system/GNOME runtime
 # (dev needs `uv venv --system-site-packages`).
 dependencies = [
-    "pillow>=12.3.0",
     "pydbus==0.6.0",
     "python-vlc>=3.0.21203",
     "yt-dlp[default]>=2026.7.4",

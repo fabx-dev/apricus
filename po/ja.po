@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: hidamari\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-12 00:19+0200\n"
+"POT-Creation-Date: 2026-10-12 00:36+0200\n"
 "PO-Revision-Date: 2026-07-10 01:30+0900\n"
 "Last-Translator: Jeff Shee <jeffshee8969@gmail.com>\n"
 "Language-Team: Japanese\n"
@@ -16,25 +16,25 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=1; plural=0;\n"
 
-#: src/apricus/gui/control.py:122
+#: src/apricus/gui/control.py:120
 #, python-brace-format
 msgid "Set For {monitor}"
 msgstr "{monitor} に設定"
 
 #. add all option
-#: src/apricus/gui/control.py:127
+#: src/apricus/gui/control.py:125
 msgid "Set For All"
 msgstr "すべてに設定"
 
-#: src/apricus/gui/control.py:218
+#: src/apricus/gui/control.py:214
 msgid "Couldn't connect to server"
 msgstr "サーバーに接続できませんでした"
 
-#: src/apricus/gui/control.py:231
+#: src/apricus/gui/control.py:227
 msgid "Welcome to Apricus 🤗"
 msgstr "Apricus へようこそ 🤗"
 
-#: src/apricus/gui/control.py:235
+#: src/apricus/gui/control.py:231
 msgid ""
 "Quickstart for adding local videos:\n"
 " ・Click the folder icon to open the Hidamari folder\n"
@@ -46,28 +46,28 @@ msgstr ""
 " ・動画をそこに入れます\n"
 " ・更新ボタンをクリックします"
 
-#: src/apricus/gui/control.py:251
+#: src/apricus/gui/control.py:247
 msgid "Oops!"
 msgstr "おっと！"
 
-#: src/apricus/gui/control.py:261 src/apricus/assets/control.ui:403
+#: src/apricus/gui/control.py:257 src/apricus/assets/control.ui:366
 #, fuzzy
 msgid "Choose video folder"
 msgstr "Hidamari フォルダーを開く"
 
-#: src/apricus/gui/control.py:266
+#: src/apricus/gui/control.py:262
 msgid "Cancel"
 msgstr ""
 
-#: src/apricus/gui/control.py:268
+#: src/apricus/gui/control.py:264
 msgid "Choose"
 msgstr ""
 
-#: src/apricus/gui/control.py:291
+#: src/apricus/gui/control.py:287
 msgid "No Video Selected"
 msgstr "動画が選択されていません"
 
-#: src/apricus/gui/control.py:293
+#: src/apricus/gui/control.py:289
 msgid ""
 "There are no video selected.\n"
 "Please choose one first."
@@ -75,11 +75,11 @@ msgstr ""
 "動画が選択されていません。\n"
 "まず動画を1つ選択してください。"
 
-#: src/apricus/gui/control.py:329
+#: src/apricus/gui/control.py:325
 msgid "Please choose a HTML file"
 msgstr "HTML ファイルを選択してください"
 
-#: src/apricus/gui/control.py:452
+#: src/apricus/gui/control.py:433
 #, python-brace-format
 msgid ""
 "Failed to access {url}. Error:\n"
@@ -88,12 +88,12 @@ msgstr ""
 "{url} にアクセスできませんでした。エラー:\n"
 "{error}"
 
-#: src/apricus/gui/control.py:457
+#: src/apricus/gui/control.py:438
 #, python-brace-format
 msgid "Failed to access {url}. Error code: {code}"
 msgstr "{url} にアクセスできませんでした。エラーコード: {code}"
 
-#: src/apricus/gui/control.py:473
+#: src/apricus/gui/control.py:454
 #, python-brace-format
 msgid ""
 "Failed to stream {url}. Error:\n"
@@ -101,6 +101,15 @@ msgid ""
 msgstr ""
 "{url} のストリーミングに失敗しました。エラー:\n"
 "{error}"
+
+#: src/apricus/gui/control.py:532
+#, fuzzy, python-brace-format
+msgid ""
+"&lt;span size=\"x-large\"&gt;&lt;b&gt;Local Video&lt;/b&gt;&lt;/span&gt;\n"
+"Videos in {folder}"
+msgstr ""
+"<span size=\"x-large\"><b>ローカル動画</b></span>\n"
+"Hidamari フォルダー内の動画"
 
 #.
 #: src/apricus/menu.py:97
@@ -113,7 +122,7 @@ msgid "Toggle Mute Audio"
 msgstr "音声ミュートの切り替え"
 
 #.
-#: src/apricus/menu.py:103 src/apricus/assets/control.ui:855
+#: src/apricus/menu.py:103 src/apricus/assets/control.ui:818
 msgid "Toggle Play/Pause"
 msgstr "再生 / 一時停止の切り替え"
 
@@ -123,12 +132,12 @@ msgid "Reload"
 msgstr "再読み込み"
 
 #.
-#: src/apricus/menu.py:109 src/apricus/assets/control.ui:874
+#: src/apricus/menu.py:109 src/apricus/assets/control.ui:837
 msgid "I'm Feeling Lucky"
 msgstr "おまかせ再生"
 
 #.
-#: src/apricus/menu.py:112 src/apricus/assets/control.ui:292
+#: src/apricus/menu.py:112 src/apricus/assets/control.ui:255
 msgid "Quit Apricus"
 msgstr ""
 
@@ -136,60 +145,56 @@ msgstr ""
 msgid "Live wallpaper for Linux. Apricus (lat.) — sunny, exposed to the sun."
 msgstr ""
 
-#: src/apricus/assets/control.ui:74
+#: src/apricus/assets/control.ui:68
 msgid "Quick toggles"
 msgstr "クイック切り替え"
 
-#: src/apricus/assets/control.ui:91
+#: src/apricus/assets/control.ui:85
 msgid "Autostart after login"
 msgstr "ログイン後に自動起動"
 
-#: src/apricus/assets/control.ui:104
+#: src/apricus/assets/control.ui:98
 msgid "Video frame can be applied as system wallpaper, look great in GNOME"
 msgstr "動画のフレームをシステム壁紙として適用でき、GNOME で美しく表示されます"
 
-#: src/apricus/assets/control.ui:106
+#: src/apricus/assets/control.ui:100
 msgid "Apply static wallpaper"
 msgstr "静止画壁紙を適用"
 
-#: src/apricus/assets/control.ui:119
+#: src/apricus/assets/control.ui:113
 msgid ""
 "Automatically pauses playback when maximized window or full screen mode is "
 "detected"
 msgstr ""
 "ウィンドウの最大化やフルスクリーンを検出すると自動的に再生を一時停止します"
 
-#: src/apricus/assets/control.ui:121
+#: src/apricus/assets/control.ui:115
 msgid "Pause when maximized window"
 msgstr "ウィンドウ最大化時に一時停止"
 
-#: src/apricus/assets/control.ui:134
+#: src/apricus/assets/control.ui:128
 msgid ""
 "Automatically mutes playback when maximized window or full screen mode is "
 "detected"
 msgstr "ウィンドウの最大化やフルスクリーンを検出すると自動的にミュートします"
 
-#: src/apricus/assets/control.ui:136
+#: src/apricus/assets/control.ui:130
 msgid "Mute when maximized window"
 msgstr "ウィンドウ最大化時にミュート"
 
-#: src/apricus/assets/control.ui:160
+#: src/apricus/assets/control.ui:154
 msgid "Volume control"
 msgstr "音量調整"
 
-#: src/apricus/assets/control.ui:221
-msgid "Static wallpaper blur radius"
-msgstr "静止画壁紙のぼかし半径"
-
-#: src/apricus/assets/control.ui:264
+#: src/apricus/assets/control.ui:227
 msgid "Open config file"
 msgstr "設定ファイルを開く"
 
-#: src/apricus/assets/control.ui:278
+#: src/apricus/assets/control.ui:241
 msgid "About Apricus"
 msgstr ""
 
-#: src/apricus/assets/control.ui:337
+#: src/apricus/assets/control.ui:300
 #, fuzzy
 msgid ""
 "<span size=\"x-large\"><b>Local Video</b></span>\n"
@@ -198,24 +203,24 @@ msgstr ""
 "<span size=\"x-large\"><b>ローカル動画</b></span>\n"
 "Hidamari フォルダー内の動画"
 
-#: src/apricus/assets/control.ui:353
+#: src/apricus/assets/control.ui:316
 msgid "Refresh"
 msgstr "更新"
 
-#: src/apricus/assets/control.ui:378
+#: src/apricus/assets/control.ui:341
 #, fuzzy
 msgid "Open video folder"
 msgstr "Hidamari フォルダーを開く"
 
-#: src/apricus/assets/control.ui:455 src/apricus/assets/control.ui:778
+#: src/apricus/assets/control.ui:418 src/apricus/assets/control.ui:741
 msgid "Apply"
 msgstr "適用"
 
-#: src/apricus/assets/control.ui:475
+#: src/apricus/assets/control.ui:438
 msgid "Local Video"
 msgstr "ローカル動画"
 
-#: src/apricus/assets/control.ui:488
+#: src/apricus/assets/control.ui:451
 msgid ""
 "<span size=\"x-large\"><b>Streaming</b></span>\n"
 "Videos from streaming services"
@@ -223,15 +228,15 @@ msgstr ""
 "<span size=\"x-large\"><b>ストリーミング</b></span>\n"
 "ストリーミングサービスの動画"
 
-#: src/apricus/assets/control.ui:523
+#: src/apricus/assets/control.ui:486
 msgid "<b>Streaming URL</b>"
 msgstr "<b>ストリーミング URL</b>"
 
-#: src/apricus/assets/control.ui:564
+#: src/apricus/assets/control.ui:527
 msgid "💡\tThis feature uses <i>yt-dlp</i> as backend"
 msgstr "💡\tこの機能はバックエンドに <i>yt-dlp</i> を使用します"
 
-#: src/apricus/assets/control.ui:578
+#: src/apricus/assets/control.ui:541
 msgid ""
 "😉\tTry playing any YouTube video! <a href=\"https://github.com/yt-dlp/yt-"
 "dlp/blob/master/supportedsites.md\">Supported sites (yt-dlp)</a>"
@@ -239,15 +244,15 @@ msgstr ""
 "😉\tYouTube の動画を再生してみましょう！<a href=\"https://github.com/yt-dlp/"
 "yt-dlp/blob/master/supportedsites.md\">対応サイト (yt-dlp)</a>"
 
-#: src/apricus/assets/control.ui:593 src/apricus/assets/control.ui:720
+#: src/apricus/assets/control.ui:556 src/apricus/assets/control.ui:683
 msgid "Hint"
 msgstr "ヒント"
 
-#: src/apricus/assets/control.ui:614
+#: src/apricus/assets/control.ui:577
 msgid "Streaming"
 msgstr "ストリーミング"
 
-#: src/apricus/assets/control.ui:628
+#: src/apricus/assets/control.ui:591
 msgid ""
 "<span size=\"x-large\"><b>Web Page</b></span>\n"
 "Set a web page as wallpaper"
@@ -255,11 +260,11 @@ msgstr ""
 "<span size=\"x-large\"><b>ウェブページ</b></span>\n"
 "ウェブページを壁紙に設定"
 
-#: src/apricus/assets/control.ui:663
+#: src/apricus/assets/control.ui:626
 msgid "<b>Web Page URL</b>"
 msgstr "<b>ウェブページ URL</b>"
 
-#: src/apricus/assets/control.ui:704
+#: src/apricus/assets/control.ui:667
 msgid ""
 "💡\tCheck this website for some really amazing examples!\n"
 "\t<a href=\"https://alteredqualia.com/\">https://alteredqualia.com/</a>"
@@ -267,17 +272,20 @@ msgstr ""
 "💡\tこのウェブサイトで素晴らしい例をチェックしてみましょう！\n"
 "\t<a href=\"https://alteredqualia.com/\">https://alteredqualia.com/</a>"
 
-#: src/apricus/assets/control.ui:736
+#: src/apricus/assets/control.ui:699
 msgid "<b>Local Web Page</b>"
 msgstr "<b>ローカルウェブページ</b>"
 
-#: src/apricus/assets/control.ui:750
+#: src/apricus/assets/control.ui:713
 msgid "Alternately, you can choose a HTML file on your PC"
 msgstr "または、PC 上の HTML ファイルを選択することもできます"
 
-#: src/apricus/assets/control.ui:813
+#: src/apricus/assets/control.ui:776
 msgid "Web Page"
 msgstr "ウェブページ"
+
+#~ msgid "Static wallpaper blur radius"
+#~ msgstr "静止画壁紙のぼかし半径"
 
 #~ msgid "Show Hidamari"
 #~ msgstr "Hidamari を表示"

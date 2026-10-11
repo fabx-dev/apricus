@@ -55,3 +55,25 @@ def test_get_video_paths_uses_given_dir(tmp_path):
 
 def test_get_video_paths_missing_dir_returns_empty(tmp_path):
     assert get_video_paths(str(tmp_path / "nope")) == []
+
+
+def test_legacy_blur_key_is_dropped_without_wipe(tmp_path, monkeypatch):
+    from unittest.mock import patch
+
+    new_dir = tmp_path / "apricus"
+    new_dir.mkdir()
+    old_cfg = dict(commons.CONFIG_TEMPLATE)
+    old_cfg["static_wallpaper_blur_radius"] = 9
+    old_cfg["audio_volume"] = 42
+    (new_dir / "config.json").write_text(json.dumps(old_cfg))
+    monkeypatch.setattr(commons, "CONFIG_PATH", str(new_dir / "config.json"))
+    monkeypatch.setattr(commons, "CONFIG_DIR", str(new_dir))
+    import apricus.utils as U
+
+    monkeypatch.setattr(U, "CONFIG_PATH", str(new_dir / "config.json"))
+    monkeypatch.setattr(U, "CONFIG_DIR", str(new_dir))
+    monkeypatch.setattr(U, "LEGACY_CONFIG_PATH", str(tmp_path / "no-legacy.json"))
+    with patch("apricus.monitor.MonitorInfo.monitors", return_value=[]):
+        loaded = ConfigUtil().load()
+    assert loaded["audio_volume"] == 42
+    assert "static_wallpaper_blur_radius" not in loaded

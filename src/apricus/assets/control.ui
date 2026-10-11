@@ -42,12 +42,6 @@ Based on Hidamari by Jeff Shee https://github.com/jeffshee/hidamari</property>
       </object>
     </child>
   </object>
-  <object class="GtkAdjustment" id="AdjustmentBlur">
-    <property name="upper">20</property>
-    <property name="step-increment">1</property>
-    <property name="page-increment">10</property>
-    <signal name="value-changed" handler="on_blur_radius_changed" swapped="no"/>
-  </object>
   <object class="GtkAdjustment" id="AdjustmentVolume">
     <property name="upper">100</property>
     <property name="step-increment">1</property>
@@ -214,37 +208,6 @@ Based on Hidamari by Jeff Shee https://github.com/jeffshee/hidamari</property>
           </packing>
         </child>
         <child>
-          <object class="GtkLabel" id="LabelBlurRadius">
-            <property name="visible">True</property>
-            <property name="sensitive">False</property>
-            <property name="can-focus">False</property>
-            <property name="label" translatable="yes">Static wallpaper blur radius</property>
-            <attributes>
-              <attribute name="weight" value="bold"/>
-            </attributes>
-          </object>
-          <packing>
-            <property name="expand">False</property>
-            <property name="fill">True</property>
-            <property name="position">8</property>
-          </packing>
-        </child>
-        <child>
-          <object class="GtkSpinButton" id="SpinBlurRadius">
-            <property name="visible">True</property>
-            <property name="can-focus">True</property>
-            <property name="text" translatable="no">0</property>
-            <property name="input-purpose">digits</property>
-            <property name="adjustment">AdjustmentBlur</property>
-            <property name="numeric">True</property>
-          </object>
-          <packing>
-            <property name="expand">False</property>
-            <property name="fill">True</property>
-            <property name="position">9</property>
-          </packing>
-        </child>
-        <child>
           <object class="GtkSeparator">
             <property name="visible">True</property>
             <property name="can-focus">False</property>
@@ -331,7 +294,7 @@ Based on Hidamari by Jeff Shee https://github.com/jeffshee/hidamari</property>
                 <property name="can-focus">False</property>
                 <property name="spacing">8</property>
                 <child>
-                  <object class="GtkLabel">
+                  <object class="GtkLabel" id="LabelVideoFolder">
                     <property name="visible">True</property>
                     <property name="can-focus">False</property>
                     <property name="label" translatable="yes">&lt;span size="x-large"&gt;&lt;b&gt;Local Video&lt;/b&gt;&lt;/span&gt;

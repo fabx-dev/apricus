@@ -14,7 +14,6 @@ gi.require_version("Gtk", "3.0")
 gi.require_version("Gdk", "3.0")
 import vlc
 from gi.repository import Gdk, GLib, Gtk
-from PIL import Image, ImageFilter
 from pydbus import SessionBus
 
 from apricus import mediacache, perf
@@ -614,12 +613,12 @@ class VideoPlayer(BasePlayer):
         self._static_token = getattr(self, "_static_token", 0) + 1
         thread = threading.Thread(
             target=self._generate_static_wallpaper,
-            args=(video, cached, self.config["static_wallpaper_blur_radius"], self._static_token),
+            args=(video, cached, self._static_token),
             daemon=True,
         )
         thread.start()
 
-    def _generate_static_wallpaper(self, video, cached, blur_radius, token):
+    def _generate_static_wallpaper(self, video, cached, token):
         _width, _height, duration = mediacache.probe_video(video)
         if duration is None:
             duration = 0
@@ -646,10 +645,9 @@ class VideoPlayer(BasePlayer):
         if ret.returncode != 0 or not os.path.isfile(tmp_path):
             logger.warning("[StaticWallpaper] frame extraction failed")
             return
+        # Sharp frame, no blur: the static wallpaper sits underneath the video
+        # and blur only added startup cost for no visible benefit.
         try:
-            blur_wallpaper = Image.open(tmp_path)
-            blur_wallpaper = blur_wallpaper.filter(ImageFilter.GaussianBlur(blur_radius))
-            blur_wallpaper.save(tmp_path)
             os.replace(tmp_path, cached)
         except OSError as e:
             logger.warning(f"[StaticWallpaper] {e}")

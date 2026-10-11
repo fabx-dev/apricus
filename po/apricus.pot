@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: apricus\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-12 00:19+0200\n"
+"POT-Creation-Date: 2026-10-12 00:36+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -17,25 +17,25 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-#: src/apricus/gui/control.py:122
+#: src/apricus/gui/control.py:120
 #, python-brace-format
 msgid "Set For {monitor}"
 msgstr ""
 
 #. add all option
-#: src/apricus/gui/control.py:127
+#: src/apricus/gui/control.py:125
 msgid "Set For All"
 msgstr ""
 
-#: src/apricus/gui/control.py:218
+#: src/apricus/gui/control.py:214
 msgid "Couldn't connect to server"
 msgstr ""
 
-#: src/apricus/gui/control.py:231
+#: src/apricus/gui/control.py:227
 msgid "Welcome to Apricus 🤗"
 msgstr ""
 
-#: src/apricus/gui/control.py:235
+#: src/apricus/gui/control.py:231
 msgid ""
 "Quickstart for adding local videos:\n"
 " ・Click the folder icon to open the Hidamari folder\n"
@@ -43,53 +43,60 @@ msgid ""
 " ・Click the refresh button"
 msgstr ""
 
-#: src/apricus/gui/control.py:251
+#: src/apricus/gui/control.py:247
 msgid "Oops!"
 msgstr ""
 
-#: src/apricus/gui/control.py:261 src/apricus/assets/control.ui:403
+#: src/apricus/gui/control.py:257 src/apricus/assets/control.ui:366
 msgid "Choose video folder"
 msgstr ""
 
-#: src/apricus/gui/control.py:266
+#: src/apricus/gui/control.py:262
 msgid "Cancel"
 msgstr ""
 
-#: src/apricus/gui/control.py:268
+#: src/apricus/gui/control.py:264
 msgid "Choose"
 msgstr ""
 
-#: src/apricus/gui/control.py:291
+#: src/apricus/gui/control.py:287
 msgid "No Video Selected"
 msgstr ""
 
-#: src/apricus/gui/control.py:293
+#: src/apricus/gui/control.py:289
 msgid ""
 "There are no video selected.\n"
 "Please choose one first."
 msgstr ""
 
-#: src/apricus/gui/control.py:329
+#: src/apricus/gui/control.py:325
 msgid "Please choose a HTML file"
 msgstr ""
 
-#: src/apricus/gui/control.py:452
+#: src/apricus/gui/control.py:433
 #, python-brace-format
 msgid ""
 "Failed to access {url}. Error:\n"
 "{error}"
 msgstr ""
 
-#: src/apricus/gui/control.py:457
+#: src/apricus/gui/control.py:438
 #, python-brace-format
 msgid "Failed to access {url}. Error code: {code}"
 msgstr ""
 
-#: src/apricus/gui/control.py:473
+#: src/apricus/gui/control.py:454
 #, python-brace-format
 msgid ""
 "Failed to stream {url}. Error:\n"
 "{error}"
+msgstr ""
+
+#: src/apricus/gui/control.py:532
+#, python-brace-format
+msgid ""
+"&lt;span size=\"x-large\"&gt;&lt;b&gt;Local Video&lt;/b&gt;&lt;/span&gt;\n"
+"Videos in {folder}"
 msgstr ""
 
 #.
@@ -103,7 +110,7 @@ msgid "Toggle Mute Audio"
 msgstr ""
 
 #.
-#: src/apricus/menu.py:103 src/apricus/assets/control.ui:855
+#: src/apricus/menu.py:103 src/apricus/assets/control.ui:818
 msgid "Toggle Play/Pause"
 msgstr ""
 
@@ -113,12 +120,12 @@ msgid "Reload"
 msgstr ""
 
 #.
-#: src/apricus/menu.py:109 src/apricus/assets/control.ui:874
+#: src/apricus/menu.py:109 src/apricus/assets/control.ui:837
 msgid "I'm Feeling Lucky"
 msgstr ""
 
 #.
-#: src/apricus/menu.py:112 src/apricus/assets/control.ui:292
+#: src/apricus/menu.py:112 src/apricus/assets/control.ui:255
 msgid "Quit Apricus"
 msgstr ""
 
@@ -126,132 +133,128 @@ msgstr ""
 msgid "Live wallpaper for Linux. Apricus (lat.) — sunny, exposed to the sun."
 msgstr ""
 
-#: src/apricus/assets/control.ui:74
+#: src/apricus/assets/control.ui:68
 msgid "Quick toggles"
 msgstr ""
 
-#: src/apricus/assets/control.ui:91
+#: src/apricus/assets/control.ui:85
 msgid "Autostart after login"
 msgstr ""
 
-#: src/apricus/assets/control.ui:104
+#: src/apricus/assets/control.ui:98
 msgid "Video frame can be applied as system wallpaper, look great in GNOME"
 msgstr ""
 
-#: src/apricus/assets/control.ui:106
+#: src/apricus/assets/control.ui:100
 msgid "Apply static wallpaper"
 msgstr ""
 
-#: src/apricus/assets/control.ui:119
+#: src/apricus/assets/control.ui:113
 msgid ""
 "Automatically pauses playback when maximized window or full screen mode is "
 "detected"
 msgstr ""
 
-#: src/apricus/assets/control.ui:121
+#: src/apricus/assets/control.ui:115
 msgid "Pause when maximized window"
 msgstr ""
 
-#: src/apricus/assets/control.ui:134
+#: src/apricus/assets/control.ui:128
 msgid ""
 "Automatically mutes playback when maximized window or full screen mode is "
 "detected"
 msgstr ""
 
-#: src/apricus/assets/control.ui:136
+#: src/apricus/assets/control.ui:130
 msgid "Mute when maximized window"
 msgstr ""
 
-#: src/apricus/assets/control.ui:160
+#: src/apricus/assets/control.ui:154
 msgid "Volume control"
 msgstr ""
 
-#: src/apricus/assets/control.ui:221
-msgid "Static wallpaper blur radius"
-msgstr ""
-
-#: src/apricus/assets/control.ui:264
+#: src/apricus/assets/control.ui:227
 msgid "Open config file"
 msgstr ""
 
-#: src/apricus/assets/control.ui:278
+#: src/apricus/assets/control.ui:241
 msgid "About Apricus"
 msgstr ""
 
-#: src/apricus/assets/control.ui:337
+#: src/apricus/assets/control.ui:300
 msgid ""
 "<span size=\"x-large\"><b>Local Video</b></span>\n"
 "Videos located in the video folder"
 msgstr ""
 
-#: src/apricus/assets/control.ui:353
+#: src/apricus/assets/control.ui:316
 msgid "Refresh"
 msgstr ""
 
-#: src/apricus/assets/control.ui:378
+#: src/apricus/assets/control.ui:341
 msgid "Open video folder"
 msgstr ""
 
-#: src/apricus/assets/control.ui:455 src/apricus/assets/control.ui:778
+#: src/apricus/assets/control.ui:418 src/apricus/assets/control.ui:741
 msgid "Apply"
 msgstr ""
 
-#: src/apricus/assets/control.ui:475
+#: src/apricus/assets/control.ui:438
 msgid "Local Video"
 msgstr ""
 
-#: src/apricus/assets/control.ui:488
+#: src/apricus/assets/control.ui:451
 msgid ""
 "<span size=\"x-large\"><b>Streaming</b></span>\n"
 "Videos from streaming services"
 msgstr ""
 
-#: src/apricus/assets/control.ui:523
+#: src/apricus/assets/control.ui:486
 msgid "<b>Streaming URL</b>"
 msgstr ""
 
-#: src/apricus/assets/control.ui:564
+#: src/apricus/assets/control.ui:527
 msgid "💡\tThis feature uses <i>yt-dlp</i> as backend"
 msgstr ""
 
-#: src/apricus/assets/control.ui:578
+#: src/apricus/assets/control.ui:541
 msgid ""
 "😉\tTry playing any YouTube video! <a href=\"https://github.com/yt-dlp/yt-"
 "dlp/blob/master/supportedsites.md\">Supported sites (yt-dlp)</a>"
 msgstr ""
 
-#: src/apricus/assets/control.ui:593 src/apricus/assets/control.ui:720
+#: src/apricus/assets/control.ui:556 src/apricus/assets/control.ui:683
 msgid "Hint"
 msgstr ""
 
-#: src/apricus/assets/control.ui:614
+#: src/apricus/assets/control.ui:577
 msgid "Streaming"
 msgstr ""
 
-#: src/apricus/assets/control.ui:628
+#: src/apricus/assets/control.ui:591
 msgid ""
 "<span size=\"x-large\"><b>Web Page</b></span>\n"
 "Set a web page as wallpaper"
 msgstr ""
 
-#: src/apricus/assets/control.ui:663
+#: src/apricus/assets/control.ui:626
 msgid "<b>Web Page URL</b>"
 msgstr ""
 
-#: src/apricus/assets/control.ui:704
+#: src/apricus/assets/control.ui:667
 msgid ""
 "💡\tCheck this website for some really amazing examples!\n"
 "\t<a href=\"https://alteredqualia.com/\">https://alteredqualia.com/</a>"
 msgstr ""
 
-#: src/apricus/assets/control.ui:736
+#: src/apricus/assets/control.ui:699
 msgid "<b>Local Web Page</b>"
 msgstr ""
 
-#: src/apricus/assets/control.ui:750
+#: src/apricus/assets/control.ui:713
 msgid "Alternately, you can choose a HTML file on your PC"
 msgstr ""
 
-#: src/apricus/assets/control.ui:813
+#: src/apricus/assets/control.ui:776
 msgid "Web Page"
 msgstr ""

@@ -20,7 +20,7 @@ path to Wayland and multi-desktop support**.
 
 - Autostart after login (`.desktop` file or user systemd unit)
 - Instant wallpaper at login: last frame applied immediately, refreshed in background
-- Static wallpaper from video frame, with blur effect <sup>1</sup>
+- Static wallpaper from the current video frame <sup>1</sup>
 - Pause on maximized window / fullscreen <sup>2</sup>
 - Volume control, mute/pause in two clicks
 - I'm feeling lucky (random video)

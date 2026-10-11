@@ -19,7 +19,6 @@ from pydbus import SessionBus
 
 from apricus.commons import (
     AUTOSTART_DESKTOP_PATH,
-    CONFIG_KEY_BLUR_RADIUS,
     CONFIG_KEY_DATA_SOURCE,
     CONFIG_KEY_FIRST_TIME,
     CONFIG_KEY_MODE,
@@ -78,7 +77,6 @@ class ControlPanel(Gtk.Application):
             "on_volume_changed": self.on_volume_changed,
             "on_streaming_activate": self.on_streaming_activate,
             "on_web_page_activate": self.on_web_page_activate,
-            "on_blur_radius_changed": self.on_blur_radius_changed,
         }
         self.builder.connect_signals(signals)
 
@@ -201,8 +199,6 @@ class ControlPanel(Gtk.Application):
         if not is_gnome():
             # Disable static wallpaper functionality for non-GNOME DE
             self.builder.get_object("ToggleStaticWallpaper").set_visible(False)
-            self.builder.get_object("LabelBlurRadius").set_visible(False)
-            self.builder.get_object("SpinBlurRadius").set_visible(False)
 
         self._reload_all_widgets()
 
@@ -372,13 +368,6 @@ class ControlPanel(Gtk.Application):
         else:
             scale.set_sensitive(True)
 
-    def set_spin_blur_radius_sensitive(self):
-        spin = self.builder.get_object("SpinBlurRadius")
-        if self.config[CONFIG_KEY_STATIC_WALLPAPER]:
-            spin.set_sensitive(True)
-        else:
-            spin.set_sensitive(False)
-
     def on_volume_changed(self, adjustment):
         self.config[CONFIG_KEY_VOLUME] = int(adjustment.get_value())
         logger.info(f"[GUI] Volume: {self.config[CONFIG_KEY_VOLUME]}")
@@ -386,13 +375,6 @@ class ControlPanel(Gtk.Application):
         if self.server is not None:
             self.server.volume = self.config[CONFIG_KEY_VOLUME]
         self.set_mute_toggle_icon()
-
-    def on_blur_radius_changed(self, adjustment):
-        self.config[CONFIG_KEY_BLUR_RADIUS] = int(adjustment.get_value())
-        logger.info(f"[GUI] Blur radius: {self.config[CONFIG_KEY_BLUR_RADIUS]}")
-        self._save_config_delay()
-        if self.server is not None:
-            self.server.blur_radius = self.config[CONFIG_KEY_BLUR_RADIUS]
 
     def on_mute(self, action, state):
         action.set_state(state)
@@ -417,7 +399,6 @@ class ControlPanel(Gtk.Application):
         self._save_config()
         if self.server is not None:
             self.server.is_static_wallpaper = self.config[CONFIG_KEY_STATIC_WALLPAPER]
-        self.set_spin_blur_radius_sensitive()
 
     def on_pause_when_maximized(self, action, state):
         action.set_state(state)
@@ -528,7 +509,6 @@ class ControlPanel(Gtk.Application):
         self._reload_icon_view()
         self.set_mute_toggle_icon()
         self.set_scale_volume_sensitive()
-        self.set_spin_blur_radius_sensitive()
         toggle_mute: Gtk.ToggleButton = self.builder.get_object("ToggleMute")
         toggle_mute.set_state = self.config[CONFIG_KEY_MUTE]
 
@@ -539,18 +519,21 @@ class ControlPanel(Gtk.Application):
         scale_volume.set_value(self.config[CONFIG_KEY_VOLUME])
         adjustment_volume.handler_unblock_by_func(self.on_volume_changed)
 
-        spin_blur_radius: Gtk.Scale = self.builder.get_object("SpinBlurRadius")
-        adjustment_blur: Gtk.Adjustment = self.builder.get_object("AdjustmentBlur")
-        # Temporary block signal
-        adjustment_blur.handler_block_by_func(self.on_blur_radius_changed)
-        spin_blur_radius.set_value(self.config[CONFIG_KEY_BLUR_RADIUS])
-        adjustment_blur.handler_unblock_by_func(self.on_blur_radius_changed)
-
         toggle_mute: Gtk.ToggleButton = self.builder.get_object("ToggleAutostart")
         toggle_mute.set_state = self.is_autostart
 
     def _reload_icon_view(self, *_):
-        self.video_paths = get_video_paths(resolve_video_dir(self.config))
+        video_dir = resolve_video_dir(self.config)
+        self.video_paths = get_video_paths(video_dir)
+        label = self.builder.get_object("LabelVideoFolder")
+        if label is not None:
+            label.set_markup(
+                _(
+                    '&lt;span size="x-large"&gt;&lt;b&gt;Local Video&lt;/b&gt;&lt;/span&gt;\n'
+                    "Videos in {folder}"
+                ).format(folder=os.path.basename(video_dir))
+            )
+            label.set_tooltip_text(video_dir)
         list_store = Gtk.ListStore(GdkPixbuf.Pixbuf, str)
         self.icon_view: Gtk.IconView = self.builder.get_object("IconView")
         self.icon_view.set_pixbuf_column(0)

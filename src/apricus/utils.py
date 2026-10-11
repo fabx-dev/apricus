@@ -20,6 +20,7 @@ from apricus.commons import (
     AUTOSTART_DESKTOP_PATH,
     AUTOSTART_DIR,
     CONFIG_DIR,
+    CONFIG_KEY_BLUR_RADIUS,
     CONFIG_KEY_DATA_SOURCE,
     CONFIG_KEY_MUTE_WHEN_MAXIMIZED,
     CONFIG_KEY_VIDEO_DIR,
@@ -579,6 +580,8 @@ class ConfigUtil:
                     # video_dir was added after v4 without a version bump:
                     # default it instead of wiping the whole config.
                     config.setdefault(CONFIG_KEY_VIDEO_DIR, None)
+                    # blur was removed: drop the legacy key, keep the rest.
+                    config.pop(CONFIG_KEY_BLUR_RADIUS, None)
                     self._migrateLegacyMonitorKeys(config)
                     self._checkDefaultSource(config)
                     self._checkMissingMonitors(config, CONFIG_TEMPLATE)

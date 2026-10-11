@@ -65,7 +65,7 @@ CONFIG_KEY_DATA_SOURCE = "data_source"
 CONFIG_KEY_MUTE = "is_mute"
 CONFIG_KEY_VOLUME = "audio_volume"
 CONFIG_KEY_STATIC_WALLPAPER = "is_static_wallpaper"
-CONFIG_KEY_BLUR_RADIUS = "static_wallpaper_blur_radius"
+CONFIG_KEY_BLUR_RADIUS = "static_wallpaper_blur_radius"  # legacy, removed (popped on load)
 CONFIG_KEY_PAUSE_WHEN_MAXIMIZED = "is_pause_when_maximized"
 CONFIG_KEY_MUTE_WHEN_MAXIMIZED = "is_mute_when_maximized"
 CONFIG_KEY_FADE_DURATION_SEC = "fade_duration_sec"
@@ -80,7 +80,6 @@ CONFIG_TEMPLATE = {
     CONFIG_KEY_MUTE: False,
     CONFIG_KEY_VOLUME: 50,
     CONFIG_KEY_STATIC_WALLPAPER: True,
-    CONFIG_KEY_BLUR_RADIUS: 5,
     CONFIG_KEY_PAUSE_WHEN_MAXIMIZED: True,
     CONFIG_KEY_MUTE_WHEN_MAXIMIZED: False,
     CONFIG_KEY_FADE_DURATION_SEC: 1.5,
