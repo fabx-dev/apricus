@@ -229,7 +229,7 @@ class ControlPanel(Gtk.Application):
             #    secondary_text="You can bring up the Menu by <b>Right click</b> on the desktop",
             secondary_text=_(
                 "Quickstart for adding local videos:\n"
-                " ・Click the folder icon to open the Hidamari folder\n"
+                " ・Click the folder icon to open your video folder\n"
                 " ・Put your videos there\n"
                 " ・Click the refresh button"
             ),
@@ -528,10 +528,9 @@ class ControlPanel(Gtk.Application):
         label = self.builder.get_object("LabelVideoFolder")
         if label is not None:
             label.set_markup(
-                _(
-                    '&lt;span size="x-large"&gt;&lt;b&gt;Local Video&lt;/b&gt;&lt;/span&gt;\n'
-                    "Videos in {folder}"
-                ).format(folder=os.path.basename(video_dir))
+                _('<span size="x-large"><b>Local Video</b></span>\nVideos in {folder}').format(
+                    folder=os.path.basename(video_dir)
+                )
             )
             label.set_tooltip_text(video_dir)
         list_store = Gtk.ListStore(GdkPixbuf.Pixbuf, str)
