@@ -25,6 +25,8 @@ from apricus.commons import (
     CONFIG_KEY_MUTE,
     CONFIG_KEY_MUTE_WHEN_MAXIMIZED,
     CONFIG_KEY_PAUSE_WHEN_MAXIMIZED,
+    CONFIG_KEY_PLAYLIST,
+    CONFIG_KEY_SHUFFLE,
     CONFIG_KEY_STATIC_WALLPAPER,
     CONFIG_KEY_VIDEO_DIR,
     CONFIG_KEY_VOLUME,
@@ -32,6 +34,7 @@ from apricus.commons import (
     DBUS_NAME_SERVER,
     DBUS_PROJECT,
     LOGGER_NAME,
+    MODE_PLAYLIST,
     MODE_STREAM,
     MODE_VIDEO,
     MODE_WEBPAGE,
@@ -86,6 +89,7 @@ class ControlPanel(Gtk.Application):
         self.server = None
         self.icon_view = None
         self.video_paths = None
+        self.playlist_paths = []
         self.all_key = "all"
 
         self.is_autostart = os.path.isfile(AUTOSTART_DESKTOP_PATH)
@@ -128,6 +132,8 @@ class ControlPanel(Gtk.Application):
 
     def _load_config(self):
         self.config = ConfigUtil().load()
+        playlist = self.config.get(CONFIG_KEY_PLAYLIST) or {}
+        self.playlist_paths = list(playlist.get("Default", []))
 
     def _save_config(self):
         ConfigUtil().save(self.config)
@@ -145,6 +151,13 @@ class ControlPanel(Gtk.Application):
             ("local_video_refresh", self._reload_icon_view),
             ("local_video_apply", self.on_local_video_apply),
             ("local_web_page_apply", self.on_local_web_page_apply),
+            ("playlist_add_selected", self.on_playlist_add_selected),
+            ("playlist_add_all", self.on_playlist_add_all),
+            ("playlist_up", self.on_playlist_up),
+            ("playlist_down", self.on_playlist_down),
+            ("playlist_remove", self.on_playlist_remove),
+            ("playlist_clear", self.on_playlist_clear),
+            ("playlist_apply", self.on_playlist_apply),
             ("play_pause", self.on_play_pause),
             ("feeling_lucky", self.on_feeling_lucky),
             (
@@ -194,6 +207,10 @@ class ControlPanel(Gtk.Application):
         if not is_gnome():
             # Disable static wallpaper functionality for non-GNOME DE
             self.builder.get_object("ToggleStaticWallpaper").set_visible(False)
+
+        check_shuffle = self.builder.get_object("CheckShuffle")
+        if check_shuffle is not None:
+            check_shuffle.connect("toggled", self.on_shuffle_toggled)
 
         self._reload_all_widgets()
 
@@ -353,6 +370,91 @@ class ControlPanel(Gtk.Application):
         if self.server is not None:
             self.server.feeling_lucky()
 
+    def _refresh_playlist_view(self):
+        view = self.builder.get_object("PlaylistView")
+        if view is None:
+            return
+        if not view.get_columns():
+            for i, title in enumerate([_("#"), _("Video")]):
+                renderer = Gtk.CellRendererText()
+                column = Gtk.TreeViewColumn(title, renderer, text=i)
+                view.append_column(column)
+        store = Gtk.ListStore(int, str)
+        for pos, path in enumerate(self.playlist_paths, start=1):
+            store.append([pos, os.path.basename(path)])
+        view.set_model(store)
+
+    def on_playlist_add_selected(self, *_args):
+        selected = self.icon_view.get_selected_items()
+        if not selected:
+            return
+        for item in selected:
+            path = self.video_paths[item.get_indices()[0]]
+            if path not in self.playlist_paths:
+                self.playlist_paths.append(path)
+        self._refresh_playlist_view()
+
+    def on_playlist_add_all(self, *_args):
+        for path in self.video_paths or []:
+            if path not in self.playlist_paths:
+                self.playlist_paths.append(path)
+        self._refresh_playlist_view()
+
+    def _playlist_selected_index(self):
+        view = self.builder.get_object("PlaylistView")
+        selection = view.get_selection()
+        _model, tree_iter = selection.get_selected()
+        if tree_iter is None:
+            return None
+        return _model.get_path(tree_iter).get_indices()[0]
+
+    def on_playlist_up(self, *_args):
+        idx = self._playlist_selected_index()
+        if idx is not None and idx > 0:
+            self.playlist_paths[idx - 1], self.playlist_paths[idx] = (
+                self.playlist_paths[idx],
+                self.playlist_paths[idx - 1],
+            )
+            self._refresh_playlist_view()
+            self.builder.get_object("PlaylistView").get_selection().select_path(idx - 1)
+
+    def on_playlist_down(self, *_args):
+        idx = self._playlist_selected_index()
+        if idx is not None and idx < len(self.playlist_paths) - 1:
+            self.playlist_paths[idx + 1], self.playlist_paths[idx] = (
+                self.playlist_paths[idx],
+                self.playlist_paths[idx + 1],
+            )
+            self._refresh_playlist_view()
+            self.builder.get_object("PlaylistView").get_selection().select_path(idx + 1)
+
+    def on_playlist_remove(self, *_args):
+        idx = self._playlist_selected_index()
+        if idx is not None:
+            del self.playlist_paths[idx]
+            self._refresh_playlist_view()
+
+    def on_playlist_clear(self, *_args):
+        self.playlist_paths = []
+        self._refresh_playlist_view()
+
+    def on_playlist_apply(self, *_args):
+        if not self.playlist_paths:
+            return
+        logger.info(f"[GUI] Playlist apply ({len(self.playlist_paths)} videos)")
+        self.config[CONFIG_KEY_MODE] = MODE_PLAYLIST
+        self._save_config()
+        if self.server is not None:
+            self.server.playlist(self.playlist_paths, "all")
+        self._reload_all_widgets()
+
+    def on_shuffle_toggled(self, check):
+        self.config[CONFIG_KEY_SHUFFLE] = bool(check.get_active())
+        logger.info(f"[GUI] Shuffle: {self.config[CONFIG_KEY_SHUFFLE]}")
+        self._save_config()
+        if self.server is not None and self.config[CONFIG_KEY_MODE] == MODE_PLAYLIST:
+            self.server.reload()
+
     def set_mute_toggle_icon(self):
         toggle_icon: Gtk.Image = self.builder.get_object("ToggleMuteIcon")
         volume, is_mute = self.config[CONFIG_KEY_VOLUME], self.config[CONFIG_KEY_MUTE]
@@ -365,6 +467,38 @@ class ControlPanel(Gtk.Application):
         else:
             icon_name = "audio-volume-high-symbolic"
         toggle_icon.set_from_icon_name(icon_name=icon_name, size=0)
+
+    def _apply_playlist_audio_gate(self):
+        """Playlist players have no audio backend: grey out volume/mute."""
+        is_playlist = self.config[CONFIG_KEY_MODE] == MODE_PLAYLIST
+        scale = self.builder.get_object("ScaleVolume")
+        toggle = self.builder.get_object("ToggleMute")
+        if scale is not None:
+            scale.set_sensitive(not is_playlist and not self.config[CONFIG_KEY_MUTE])
+            scale.set_tooltip_text(
+                _("Disabled in playlist mode (muted by design)")
+                if is_playlist
+                else _("Volume control")
+            )
+        if toggle is not None:
+            toggle.set_sensitive(not is_playlist)
+        mute_action = self.lookup_action("mute")
+        if mute_action is not None:
+            mute_action.set_enabled(not is_playlist)
+
+    def _select_tab_for_mode(self):
+        stack = self.builder.get_object("stack1")
+        if stack is None:
+            return
+        mapping = {
+            MODE_VIDEO: "video",
+            MODE_STREAM: "streaming",
+            MODE_WEBPAGE: "webpage",
+            MODE_PLAYLIST: "playlist",
+        }
+        child = mapping.get(self.config[CONFIG_KEY_MODE])
+        if child is not None:
+            stack.set_visible_child_name(child)
 
     def set_scale_volume_sensitive(self):
         scale = self.builder.get_object("ScaleVolume")
@@ -512,8 +646,14 @@ class ControlPanel(Gtk.Application):
 
     def _reload_all_widgets(self):
         self._reload_icon_view()
+        self._refresh_playlist_view()
         self.set_mute_toggle_icon()
         self.set_scale_volume_sensitive()
+        self._apply_playlist_audio_gate()
+        self._select_tab_for_mode()
+        check_shuffle = self.builder.get_object("CheckShuffle")
+        if check_shuffle is not None:
+            check_shuffle.set_active(bool(self.config.get(CONFIG_KEY_SHUFFLE)))
         toggle_mute: Gtk.ToggleButton = self.builder.get_object("ToggleMute")
         toggle_mute.set_state = self.config[CONFIG_KEY_MUTE]
 

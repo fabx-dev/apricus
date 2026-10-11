@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: apricus\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-12 01:05+0200\n"
+"POT-Creation-Date: 2026-10-12 01:21+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: Fabrizio <fabx-dev>\n"
 "Language-Team: Spanish\n"
@@ -17,23 +17,23 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-#: src/apricus/gui/control.py:120
+#: src/apricus/gui/control.py:124
 msgid "Set For {monitor}"
 msgstr "Establecer para {monitor}"
 
-#: src/apricus/gui/control.py:125
+#: src/apricus/gui/control.py:129
 msgid "Set For All"
 msgstr "Establecer para todos"
 
-#: src/apricus/gui/control.py:209
+#: src/apricus/gui/control.py:226
 msgid "Couldn't connect to server"
 msgstr "No se pudo conectar con el servidor"
 
-#: src/apricus/gui/control.py:222
+#: src/apricus/gui/control.py:239
 msgid "Welcome to Apricus 🤗"
 msgstr "Bienvenido a Apricus 🤗"
 
-#: src/apricus/gui/control.py:226
+#: src/apricus/gui/control.py:243
 msgid "Quickstart for adding local videos:\n ・Click the folder icon to open your video folder\n ・Put your videos there\n ・Click the refresh button"
 msgstr ""
 "Guía rápida para añadir vídeos locales:\n"
@@ -41,65 +41,81 @@ msgstr ""
 " • Pon allí tus vídeos\n"
 " • Haz clic en el botón de actualizar"
 
-#: src/apricus/gui/control.py:242
+#: src/apricus/gui/control.py:259
 msgid "Oops!"
 msgstr "¡Ups!"
 
-#: src/apricus/gui/control.py:260
+#: src/apricus/gui/control.py:277
 msgid "Choose video folder (current: {folder})"
 msgstr "Elegir la carpeta de vídeos (actual: {folder})"
 
-#: src/apricus/gui/control.py:261
+#: src/apricus/gui/control.py:278
 msgid "none chosen yet"
 msgstr "ninguna elegida"
 
-#: src/apricus/gui/control.py:267
+#: src/apricus/gui/control.py:284
 msgid "Cancel"
 msgstr "Cancelar"
 
-#: src/apricus/gui/control.py:269
+#: src/apricus/gui/control.py:286
 msgid "Choose"
 msgstr "Elegir"
 
-#: src/apricus/gui/control.py:292
+#: src/apricus/gui/control.py:309
 msgid "No Video Selected"
 msgstr "Ningún vídeo seleccionado"
 
-#: src/apricus/gui/control.py:294
+#: src/apricus/gui/control.py:311
 msgid "There are no video selected.\nPlease choose one first."
 msgstr ""
 "No hay ningún vídeo seleccionado.\n"
 "Elige uno primero."
 
-#: src/apricus/gui/control.py:330
+#: src/apricus/gui/control.py:347
 msgid "Please choose a HTML file"
 msgstr "Elige un archivo HTML"
 
-#: src/apricus/gui/control.py:438
+#: src/apricus/gui/control.py:378
+msgid "#"
+msgstr "#"
+
+#: src/apricus/gui/control.py:378
+msgid "Video"
+msgstr "Vídeo"
+
+#: src/apricus/gui/control.py:479
+msgid "Disabled in playlist mode (muted by design)"
+msgstr "Desactivado en modo playlist (silencioso por diseño)"
+
+#: src/apricus/gui/control.py:481 src/apricus/assets/control.ui:154
+msgid "Volume control"
+msgstr "Control de volumen"
+
+#: src/apricus/gui/control.py:572
 msgid "Failed to access {url}. Error:\n{error}"
 msgstr ""
 "No se pudo acceder a {url}. Error:\n"
 "{error}"
 
-#: src/apricus/gui/control.py:443
+#: src/apricus/gui/control.py:577
 msgid "Failed to access {url}. Error code: {code}"
 msgstr "No se pudo acceder a {url}. Código de error: {code}"
 
-#: src/apricus/gui/control.py:459
+#: src/apricus/gui/control.py:593
 msgid "Failed to stream {url}. Error:\n{error}"
 msgstr ""
 "No se pudo reproducir {url} en continuo. Error:\n"
 "{error}"
 
-#: src/apricus/gui/control.py:536
+#: src/apricus/gui/control.py:676
 msgid "Choose a video folder to begin"
 msgstr "Elige una carpeta de vídeos para empezar"
 
-#: src/apricus/gui/control.py:538
+#: src/apricus/gui/control.py:678
 msgid "Videos in {folder} ({count})"
 msgstr "Vídeos en {folder} ({count})"
 
-#: src/apricus/gui/control.py:542
+#: src/apricus/gui/control.py:682
 msgid "No videos in {folder}"
 msgstr "Ningún vídeo en {folder}"
 
@@ -111,7 +127,7 @@ msgstr "Mostrar Apricus"
 msgid "Toggle Mute Audio"
 msgstr "Activar/silenciar audio"
 
-#: src/apricus/menu.py:103 src/apricus/assets/control.ui:818
+#: src/apricus/menu.py:103 src/apricus/assets/control.ui:995
 msgid "Toggle Play/Pause"
 msgstr "Reproducir/Pausar"
 
@@ -119,7 +135,7 @@ msgstr "Reproducir/Pausar"
 msgid "Reload"
 msgstr "Recargar"
 
-#: src/apricus/menu.py:109 src/apricus/assets/control.ui:837
+#: src/apricus/menu.py:109 src/apricus/assets/control.ui:1014
 msgid "I'm Feeling Lucky"
 msgstr "Voy a tener suerte"
 
@@ -162,10 +178,6 @@ msgstr "Silencia automáticamente cuando se detecta una ventana maximizada o a p
 #: src/apricus/assets/control.ui:130
 msgid "Mute when maximized window"
 msgstr "Silenciar si hay ventana maximizada"
-
-#: src/apricus/assets/control.ui:154
-msgid "Volume control"
-msgstr "Control de volumen"
 
 #: src/apricus/assets/control.ui:227
 msgid "Open config file"
@@ -254,3 +266,53 @@ msgstr "También puedes elegir un archivo HTML de tu PC"
 #: src/apricus/assets/control.ui:776
 msgid "Web Page"
 msgstr "Página web"
+
+#: src/apricus/assets/control.ui:790
+msgid "<span size=\"x-large\"><b>Playlist</b></span>\nMuted loop over your videos"
+msgstr ""
+"<span size=\"x-large\"><b>Playlist</b></span>\n"
+"Reproducción en bucle de tus vídeos (sin sonido)"
+
+#: src/apricus/assets/control.ui:837
+msgid "Add selected"
+msgstr "Añadir selección"
+
+#: src/apricus/assets/control.ui:838
+msgid "Add the video selected in Local Video"
+msgstr "Añadir el vídeo seleccionado en Vídeo local"
+
+#: src/apricus/assets/control.ui:851
+msgid "Add all"
+msgstr "Añadir todos"
+
+#: src/apricus/assets/control.ui:852
+msgid "Add every video in the library"
+msgstr "Añadir todos los vídeos de la biblioteca"
+
+#: src/apricus/assets/control.ui:865
+msgid "Up"
+msgstr "Subir"
+
+#: src/apricus/assets/control.ui:878
+msgid "Down"
+msgstr "Bajar"
+
+#: src/apricus/assets/control.ui:891
+msgid "Remove"
+msgstr "Quitar"
+
+#: src/apricus/assets/control.ui:904
+msgid "Clear"
+msgstr "Vaciar"
+
+#: src/apricus/assets/control.ui:917
+msgid "Shuffle"
+msgstr "Aleatorio"
+
+#: src/apricus/assets/control.ui:930
+msgid "Apply playlist"
+msgstr "Aplicar playlist"
+
+#: src/apricus/assets/control.ui:953
+msgid "Playlist"
+msgstr "Playlist"
