@@ -61,6 +61,9 @@ class MonitorInfo:
     @staticmethod
     def monitors():
         display = Gdk.Display.get_default()
+        if display is None:
+            # Headless (CI, tests): no monitors to report.
+            return []
         n_monitors = display.get_n_monitors()
         monitors = []
 

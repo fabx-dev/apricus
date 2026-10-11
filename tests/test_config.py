@@ -1,6 +1,7 @@
 """Tests for ConfigUtil legacy Hidamari import (no display required)."""
 
 import json
+from unittest.mock import patch
 
 from apricus import commons
 from apricus.utils import ConfigUtil
@@ -23,9 +24,12 @@ def test_legacy_config_imported_once(tmp_path, monkeypatch):
     monkeypatch.setattr(U, "CONFIG_PATH", str(new_dir / "config.json"))
     monkeypatch.setattr(U, "LEGACY_CONFIG_PATH", str(legacy_dir / "config.json"))
 
-    loaded = ConfigUtil().load()
+    loaded = None
+    with patch("apricus.monitor.MonitorInfo.monitors", return_value=[]):
+        loaded = ConfigUtil().load()
     assert loaded["audio_volume"] == 77
     assert (new_dir / "config.json").is_file()
     # second load: adopted config used, legacy untouched
     (legacy_dir / "config.json").write_text(json.dumps(dict(legacy_cfg, audio_volume=11)))
-    assert ConfigUtil().load()["audio_volume"] == 77
+    with patch("apricus.monitor.MonitorInfo.monitors", return_value=[]):
+        assert ConfigUtil().load()["audio_volume"] == 77
