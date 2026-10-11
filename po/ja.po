@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: hidamari\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-12 00:36+0200\n"
+"POT-Creation-Date: 2026-10-12 00:49+0200\n"
 "PO-Revision-Date: 2026-07-10 01:30+0900\n"
 "Last-Translator: Jeff Shee <jeffshee8969@gmail.com>\n"
 "Language-Team: Japanese\n"
@@ -35,9 +35,10 @@ msgid "Welcome to Apricus 🤗"
 msgstr "Apricus へようこそ 🤗"
 
 #: src/apricus/gui/control.py:231
+#, fuzzy
 msgid ""
 "Quickstart for adding local videos:\n"
-" ・Click the folder icon to open the Hidamari folder\n"
+" ・Click the folder icon to open your video folder\n"
 " ・Put your videos there\n"
 " ・Click the refresh button"
 msgstr ""
@@ -50,24 +51,24 @@ msgstr ""
 msgid "Oops!"
 msgstr "おっと！"
 
-#: src/apricus/gui/control.py:257 src/apricus/assets/control.ui:366
-#, fuzzy
-msgid "Choose video folder"
+#: src/apricus/gui/control.py:258
+#, fuzzy, python-brace-format
+msgid "Choose video folder (current: {folder})"
 msgstr "Hidamari フォルダーを開く"
 
-#: src/apricus/gui/control.py:262
+#: src/apricus/gui/control.py:263
 msgid "Cancel"
 msgstr ""
 
-#: src/apricus/gui/control.py:264
+#: src/apricus/gui/control.py:265
 msgid "Choose"
 msgstr ""
 
-#: src/apricus/gui/control.py:287
+#: src/apricus/gui/control.py:288
 msgid "No Video Selected"
 msgstr "動画が選択されていません"
 
-#: src/apricus/gui/control.py:289
+#: src/apricus/gui/control.py:290
 msgid ""
 "There are no video selected.\n"
 "Please choose one first."
@@ -75,11 +76,11 @@ msgstr ""
 "動画が選択されていません。\n"
 "まず動画を1つ選択してください。"
 
-#: src/apricus/gui/control.py:325
+#: src/apricus/gui/control.py:326
 msgid "Please choose a HTML file"
 msgstr "HTML ファイルを選択してください"
 
-#: src/apricus/gui/control.py:433
+#: src/apricus/gui/control.py:434
 #, python-brace-format
 msgid ""
 "Failed to access {url}. Error:\n"
@@ -88,12 +89,12 @@ msgstr ""
 "{url} にアクセスできませんでした。エラー:\n"
 "{error}"
 
-#: src/apricus/gui/control.py:438
+#: src/apricus/gui/control.py:439
 #, python-brace-format
 msgid "Failed to access {url}. Error code: {code}"
 msgstr "{url} にアクセスできませんでした。エラーコード: {code}"
 
-#: src/apricus/gui/control.py:454
+#: src/apricus/gui/control.py:455
 #, python-brace-format
 msgid ""
 "Failed to stream {url}. Error:\n"
@@ -102,14 +103,15 @@ msgstr ""
 "{url} のストリーミングに失敗しました。エラー:\n"
 "{error}"
 
-#: src/apricus/gui/control.py:532
-#, fuzzy, python-brace-format
-msgid ""
-"&lt;span size=\"x-large\"&gt;&lt;b&gt;Local Video&lt;/b&gt;&lt;/span&gt;\n"
-"Videos in {folder}"
+#: src/apricus/gui/control.py:533
+#, python-brace-format
+msgid "Videos in {folder} ({count})"
 msgstr ""
-"<span size=\"x-large\"><b>ローカル動画</b></span>\n"
-"Hidamari フォルダー内の動画"
+
+#: src/apricus/gui/control.py:537
+#, fuzzy, python-brace-format
+msgid "No videos in {folder}"
+msgstr "Hidamari フォルダーを開く"
 
 #.
 #: src/apricus/menu.py:97
@@ -212,6 +214,11 @@ msgstr "更新"
 msgid "Open video folder"
 msgstr "Hidamari フォルダーを開く"
 
+#: src/apricus/assets/control.ui:366
+#, fuzzy
+msgid "Choose video folder"
+msgstr "Hidamari フォルダーを開く"
+
 #: src/apricus/assets/control.ui:418 src/apricus/assets/control.ui:741
 msgid "Apply"
 msgstr "適用"
@@ -283,6 +290,14 @@ msgstr "または、PC 上の HTML ファイルを選択することもできま
 #: src/apricus/assets/control.ui:776
 msgid "Web Page"
 msgstr "ウェブページ"
+
+#, fuzzy, python-brace-format
+#~ msgid ""
+#~ "&lt;span size=\"x-large\"&gt;&lt;b&gt;Local Video&lt;/b&gt;&lt;/span&gt;\n"
+#~ "Videos in {folder}"
+#~ msgstr ""
+#~ "<span size=\"x-large\"><b>ローカル動画</b></span>\n"
+#~ "Hidamari フォルダー内の動画"
 
 #~ msgid "Static wallpaper blur radius"
 #~ msgstr "静止画壁紙のぼかし半径"

@@ -253,8 +253,9 @@ class ControlPanel(Gtk.Application):
         dialog.destroy()
 
     def on_choose_video_dir(self, *_args):
+        current = resolve_video_dir(self.config)
         dialog = Gtk.FileChooserDialog(
-            title=_("Choose video folder"),
+            title=_("Choose video folder (current: {folder})").format(folder=current),
             parent=self.window,
             action=Gtk.FileChooserAction.SELECT_FOLDER,
         )
@@ -527,10 +528,15 @@ class ControlPanel(Gtk.Application):
         self.video_paths = get_video_paths(video_dir)
         label = self.builder.get_object("LabelVideoFolder")
         if label is not None:
-            label.set_markup(
-                _('<span size="x-large"><b>Local Video</b></span>\nVideos in {folder}').format(
-                    folder=os.path.basename(video_dir)
+            folder = os.path.basename(video_dir)
+            if self.video_paths:
+                text = _("Videos in {folder} ({count})").format(
+                    folder=folder, count=len(self.video_paths)
                 )
+            else:
+                text = _("No videos in {folder}").format(folder=folder)
+            label.set_markup(
+                '<span size="x-large"><b>Local Video</b></span>\n' + GLib.markup_escape_text(text)
             )
             label.set_tooltip_text(video_dir)
         list_store = Gtk.ListStore(GdkPixbuf.Pixbuf, str)

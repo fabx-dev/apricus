@@ -215,13 +215,12 @@ def setup_systemd_autostart(enable):
 def get_video_paths(video_dir=None):
     directory = video_dir or VIDEO_WALLPAPER_DIR
     file_list = []
-    try:
-        entries = os.listdir(directory)
-    except OSError as e:
-        logger.warning(f"[Utils] Cannot list {directory}: {e}")
+    if not os.path.isdir(directory):
+        logger.warning(f"[Utils] Video folder missing: {directory}")
         return []
-    for filename in entries:
-        filepath = os.path.join(directory, filename)
+    for root, _dirs, files in os.walk(directory):
+        for filename in files:
+            filepath = os.path.join(root, filename)
         file = Gio.file_new_for_path(filepath)
         info = file.query_info("standard::content-type", Gio.FileQueryInfoFlags.NONE, None)
         mime_type = info.get_content_type()
