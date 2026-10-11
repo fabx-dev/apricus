@@ -635,7 +635,10 @@ class VideoPlayer(BasePlayer):
             self._apply_static_wallpaper(cached)
         else:
             perf.mark("player: static cache miss")
-        # Refresh the frame in background; applied on completion if still current.
+        # Refresh the frame in background unless fast login startup.
+        if os.environ.get("HIDAMARI_FAST") == "1":
+            perf.mark("player: static refresh skipped (fast mode)")
+            return
         self._static_token = getattr(self, "_static_token", 0) + 1
         thread = threading.Thread(
             target=self._generate_static_wallpaper,

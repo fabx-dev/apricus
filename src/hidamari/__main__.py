@@ -5,7 +5,12 @@ import sys
 
 from hidamari import perf, server  # perf first: import captures process-start T0
 from hidamari.commons import LOGGER_NAME, VIDEO_WALLPAPER_DIR
-from hidamari.utils import is_flatpak, is_gnome, is_wayland
+from hidamari.utils import (
+    is_flatpak,
+    is_gnome,
+    is_wayland,
+    setup_systemd_autostart,
+)
 
 logger = logging.getLogger(LOGGER_NAME)
 
@@ -29,9 +34,35 @@ def main(version="devel", pkgdatadir="/usr/share/hidamari", localedir="/usr/shar
     parser.add_argument(
         "-b", "--background", action="store_true", help="Launch only the live wallpaper."
     )
+    parser.add_argument(
+        "--fast",
+        action="store_true",
+        help="Low-contention login startup: implies -b and skips the "
+        "background static-wallpaper refresh (cached frame only).",
+    )
     parser.add_argument("-d", "--debug", action="store_true", help="Print debug messages.")
     parser.add_argument("-r", "--reset", action="store_true", help="Reset user configuration.")
+    parser.add_argument(
+        "--systemd-enable",
+        action="store_true",
+        help="Install and enable user systemd autostart, then exit.",
+    )
+    parser.add_argument(
+        "--systemd-disable",
+        action="store_true",
+        help="Disable and remove user systemd autostart, then exit.",
+    )
     args = parser.parse_args()
+
+    if args.systemd_enable or args.systemd_disable:
+        ok = setup_systemd_autostart(bool(args.systemd_enable))
+        action = "enabled" if args.systemd_enable else "disabled"
+        print(f"systemd autostart {action}" if ok else "systemd autostart change FAILED")
+        return 0 if ok else 1
+
+    if args.fast:
+        args.background = True
+        os.environ["HIDAMARI_FAST"] = "1"
 
     # Setup logger
     if args.debug:

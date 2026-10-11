@@ -3,6 +3,9 @@ import json
 import locale
 import logging
 import os
+import shutil
+import subprocess
+import sys
 from pprint import pformat
 
 import gi
@@ -128,6 +131,82 @@ def setup_autostart(autostart):
     else:
         if os.path.isfile(AUTOSTART_DESKTOP_PATH):
             os.remove(AUTOSTART_DESKTOP_PATH)
+
+
+SYSTEMD_UNIT_NAME = "hidamari.service"
+
+
+def _systemd_user_dir():
+    return os.path.join(
+        os.environ.get("XDG_CONFIG_HOME", os.path.join(os.path.expanduser("~"), ".config")),
+        "systemd",
+        "user",
+    )
+
+
+def systemd_unit_content():
+    """User unit for login autostart (opt-in alternative to .desktop).
+
+    Ordered after graphical-session, restarted on failure, niced down so
+    login stays responsive. The launcher command is resolved for the
+    current install: inside a venv (uv dev install) the venv python is
+    used explicitly, because the installed script's system-python shebang
+    may lack venv-only deps.
+    """
+    script = shutil.which("hidamari") or os.path.join(
+        os.path.expanduser("~"), ".local", "bin", "hidamari"
+    )
+    if sys.prefix != getattr(sys, "base_prefix", sys.prefix):
+        exec_start = f"{sys.executable} {script} --fast -b"
+    else:
+        exec_start = f"{script} --fast -b"
+    return f"""[Unit]
+Description=Apricus live wallpaper (Hidamari)
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart={exec_start}
+Restart=on-failure
+RestartSec=5
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+
+[Install]
+WantedBy=graphical-session.target
+"""
+
+
+def setup_systemd_autostart(enable):
+    """Install/enable or disable/remove the user systemd autostart unit.
+
+    Returns True on success. Never raises.
+    """
+    unit_path = os.path.join(_systemd_user_dir(), SYSTEMD_UNIT_NAME)
+    try:
+        if enable:
+            os.makedirs(_systemd_user_dir(), exist_ok=True)
+            with open(unit_path, mode="w") as f:
+                f.write(systemd_unit_content())
+            subprocess.run(["systemctl", "--user", "daemon-reload"], check=True)
+            subprocess.run(
+                ["systemctl", "--user", "enable", "--now", SYSTEMD_UNIT_NAME], check=True
+            )
+            logger.info(f"[Utils] systemd autostart enabled ({unit_path})")
+        else:
+            subprocess.run(
+                ["systemctl", "--user", "disable", "--now", SYSTEMD_UNIT_NAME], check=False
+            )
+            if os.path.isfile(unit_path):
+                os.remove(unit_path)
+            subprocess.run(["systemctl", "--user", "daemon-reload"], check=False)
+            logger.info("[Utils] systemd autostart disabled")
+        return True
+    except (OSError, subprocess.CalledProcessError) as e:
+        logger.warning(f"[Utils] systemd autostart failed: {e}")
+        return False
 
 
 def get_video_paths():
