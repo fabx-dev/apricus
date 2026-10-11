@@ -1,5 +1,6 @@
 import logging
 import multiprocessing as mp
+import os
 import random
 import signal
 import time
@@ -75,6 +76,9 @@ class HidamariServer:
 
     def __init__(self, version, pkgdatadir, localedir, args):
         setproctitle.setproctitle("hidamari-server")
+
+        # Share the login-timescale T0 with all forkserver children.
+        os.environ["HIDAMARI_T0"] = repr(perf.start_time())
 
         self.version = version
         self.pkgdatadir = pkgdatadir
