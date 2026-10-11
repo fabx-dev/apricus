@@ -251,6 +251,20 @@ Based on Hidamari by Jeff Shee https://github.com/jeffshee/hidamari</property>
             <property name="visible">True</property>
             <property name="can-focus">True</property>
             <property name="receives-default">True</property>
+            <property name="action-name">app.selection_help</property>
+            <property name="text" translatable="yes">How to select videos</property>
+          </object>
+          <packing>
+            <property name="expand">False</property>
+            <property name="fill">True</property>
+            <property name="position">13</property>
+          </packing>
+        </child>
+        <child>
+          <object class="GtkModelButton">
+            <property name="visible">True</property>
+            <property name="can-focus">True</property>
+            <property name="receives-default">True</property>
             <property name="action-name">app.quit</property>
             <property name="text" translatable="yes">Quit Apricus</property>
           </object>
@@ -293,6 +307,22 @@ Based on Hidamari by Jeff Shee https://github.com/jeffshee/hidamari</property>
                 <property name="visible">True</property>
                 <property name="can-focus">False</property>
                 <property name="spacing">8</property>
+                <child>
+                  <object class="GtkLabel" id="LabelSelectionHint">
+                    <property name="visible">True</property>
+                    <property name="can-focus">False</property>
+                    <property name="label" translatable="yes">Click to select. Ctrl+click or Shift+click selects more than one.</property>
+                    <property name="xalign">0</property>
+                    <style>
+                      <class name="dim-label"/>
+                    </style>
+                  </object>
+                  <packing>
+                    <property name="expand">False</property>
+                    <property name="fill">True</property>
+                    <property name="position">1</property>
+                  </packing>
+                </child>
                 <child>
                   <object class="GtkLabel" id="LabelVideoFolder">
                     <property name="visible">True</property>
@@ -419,6 +449,20 @@ Videos located in the video folder</property>
                 <property name="visible">True</property>
                 <property name="can-focus">False</property>
                 <property name="spacing">6</property>
+                <child>
+                  <object class="GtkLabel" id="LabelSelectionCount">
+                    <property name="visible">True</property>
+                    <property name="can-focus">False</property>
+                    <property name="label" translatable="yes">No selection</property>
+                    <property name="xalign">0</property>
+                    <property name="hexpand">True</property>
+                  </object>
+                  <packing>
+                    <property name="expand">True</property>
+                    <property name="fill">True</property>
+                    <property name="position">0</property>
+                  </packing>
+                </child>
                 <child>
                   <object class="GtkButton" id="ButtonApply">
                     <property name="label" translatable="yes">Apply selected</property>

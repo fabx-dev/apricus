@@ -159,6 +159,7 @@ class ControlPanel(Gtk.Application):
             ("playlist_clear", self.on_playlist_clear),
             ("playlist_apply", self.on_playlist_apply),
             ("playlist_show", self.on_playlist_show),
+            ("selection_help", self.on_selection_help),
             ("play_pause", self.on_play_pause),
             ("feeling_lucky", self.on_feeling_lucky),
             (
@@ -213,6 +214,19 @@ class ControlPanel(Gtk.Application):
         if check_shuffle is not None:
             check_shuffle.connect("toggled", self.on_shuffle_toggled)
 
+        # Make gallery selection unmissable: the default IconView only tints
+        # the caption. Invalid selectors log a Gtk warning and nothing else.
+        css = Gtk.CssProvider()
+        css.load_from_data(
+            b"iconview:selected { background-color: @theme_selected_bg_color; border-radius: 8px; } "
+            b"iconview cell:selected { background-color: @theme_selected_bg_color; }"
+        )
+        screen = Gdk.Screen.get_default()
+        if screen is not None:
+            Gtk.StyleContext.add_provider_for_screen(
+                screen, css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+            )
+
         self._reload_all_widgets()
 
     def do_activate(self):
@@ -244,7 +258,8 @@ class ControlPanel(Gtk.Application):
                 "Quickstart for adding local videos:\n"
                 " ・Click the folder icon to open your video folder\n"
                 " ・Put your videos there\n"
-                " ・Click the refresh button"
+                " ・Click the refresh button\n"
+                " ・Click to select, Ctrl+click for more than one"
             ),
             secondary_use_markup=True,
             buttons=Gtk.ButtonsType.OK,
@@ -309,7 +324,10 @@ class ControlPanel(Gtk.Application):
                 destroy_with_parent=True,
                 text=_("No Video Selected"),
                 message_type=Gtk.MessageType.INFO,
-                secondary_text=_("There are no video selected.\nPlease choose one first."),
+                secondary_text=_(
+                    "There are no video selected.\n"
+                    "Please choose one first (Ctrl+click for more than one)."
+                ),
                 secondary_use_markup=True,
                 buttons=Gtk.ButtonsType.OK,
             )
@@ -409,6 +427,15 @@ class ControlPanel(Gtk.Application):
 
     def _on_gallery_selection_changed(self, *_args):
         self._update_playlist_add_label()
+        count_label = self.builder.get_object("LabelSelectionCount")
+        if count_label is not None and self.icon_view is not None:
+            n = len(self.icon_view.get_selected_items())
+            if n == 0:
+                count_label.set_text(_("No selection"))
+            elif n == 1:
+                count_label.set_text(_("1 video selected"))
+            else:
+                count_label.set_text(_("{n} videos selected").format(n=n))
         apply_button = self.builder.get_object("ButtonApply")
         if apply_button is not None and self.icon_view is not None:
             # Monitor assignment applies to a single video.
@@ -425,6 +452,28 @@ class ControlPanel(Gtk.Application):
         stack = self.builder.get_object("stack1")
         if stack is not None:
             stack.set_visible_child_name("playlist")
+
+    def on_selection_help(self, *_args):
+        self._show_selection_help()
+
+    def _show_selection_help(self):
+        dialog = Gtk.MessageDialog(
+            parent=self.window,
+            modal=True,
+            destroy_with_parent=True,
+            text=_("Selecting videos"),
+            message_type=Gtk.MessageType.INFO,
+            secondary_text=_(
+                " ・Click a video to select it\n"
+                " ・Ctrl+click adds or removes single videos\n"
+                " ・Shift+click selects a whole range\n"
+                " ・Right-click a video to set it on a monitor"
+            ),
+            secondary_use_markup=True,
+            buttons=Gtk.ButtonsType.OK,
+        )
+        dialog.run()
+        dialog.destroy()
 
     def on_playlist_add_selected(self, *_args):
         selected = self.icon_view.get_selected_items()
