@@ -1,9 +1,7 @@
 import ctypes
-import glob
 import hashlib
 import logging
 import os
-import pathlib
 import subprocess
 import sys
 import threading
@@ -15,11 +13,12 @@ import gi
 gi.require_version("Gtk", "3.0")
 gi.require_version("Gdk", "3.0")
 import vlc
-from gi.repository import Gdk, Gio, GLib, Gtk
+from gi.repository import Gdk, GLib, Gtk
 from PIL import Image, ImageFilter
 from pydbus import SessionBus
 
 from hidamari import mediacache, perf
+from hidamari.backends import create_wallpaper_backend, create_window_state_backend
 from hidamari.commons import (
     CONFIG_DIR,
     CONFIG_KEY_DATA_SOURCE,
@@ -41,22 +40,11 @@ from hidamari.player.base_player import BasePlayer
 from hidamari.utils import (
     ActiveHandler,
     ConfigUtil,
-    is_flatpak,
-    is_gnome,
-    is_wayland,
     setup_logging,
 )
 from hidamari.yt_utils import get_best_audio, get_formats, get_optimal_video
 
 logger = logging.getLogger(LOGGER_NAME)
-
-if is_wayland():
-    # TODO: Window event monitoring for GNOME Wayland is broken
-    class WindowHandler:
-        def __init__(self, _: callable):
-            pass
-else:
-    from hidamari.utils import WindowHandler
 
 
 class Fade:
@@ -356,31 +344,12 @@ class VideoPlayer(BasePlayer):
         self.config = None
         self.reload_config()
 
-        # Static wallpaper (currently for GNOME only)
-        if is_gnome():
-            self.original_wallpaper_uri = None
-            self.original_wallpaper_uri_dark = None
-            if is_flatpak():
-                try:
-                    self.original_wallpaper_uri = subprocess.check_output(
-                        "flatpak-spawn --host gsettings get org.gnome.desktop.background picture-uri",
-                        shell=True,
-                        encoding="UTF-8",
-                    )
-                    self.original_wallpaper_uri_dark = subprocess.check_output(
-                        "flatpak-spawn --host gsettings get org.gnome.desktop.background picture-uri-dark",
-                        shell=True,
-                        encoding="UTF-8",
-                    )
-                except subprocess.CalledProcessError as e:
-                    logger.error(f"[StaticWallpaper] {e}")
-            else:
-                gso = Gio.Settings.new("org.gnome.desktop.background")
-                self.original_wallpaper_uri = gso.get_string("picture-uri")
-                self.original_wallpaper_uri_dark = gso.get_string("picture-uri-dark")
+        # DE-specific behavior (wallpaper + window state) lives in backends.
+        self.wallpaper = create_wallpaper_backend()
+        self.wallpaper.capture_original()
 
         # Handler should be created after everything initialized
-        self.active_handler, self.window_handler = None, None
+        self.active_handler, self.window_state = None, None
         self.is_any_maximized, self.is_any_fullscreen = False, False
         self.is_paused_by_user = False
 
@@ -551,9 +520,9 @@ class VideoPlayer(BasePlayer):
         # Everything is initialized. Create handlers if haven't (singleton pattern).
         if not self.active_handler:
             self.active_handler = ActiveHandler(self._on_active_changed)
-        if not self.window_handler and not is_wayland():
-            # Only create WindowHandler on X11, not Wayland
-            self.window_handler = WindowHandler(self._on_window_state_changed)
+        if not self.window_state:
+            self.window_state = create_window_state_backend(self._on_window_state_changed)
+            self.window_state.start()
 
         if self.config[CONFIG_KEY_STATIC_WALLPAPER] and self.mode == MODE_VIDEO:
             self.set_static_wallpaper()
@@ -628,8 +597,7 @@ class VideoPlayer(BasePlayer):
         return os.path.join(CONFIG_DIR, f"static-{digest}.png")
 
     def set_static_wallpaper(self):
-        # Currently for GNOME only
-        if not is_gnome():
+        if not self.wallpaper.supports_static:
             return
         video = self.data_source["Default"]
         cached = self._static_cache_path(video)
@@ -697,79 +665,11 @@ class VideoPlayer(BasePlayer):
             GLib.idle_add(self._apply_static_wallpaper, cached)
 
     def _apply_static_wallpaper(self, static_wallpaper_path):
-        static_wallpaper_uri = pathlib.Path(static_wallpaper_path).resolve().as_uri()
-        if is_flatpak():
-            try:
-                subprocess.run(
-                    [
-                        "flatpak-spawn",
-                        "--host",
-                        "gsettings",
-                        "set",
-                        "org.gnome.desktop.background",
-                        "picture-uri",
-                        static_wallpaper_uri,
-                    ],
-                    shell=False,
-                )
-                subprocess.run(
-                    [
-                        "flatpak-spawn",
-                        "--host",
-                        "gsettings",
-                        "set",
-                        "org.gnome.desktop.background",
-                        "picture-uri-dark",
-                        static_wallpaper_uri,
-                    ],
-                    shell=False,
-                )
-            except subprocess.CalledProcessError as e:
-                logger.error(f"[StaticWallpaper] {e}")
-        else:
-            gso = Gio.Settings.new("org.gnome.desktop.background")
-            gso.set_string("picture-uri", static_wallpaper_uri)
-            gso.set_string("picture-uri-dark", static_wallpaper_uri)
+        self.wallpaper.apply_static(static_wallpaper_path)
         return False
 
     def set_original_wallpaper(self):
-        # Currently for GNOME only
-        if not is_gnome():
-            return
-        if is_flatpak():
-            try:
-                if self.original_wallpaper_uri is not None:
-                    subprocess.run(
-                        [
-                            "flatpak-spawn",
-                            "--host",
-                            "gsettings",
-                            "set",
-                            "org.gnome.desktop.background",
-                            "picture-uri",
-                            self.original_wallpaper_uri,
-                        ],
-                        shell=False,
-                    )
-                if self.original_wallpaper_uri_dark is not None:
-                    subprocess.run(
-                        [
-                            "flatpak-spawn",
-                            "--host",
-                            "gsettings",
-                            "set",
-                            "org.gnome.desktop.background",
-                            "picture-uri-dark",
-                            self.original_wallpaper_uri_dark,
-                        ],
-                        shell=False,
-                    )
-            except subprocess.CalledProcessError as e:
-                logger.error(f"[StaticWallpaper] {e}")
-        else:
-            gso = Gio.Settings.new("org.gnome.desktop.background")
-            gso.set_string("picture-uri", self.original_wallpaper_uri)
-            gso.set_string("picture-uri-dark", self.original_wallpaper_uri_dark)
+        self.wallpaper.restore_original()
         # Prune stale static-wallpaper caches, keeping the ones for the
         # currently configured videos (instant wallpaper on next login).
         # Legacy random-named caches (static-XXXXXX.png) match nothing and go.
@@ -780,12 +680,7 @@ class VideoPlayer(BasePlayer):
                     keep.add(os.path.abspath(self._static_cache_path(video)))
         except AttributeError:
             pass
-        for f in glob.glob(os.path.join(CONFIG_DIR, "static-*.png")):
-            if os.path.abspath(f) not in keep:
-                try:
-                    os.remove(f)
-                except OSError as e:
-                    logger.warning(f"[StaticWallpaper] {e}")
+        self.wallpaper.prune_cache(keep)
 
     def reload_config(self):
         self.config = ConfigUtil().load()
@@ -798,9 +693,9 @@ class VideoPlayer(BasePlayer):
             self.active_handler.cleanup()
             self.active_handler = None
 
-        if self.window_handler:
-            self.window_handler.cleanup()
-            self.window_handler = None
+        if self.window_state:
+            self.window_state.stop()
+            self.window_state = None
 
         # Cleanup all windows
         for _monitor, window in self.windows.items():
