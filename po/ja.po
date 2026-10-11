@@ -4,9 +4,9 @@
 #
 msgid ""
 msgstr ""
-"Project-Id-Version: hidamari\n"
+"Project-Id-Version: apricus\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-12 00:49+0200\n"
+"POT-Creation-Date: 2026-10-12 00:55+0200\n"
 "PO-Revision-Date: 2026-07-10 01:30+0900\n"
 "Last-Translator: Jeff Shee <jeffshee8969@gmail.com>\n"
 "Language-Team: Japanese\n"
