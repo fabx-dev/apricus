@@ -223,13 +223,16 @@ class HidamariServer:
         for monitor in monitors:
             file_list = get_video_paths()
             # Remove current data source from the random selection
-            if self.config[CONFIG_KEY_DATA_SOURCE][monitor] in file_list:
-                file_list.remove(self.config[CONFIG_KEY_DATA_SOURCE][monitor])
-            if file_list:
-                video_path = random.choice(file_list)
-                self.config[CONFIG_KEY_MODE] = MODE_VIDEO
-                self.config[CONFIG_KEY_DATA_SOURCE][monitor] = video_path
-                self._save_config()
+            current = self.config[CONFIG_KEY_DATA_SOURCE].get(monitor)
+            if current in file_list:
+                file_list.remove(current)
+            if not file_list:
+                logger.warning(f"[Server] No videos available for monitor {monitor}, skipping")
+                continue
+            video_path = random.choice(file_list)
+            self.config[CONFIG_KEY_MODE] = MODE_VIDEO
+            self.config[CONFIG_KEY_DATA_SOURCE][monitor] = video_path
+            self._save_config()
             self.video(video_path)
 
     def show_gui(self):
