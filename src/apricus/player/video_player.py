@@ -2,6 +2,7 @@ import ctypes
 import hashlib
 import logging
 import os
+import random
 import subprocess
 import sys
 import threading
@@ -27,10 +28,13 @@ from apricus.commons import (
     CONFIG_KEY_MUTE,
     CONFIG_KEY_MUTE_WHEN_MAXIMIZED,
     CONFIG_KEY_PAUSE_WHEN_MAXIMIZED,
+    CONFIG_KEY_PLAYLIST,
+    CONFIG_KEY_SHUFFLE,
     CONFIG_KEY_STATIC_WALLPAPER,
     CONFIG_KEY_VOLUME,
     DBUS_NAME_PLAYER,
     LOGGER_NAME,
+    MODE_PLAYLIST,
     MODE_STREAM,
     MODE_VIDEO,
 )
@@ -104,7 +108,7 @@ class VLCWidget(Gtk.DrawingArea):
 
     __gtype_name__ = "VLCWidget"
 
-    def __init__(self, width, height):
+    def __init__(self, width, height, disable_audio=False):
         Gtk.DrawingArea.__init__(self)
 
         # Spawn a VLC instance and create a new media player to embed.
@@ -113,7 +117,12 @@ class VLCWidget(Gtk.DrawingArea):
         # --aout=pulse: Force PulseAudio output. VLC's PipeWire audio-output
         #   plugin segfaults (pw_thread_loop_lock) when multiple instances are
         #   active, e.g. one per monitor. See the Flatpak, which uses Pulse too.
-        vlc_options = ["--no-disable-screensaver", "--aout=pulse"]
+        # Playlist mode never needs audio: opening/closing the audio output
+        # on every transition locks up PipeWire, so it is disabled entirely.
+        if disable_audio:
+            vlc_options = ["--no-disable-screensaver", "--no-audio", "--aout=none"]
+        else:
+            vlc_options = ["--no-disable-screensaver", "--aout=pulse"]
         self.instance = vlc.Instance(vlc_options)
         self.player = self.instance.media_player_new()
 
@@ -140,13 +149,18 @@ class VLCWidget(Gtk.DrawingArea):
 
 
 class PlayerWindow(Gtk.ApplicationWindow):
-    def __init__(self, name, width, height, *args, **kwargs):
+    def __init__(self, name, width, height, *args, mode=MODE_VIDEO, **kwargs):
         super().__init__(*args, **kwargs)
         # Setup a VLC widget given the provided width and height.
         self.width = width
         self.height = height
         self.name = name
-        self.__vlc_widget = VLCWidget(width, height)
+        self._mode = mode
+        self.__vlc_widget = VLCWidget(width, height, disable_audio=(mode == MODE_PLAYLIST))
+        # Playlist state (used only in MODE_PLAYLIST).
+        self._queue = []
+        self._queue_index = 0
+        self._transitioning = False
         self.add(self.__vlc_widget)
         self.__vlc_widget.show()
 
@@ -170,6 +184,22 @@ class PlayerWindow(Gtk.ApplicationWindow):
 
     def play(self):
         self.__vlc_widget.player.play()
+
+    def stop(self):
+        try:
+            self.__vlc_widget.player.stop()
+        except Exception as e:
+            logger.warning(f"[PlayerWindow] stop failed: {e}")
+
+    def attach_end_reached(self, callback):
+        """Call callback() on the GTK main thread when the media ends."""
+
+        def _cb(_event):
+            GLib.idle_add(callback)
+
+        self.__vlc_widget.player.event_manager().event_attach(
+            vlc.EventType.MediaPlayerEndReached, _cb
+        )
 
     def play_fade(self, target, fade_duration_sec, fade_interval):
         self.play()
@@ -292,7 +322,7 @@ class PlayerWindow(Gtk.ApplicationWindow):
     def _on_button_press_event(self, widget, event):
         if event.type == Gdk.EventType.BUTTON_PRESS and event.button == 3:
             if not self.menu:
-                self.menu = build_menu(MODE_VIDEO)
+                self.menu = build_menu(self._mode)
             self.menu.popup_at_pointer()
             return True
         return False
@@ -354,7 +384,9 @@ class VideoPlayer(BasePlayer):
 
     def new_window(self, gdk_monitor):
         rect = gdk_monitor.get_geometry()
-        return PlayerWindow(gdk_monitor.get_model(), rect.width, rect.height, application=self)
+        return PlayerWindow(
+            gdk_monitor.get_model(), rect.width, rect.height, application=self, mode=self.mode
+        )
 
     def do_activate(self):
         super().do_activate()
@@ -509,6 +541,21 @@ class VideoPlayer(BasePlayer):
                     # `get_optimal_video` now might return video with audio.
                     media.add_option("no-audio")
                 window.centercrop(video_width, video_height)
+        elif self.mode == MODE_PLAYLIST:
+            playlist = self.config.get(CONFIG_KEY_PLAYLIST) or {}
+            shuffle = bool(self.config.get(CONFIG_KEY_SHUFFLE))
+            for monitor, window in self.windows.items():
+                mkey = key_of.get(id(monitor), monitor.get_model())
+                queue = self._queue_for(playlist, mkey, monitor.get_model())
+                if shuffle:
+                    queue = random.sample(queue, len(queue))
+                if not queue:
+                    logger.warning(f"[Playlist] No videos for {mkey}, monitor stays blank")
+                    continue
+                window._queue = queue
+                window._queue_index = 0
+                window.attach_end_reached(lambda w=window: self._on_media_end(w))
+                self._play_queue_item(window)
         else:
             raise ValueError("Invalid mode")
 
@@ -525,8 +572,64 @@ class VideoPlayer(BasePlayer):
 
         if self.config[CONFIG_KEY_STATIC_WALLPAPER] and self.mode == MODE_VIDEO:
             self.set_static_wallpaper()
+        elif self.config[CONFIG_KEY_STATIC_WALLPAPER] and self.mode == MODE_PLAYLIST:
+            # Static frame from the first queued video only; per-transition
+            # refreshes would thrash ffmpeg on every video change.
+            first = self._first_queued_video()
+            if first:
+                self.set_static_wallpaper(first)
+            else:
+                self.set_original_wallpaper()
         else:
             self.set_original_wallpaper()
+
+    @staticmethod
+    def _queue_for(playlist, key, model):
+        """Resolve the play queue for a monitor: stable key, legacy model,
+        then Default. Non-list or missing entries count as empty."""
+        for candidate in (key, model, "Default"):
+            queue = playlist.get(candidate)
+            if isinstance(queue, list) and queue:
+                return list(queue)
+        return []
+
+    def _first_queued_video(self):
+        playlist = self.config.get(CONFIG_KEY_PLAYLIST) or {}
+        for queue in [playlist.get("Default")] + [q for k, q in playlist.items() if k != "Default"]:
+            if isinstance(queue, list) and queue:
+                return queue[0]
+        return None
+
+    def _play_queue_item(self, window):
+        """Play window._queue[window._queue_index]. Main thread only."""
+        if getattr(window, "_transitioning", False):
+            logger.debug("[Playlist] Transition already in progress, skipping")
+            return
+        queue = getattr(window, "_queue", [])
+        if not queue:
+            return
+        window._transitioning = True
+        try:
+            video = queue[window._queue_index % len(queue)]
+            logger.info(f"Setting playlist source {video} to {window.get_name()}")
+            width, height, _duration = mediacache.probe_video(video)
+            media = window.media_new(video)
+            media.add_option("no-audio")
+            window.stop()
+            window.set_media(media)
+            window.play()
+            window.centercrop(width, height)
+        finally:
+            window._transitioning = False
+
+    def _on_media_end(self, window):
+        """Advance the queue. Invoked on the GTK main thread via idle_add."""
+        queue = getattr(window, "_queue", [])
+        if not queue:
+            return False
+        window._queue_index = (window._queue_index + 1) % len(queue)
+        self._play_queue_item(window)
+        return False
 
     @property
     def volume(self):
@@ -535,6 +638,8 @@ class VideoPlayer(BasePlayer):
     @volume.setter
     def volume(self, volume):
         self.config[CONFIG_KEY_VOLUME] = volume
+        if self.mode == MODE_PLAYLIST:
+            return  # playlist players have no audio backend
         for monitor in self.windows:
             if monitor.is_primary():
                 self.windows[monitor].set_volume(volume)
@@ -546,6 +651,8 @@ class VideoPlayer(BasePlayer):
     @is_mute.setter
     def is_mute(self, is_mute):
         self.config[CONFIG_KEY_MUTE] = is_mute
+        if self.mode == MODE_PLAYLIST:
+            return  # playlist players have no audio backend
         for monitor, window in self.windows.items():
             if monitor.is_primary():
                 window.set_mute(is_mute)
@@ -595,10 +702,10 @@ class VideoPlayer(BasePlayer):
         digest = hashlib.sha1(os.path.abspath(video_path).encode()).hexdigest()[:16]
         return os.path.join(CONFIG_DIR, f"static-{digest}.png")
 
-    def set_static_wallpaper(self):
+    def set_static_wallpaper(self, video=None):
         if not self.wallpaper.supports_static:
             return
-        video = self.data_source["Default"]
+        video = video or self.data_source["Default"]
         cached = self._static_cache_path(video)
         if os.path.isfile(cached):
             # Instant path: show last frame immediately, no ffmpeg involved.

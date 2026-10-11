@@ -23,6 +23,8 @@ from apricus.commons import (
     CONFIG_KEY_BLUR_RADIUS,
     CONFIG_KEY_DATA_SOURCE,
     CONFIG_KEY_MUTE_WHEN_MAXIMIZED,
+    CONFIG_KEY_PLAYLIST,
+    CONFIG_KEY_SHUFFLE,
     CONFIG_KEY_VIDEO_DIR,
     CONFIG_PATH,
     CONFIG_TEMPLATE,
@@ -485,6 +487,23 @@ class ConfigUtil:
         # save config file
         self.save(config)
 
+    def _migrateV4To5(self, config: dict):
+        logger.debug("[Config] Migration from version 4 to 5.")
+        config[CONFIG_KEY_PLAYLIST] = dict(CONFIG_TEMPLATE[CONFIG_KEY_PLAYLIST])
+        config[CONFIG_KEY_SHUFFLE] = False
+        config["version"] = 5
+        self.save(config)
+
+    def _ensurePlaylistKeys(self, config: dict):
+        """Backfill playlist queues for monitors missing one (same policy as
+        _checkMissingMonitors, but queues default to [] not Default)."""
+        playlist = config.get(CONFIG_KEY_PLAYLIST)
+        if not isinstance(playlist, dict):
+            return
+        playlist.setdefault("Default", [])
+        for key in CONFIG_TEMPLATE[CONFIG_KEY_PLAYLIST]:
+            playlist.setdefault(key, [])
+
     def _migrateLegacyMonitorKeys(self, config: dict):
         """Move per-monitor sources keyed by bare model to stable keys.
 
@@ -577,6 +596,10 @@ class ConfigUtil:
                     # migration to version 4 for data_source type change
                     if config.get("version") <= 3 and CONFIG_VERSION >= 4:
                         self._migrateV3To4(config)
+                    # migration to version 5 for playlist queues
+                    if config.get("version") == 4 and CONFIG_VERSION >= 5:
+                        self._migrateV4To5(config)
+                    self._ensurePlaylistKeys(config)
                     # video_dir was added after v4 without a version bump:
                     # default it instead of wiping the whole config.
                     config.setdefault(CONFIG_KEY_VIDEO_DIR, None)

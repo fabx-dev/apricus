@@ -57,8 +57,9 @@ MODE_NULL = "MODE_NULL"
 MODE_VIDEO = "MODE_VIDEO"
 MODE_STREAM = "MODE_STREAM"
 MODE_WEBPAGE = "MODE_WEBPAGE"
+MODE_PLAYLIST = "MODE_PLAYLIST"
 
-CONFIG_VERSION = 4
+CONFIG_VERSION = 5
 CONFIG_KEY_VERSION = "version"
 CONFIG_KEY_MODE = "mode"
 CONFIG_KEY_DATA_SOURCE = "data_source"
@@ -73,6 +74,8 @@ CONFIG_KEY_FADE_INTERVAL = "fade_interval"
 CONFIG_KEY_SYSTRAY = "is_show_systray"
 CONFIG_KEY_FIRST_TIME = "is_first_time"
 CONFIG_KEY_VIDEO_DIR = "video_dir"
+CONFIG_KEY_PLAYLIST = "playlist"
+CONFIG_KEY_SHUFFLE = "playlist_shuffle"
 CONFIG_TEMPLATE = {
     CONFIG_KEY_VERSION: CONFIG_VERSION,
     CONFIG_KEY_MODE: MODE_NULL,
@@ -89,6 +92,10 @@ CONFIG_TEMPLATE = {
     # Custom video library folder chosen by the user. None means the default
     # location (~/Video(s)/Hidamari, kept from Hidamari for compatibility).
     CONFIG_KEY_VIDEO_DIR: None,
+    # Per-monitor video queues ({monitor_key: [paths]}); empty queue falls
+    # back to "Default". Shuffled order is computed at apply time.
+    CONFIG_KEY_PLAYLIST: None,
+    CONFIG_KEY_SHUFFLE: False,
 }
 
 from apricus.monitor import MonitorInfo
@@ -109,6 +116,20 @@ def _default_data_sources():
 
 
 CONFIG_TEMPLATE[CONFIG_KEY_DATA_SOURCE] = _default_data_sources()
+
+
+def _default_playlist():
+    playlist = {}
+    try:
+        for monitor in MonitorInfo().monitors():
+            playlist[monitor["key"]] = []
+    except Exception:
+        pass
+    playlist["Default"] = []
+    return playlist
+
+
+CONFIG_TEMPLATE[CONFIG_KEY_PLAYLIST] = _default_playlist()
 
 
 def resolve_video_dir(config=None):

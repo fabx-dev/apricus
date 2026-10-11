@@ -17,6 +17,7 @@ from apricus.commons import (
     CONFIG_KEY_MUTE,
     CONFIG_KEY_MUTE_WHEN_MAXIMIZED,
     CONFIG_KEY_PAUSE_WHEN_MAXIMIZED,
+    CONFIG_KEY_PLAYLIST,
     CONFIG_KEY_STATIC_WALLPAPER,
     CONFIG_KEY_SYSTRAY,
     CONFIG_KEY_VOLUME,
@@ -24,6 +25,7 @@ from apricus.commons import (
     DBUS_NAME_SERVER,
     LOGGER_NAME,
     MODE_NULL,
+    MODE_PLAYLIST,
     MODE_STREAM,
     MODE_VIDEO,
     MODE_WEBPAGE,
@@ -54,6 +56,10 @@ class ApricusServer:
         </method>
         <method name='webpage'>
             <arg type='s' name='webpage_url' direction='in'/>
+        </method>
+        <method name='playlist'>
+            <arg type='as' name='video_paths' direction='in'/>
+            <arg type='s' name='monitor' direction='in'/>
         </method>
         <method name='pause_playback'/>
         <method name='start_playback'/>
@@ -129,9 +135,11 @@ class ApricusServer:
         self.config[CONFIG_KEY_MODE] = mode
 
         # Set data source if specified
-        if data_source and monitor:
-            self.config[CONFIG_KEY_DATA_SOURCE][monitor] = data_source
-        self.config[CONFIG_KEY_DATA_SOURCE]["Default"] = data_source  # always update default source
+        if data_source is not None:
+            if monitor:
+                self.config[CONFIG_KEY_DATA_SOURCE][monitor] = data_source
+            # always update default source
+            self.config[CONFIG_KEY_DATA_SOURCE]["Default"] = data_source
 
         # Quit current then create a new player
         self._quit_player()
@@ -146,7 +154,7 @@ class ApricusServer:
                 self.player_process.join(timeout=2)
             self.player_process = None
 
-        if mode in [MODE_VIDEO, MODE_STREAM]:
+        if mode in [MODE_VIDEO, MODE_STREAM, MODE_PLAYLIST]:
             self.player_process = Process(
                 name=f"apricus-player-{self._player_count}", target=video_player_main
             )
@@ -197,6 +205,22 @@ class ApricusServer:
     def webpage(self, webpage_url=None):
         self._setup_player(MODE_WEBPAGE, webpage_url)
 
+    def playlist(self, video_paths=None, monitor=None):
+        """Play a queue of videos, looping. Muted by design (PipeWire safety)."""
+        video_paths = [p for p in (video_paths or []) if p]
+        if not video_paths:
+            logger.warning("[Server] Empty playlist, ignoring")
+            return
+        playlist = self.config.setdefault(CONFIG_KEY_PLAYLIST, {})
+        if monitor and monitor != "all":
+            playlist[monitor] = list(video_paths)
+        else:
+            for key in list(playlist):
+                playlist[key] = list(video_paths)
+            playlist["Default"] = list(video_paths)
+        self._save_config()
+        self._setup_player(MODE_PLAYLIST)
+
     @staticmethod
     def pause_playback():
         player = get_instance(DBUS_NAME_PLAYER)
@@ -216,6 +240,8 @@ class ApricusServer:
             self.stream()
         elif self.config[CONFIG_KEY_MODE] == MODE_WEBPAGE:
             self.webpage()
+        elif self.config[CONFIG_KEY_MODE] == MODE_PLAYLIST:
+            self._setup_player(MODE_PLAYLIST)
         elif self.config[CONFIG_KEY_MODE] == MODE_NULL:
             pass
         else:
