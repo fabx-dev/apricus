@@ -364,7 +364,7 @@ class EndSessionHandler:
         self.on_end_session()
         self.__end_session_response_gnome(True)
 
-    def __end_session_handler(self, *_):
+    def __end_session_handler(self, *_args):
         logger.debug("[EndSessionHandler] called")
         self.on_end_session()
 

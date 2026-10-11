@@ -334,7 +334,7 @@ class ControlPanel(Gtk.Application):
         if self.server is not None:
             self.server.webpage(choose.get_path())
 
-    def on_play_pause(self, *_):
+    def on_play_pause(self, *_args):
         if self.server is None:
             return
         prev_state = self.server.is_paused_by_user
@@ -344,7 +344,7 @@ class ControlPanel(Gtk.Application):
         else:
             self.server.start_playback()
 
-    def on_feeling_lucky(self, *_):
+    def on_feeling_lucky(self, *_args):
         if self.server is not None:
             self.server.feeling_lucky()
 
@@ -416,7 +416,7 @@ class ControlPanel(Gtk.Application):
         if self.server is not None:
             self.server.is_mute_when_maximized = self.config[CONFIG_KEY_MUTE_WHEN_MAXIMIZED]
 
-    def on_about(self, *_):
+    def on_about(self, *_args):
         self.builder.add_from_resource(APP_UI_RESOURCE_PATH)
         about_dialog: Gtk.AboutDialog = self.builder.get_object("AboutDialog")
         about_dialog.set_transient_for(self.window)
@@ -496,7 +496,7 @@ class ControlPanel(Gtk.Application):
                 return True
         return False
 
-    def on_quit(self, *_):
+    def on_quit(self, *_args):
         if self.server is not None:
             try:
                 self.server.quit()
@@ -522,7 +522,7 @@ class ControlPanel(Gtk.Application):
         toggle_mute: Gtk.ToggleButton = self.builder.get_object("ToggleAutostart")
         toggle_mute.set_state = self.is_autostart
 
-    def _reload_icon_view(self, *_):
+    def _reload_icon_view(self, *_args):
         video_dir = resolve_video_dir(self.config)
         self.video_paths = get_video_paths(video_dir)
         label = self.builder.get_object("LabelVideoFolder")
