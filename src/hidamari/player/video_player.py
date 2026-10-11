@@ -451,9 +451,40 @@ class VideoPlayer(BasePlayer):
     def data_source(self):
         return self.config[CONFIG_KEY_DATA_SOURCE]
 
+    @staticmethod
+    def _source_for(data_source, key, model):
+        """Resolve (source, matched_key) for a monitor.
+
+        Priority: stable `key`, then legacy bare `model` (pre-migration
+        configs), then `Default`. Empty strings count as unset.
+        """
+        for candidate in (key, model):
+            if candidate in data_source and len(data_source[candidate]) != 0:
+                return data_source[candidate], candidate
+        return data_source.get("Default", ""), "Default"
+
     @data_source.setter
     def data_source(self, data_source):
         self.config[CONFIG_KEY_DATA_SOURCE] = data_source
+
+        # Stable config keys for live monitors (unique models keep the bare
+        # model; duplicates get Model#i). Order matches self.windows.
+        key_of = {}
+        if self.windows:
+            from hidamari.monitor import assign_keys
+
+            keyed = assign_keys(
+                [
+                    {
+                        "name": m.get_model(),
+                        "x": m.get_geometry().x,
+                        "y": m.get_geometry().y,
+                    }
+                    for m in self.windows
+                ]
+            )
+            for gdk_monitor, info in zip(self.windows, keyed):
+                key_of[id(gdk_monitor)] = info["key"]
 
         if self.mode == MODE_VIDEO:
             # Get the dimension of the video
@@ -488,13 +519,9 @@ class VideoPlayer(BasePlayer):
                     video_height.setdefault(monitor, None)
 
             for monitor, window in self.windows.items():
-                source = (
-                    data_source[monitor.get_model()]
-                    if monitor.get_model() in data_source
-                    and len(data_source[monitor.get_model()]) != 0
-                    else data_source["Default"]
-                )
-                logger.info(f"Setting source {source} to {monitor.get_model()}")
+                mkey = key_of.get(id(monitor), monitor.get_model())
+                source, srckey = self._source_for(data_source, mkey, monitor.get_model())
+                logger.info(f"Setting source {source} to {mkey}")
                 media = window.media_new(source)
                 """
                 This loops the media itself. Using -R / --repeat and/or -L / --loop don't seem to work. However,
@@ -507,15 +534,10 @@ class VideoPlayer(BasePlayer):
                     media.add_option("no-audio")
                 window.set_media(media)
                 window.set_position(0.0)
-                if (
-                    monitor.get_model() not in data_source
-                    or len(data_source[monitor.get_model()]) == 0
-                ):
-                    window.centercrop(video_width["Default"], video_height["Default"])
-                else:
-                    window.centercrop(
-                        video_width[monitor.get_model()], video_height[monitor.get_model()]
-                    )
+                dims = (video_width.get(srckey), video_height.get(srckey))
+                if dims == (None, None):
+                    dims = (video_width.get("Default"), video_height.get("Default"))
+                window.centercrop(*dims)
 
         elif self.mode == MODE_STREAM:
             source = data_source["Default"]

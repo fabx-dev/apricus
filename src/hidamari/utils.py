@@ -385,6 +385,37 @@ class ConfigUtil:
         # save config file
         self.save(config)
 
+    def _migrateLegacyMonitorKeys(self, config: dict):
+        """Move per-monitor sources keyed by bare model to stable keys.
+
+        Unique models keep the bare model (no-op). Duplicate models now use
+        `Model#i`: copy the legacy value to every new key missing one, then
+        drop the legacy entry. `Default` is never touched.
+        """
+        from hidamari.monitor import MonitorInfo
+
+        data_source = config.get(CONFIG_KEY_DATA_SOURCE, {})
+        if not isinstance(data_source, dict):
+            return
+        infos = MonitorInfo.monitors()
+        current_keys = {info["key"] for info in infos}
+        moved = []
+        touched = set()
+        for info in infos:
+            model, key = info["name"], info["key"]
+            if model == key:
+                continue
+            if (key not in data_source or not data_source[key]) and data_source.get(model):
+                data_source[key] = data_source[model]
+                moved.append(key)
+                touched.add(model)
+        for model in touched:
+            if model not in current_keys and model in data_source:
+                del data_source[model]
+        if moved:
+            logger.debug(f"[Config] Migrated legacy monitor keys {sorted(touched)} to {moved}")
+            self.save(config)
+
     def _checkMissingMonitors(self, old_config: dict, template: dict):
         # Extract the monitors from both configurations
         old_monitors = old_config.get("data_source", {}).keys()
@@ -434,6 +465,7 @@ class ConfigUtil:
                     # migration to version 4 for data_source type change
                     if config.get("version") <= 3 and CONFIG_VERSION >= 4:
                         self._migrateV3To4(config)
+                    self._migrateLegacyMonitorKeys(config)
                     self._checkDefaultSource(config)
                     self._checkMissingMonitors(config, CONFIG_TEMPLATE)
                     if self._check(config):

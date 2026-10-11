@@ -97,12 +97,12 @@ class ControlPanel(Gtk.Application):
         self.monitors = Monitors()
         # get video paths
         video_paths = self.config[CONFIG_KEY_DATA_SOURCE]
-        for monitor in self.monitors.get_monitors():
+        for key in self.monitors.get_monitors():
             # check if monitor exists in paths
-            if monitor in video_paths:
-                self.monitors.get_monitor(monitor).set_wallpaper(video_paths[monitor])
+            if key in video_paths and len(video_paths[key]) != 0:
+                self.monitors.get_monitor(key).set_wallpaper(video_paths[key])
             else:
-                self.monitors.get_monitor(monitor).set_wallpaper(video_paths["Default"])
+                self.monitors.get_monitor(key).set_wallpaper(video_paths["Default"])
 
         self._setup_context_menu()  # setup context menu for selecting monitors
 
@@ -116,8 +116,8 @@ class ControlPanel(Gtk.Application):
         self.contextMenu_monitors = Gtk.Menu()
         self.contextMenu_monitors.show_all()
 
-        for monitor_name, monitor in self.monitors.get_monitors().items():
-            item = Gtk.MenuItem(label=_("Set For {monitor}").format(monitor=monitor_name))
+        for monitor_key, monitor in self.monitors.get_monitors().items():
+            item = Gtk.MenuItem(label=_("Set For {monitor}").format(monitor=monitor.name))
             item.connect("activate", self.on_set_as, monitor)
             self.contextMenu_monitors.append(item)
 
@@ -279,19 +279,22 @@ class ControlPanel(Gtk.Application):
         paths = self.config[CONFIG_KEY_DATA_SOURCE] if not None else []
         # all option
         if monitor == self.all_key:
-            for name, monitor in self.monitors.get_monitors().items():
-                paths[name] = video_path
-                monitor.set_wallpaper(video_path)
+            for key, mon in self.monitors.get_monitors().items():
+                paths[key] = video_path
+                mon.set_wallpaper(video_path)
+            server_monitor = None
         else:
-            paths[monitor.name] = video_path
-            self.monitors.get_monitor(monitor.name).set_wallpaper(video_path)
+            paths[monitor.key] = video_path
+            self.monitors.get_monitor(monitor.key).set_wallpaper(video_path)
+            server_monitor = monitor.key
 
         # also update the Default video
         paths["Default"] = video_path
         self.config[CONFIG_KEY_DATA_SOURCE] = paths
         self._save_config()
         if self.server is not None:
-            self.server.video(video_path, monitor.name)
+            # monitor=None: player reloads the full saved config (single restart)
+            self.server.video(video_path, server_monitor)
 
     def on_local_web_page_apply(self, *_args):
         file_chooser: Gtk.FileChooserButton = self.builder.get_object("FileChooser")
