@@ -39,7 +39,7 @@ multi-desktop support, fast login startup, and a robust player**.
 
 See [PLAN.md](PLAN.md) for the full roadmap. So far (branch `fase-1b`):
 
-- Startup timing instrumentation (`hidamari.perf`, `[Perf]` marks)
+- Startup timing instrumentation (`apricus.perf`, `[Perf]` marks)
 - Stable per-monitor config keys (duplicate models get `Model#i`, with legacy migration)
 - `feeling_lucky` no longer crashes on an empty library (upstream #272)
 - Correct dark-mode wallpaper restore, `ffprobe` timeouts, headless-safe imports
@@ -62,8 +62,8 @@ Run it (via the dev env, in debug mode):
 make run
 ```
 
-Put videos in the Hidamari folder (`~/Video/Hidamari` or `~/Videos/Hidamari`
-depending on distro) and pick them from the GUI. A Flatpak package is planned
+Put videos in the video folder (`~/Video/Hidamari` or `~/Videos/Hidamari`
+depending on distro, kept from Hidamari for compatibility) and pick them from the GUI. A Flatpak package is planned
 but not published yet.
 
 ## Development

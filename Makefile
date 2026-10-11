@@ -4,7 +4,7 @@
 BUILDDIR    ?= _build
 PREFIX      ?= $(HOME)/.local
 FLATPAK_DIR ?= build-flatpak
-MANIFEST    := pkgs/flatpak/io.github.jeffshee.Hidamari.json
+MANIFEST    := pkgs/flatpak/io.github.fabx-dev.Apricus.json
 
 .DEFAULT_GOAL := help
 
@@ -15,7 +15,7 @@ sync: ## Create/refresh the uv dev environment (uses system PyGObject)
 	uv sync
 
 run: install ## Install into PREFIX and run it in debug mode (via the uv env)
-	uv run python $(PREFIX)/bin/hidamari -d
+	uv run python $(PREFIX)/bin/apricus -d
 
 lint: ## Lint the sources with ruff
 	uv run ruff check src/
@@ -40,15 +40,15 @@ uninstall: $(BUILDDIR) ## Remove a previous install from PREFIX
 
 # --- Translations (gettext, via Meson) --------------------------------------
 
-pot: $(BUILDDIR) ## Regenerate po/hidamari.pot (with a filled-in header)
-	meson compile -C $(BUILDDIR) hidamari-pot
+pot: $(BUILDDIR) ## Regenerate po/apricus.pot (with a filled-in header)
+	meson compile -C $(BUILDDIR) apricus-pot
 	sed -i \
-		-e "s/SOME DESCRIPTIVE TITLE\./Hidamari - Video wallpaper for Linux/" \
+		-e "s/SOME DESCRIPTIVE TITLE\./Apricus - Live wallpaper for Linux/" \
 		-e "s/Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER/Copyright (C) 2022 Jeff Shee (jeffshee8969@gmail.com)/" \
-		po/hidamari.pot
+		po/apricus.pot
 
 update-po: $(BUILDDIR) ## Merge the template into the per-language .po files
-	meson compile -C $(BUILDDIR) hidamari-update-po
+	meson compile -C $(BUILDDIR) apricus-update-po
 
 # --- Flatpak ----------------------------------------------------------------
 

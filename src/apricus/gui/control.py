@@ -17,7 +17,7 @@ import yt_dlp
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk
 from pydbus import SessionBus
 
-from hidamari.commons import (
+from apricus.commons import (
     AUTOSTART_DESKTOP_PATH,
     CONFIG_KEY_BLUR_RADIUS,
     CONFIG_KEY_DATA_SOURCE,
@@ -30,17 +30,17 @@ from hidamari.commons import (
     CONFIG_KEY_VOLUME,
     CONFIG_PATH,
     DBUS_NAME_SERVER,
+    DBUS_PROJECT,
     LOGGER_NAME,
     MODE_STREAM,
     MODE_VIDEO,
     MODE_WEBPAGE,
-    PROJECT,
     TRANSLATION_DOMAIN,
     VIDEO_WALLPAPER_DIR,
 )
-from hidamari.gui.gui_utils import debounce, get_thumbnail
-from hidamari.monitor import Monitors
-from hidamari.utils import (
+from apricus.gui.gui_utils import debounce, get_thumbnail
+from apricus.monitor import Monitors
+from apricus.utils import (
     ConfigUtil,
     get_video_paths,
     init_translations,
@@ -53,9 +53,9 @@ from hidamari.utils import (
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(LOGGER_NAME)
 
-APP_ID = f"{PROJECT}.gui"
-APP_TITLE = "Hidamari"
-APP_UI_RESOURCE_PATH = "/io/jeffshee/Hidamari/control.ui"
+APP_ID = f"{DBUS_PROJECT}.gui"
+APP_TITLE = "Apricus"
+APP_UI_RESOURCE_PATH = "/io/github/fabx-dev/Apricus/control.ui"
 
 
 class ControlPanel(Gtk.Application):
@@ -205,7 +205,7 @@ class ControlPanel(Gtk.Application):
     def do_activate(self):
         if self.window is None:
             self.window: Gtk.ApplicationWindow = self.builder.get_object("ApplicationWindow")
-            self.window.set_title("Hidamari")
+            self.window.set_title("Apricus")
             self.window.set_application(self)
             self.window.set_position(Gtk.WindowPosition.CENTER)
         self.window.present()
@@ -224,7 +224,7 @@ class ControlPanel(Gtk.Application):
             parent=self.window,
             modal=True,
             destroy_with_parent=True,
-            text=_("Welcome to Hidamari 🤗"),
+            text=_("Welcome to Apricus 🤗"),
             message_type=Gtk.MessageType.INFO,
             #    secondary_text="You can bring up the Menu by <b>Right click</b> on the desktop",
             secondary_text=_(
@@ -541,25 +541,25 @@ class ControlPanel(Gtk.Application):
 
 
 def _find_gresource(pkgdatadir):
-    """Locate hidamari.gresource: the launcher-provided prefix first, then the
-    standard XDG data dirs (so `python -m hidamari` works for any install)."""
-    candidates = [os.path.join(pkgdatadir, "hidamari.gresource")]
+    """Locate apricus.gresource: the launcher-provided prefix first, then the
+    standard XDG data dirs (so `python -m apricus` works for any install)."""
+    candidates = [os.path.join(pkgdatadir, "apricus.gresource")]
     candidates += [
-        os.path.join(d, "hidamari", "hidamari.gresource")
+        os.path.join(d, "apricus", "apricus.gresource")
         for d in (GLib.get_user_data_dir(), *GLib.get_system_data_dirs())
     ]
     return next((c for c in candidates if os.path.isfile(c)), None)
 
 
-def main(version="devel", pkgdatadir="/usr/share/hidamari", localedir="/usr/share/locale"):
+def main(version="devel", pkgdatadir="/usr/share/apricus", localedir="/usr/share/locale"):
     setup_logging()
     init_translations(localedir)
     gresource = _find_gresource(pkgdatadir)
     if gresource is None:
-        logger.error("[GUI] Couldn't find hidamari.gresource. Is Hidamari installed?")
+        logger.error("[GUI] Couldn't find apricus.gresource. Is Apricus installed?")
         return
     Gio.Resource.load(gresource)._register()
-    Gtk.IconTheme.get_default().add_resource_path("/io/jeffshee/Hidamari/icons")
+    Gtk.IconTheme.get_default().add_resource_path("/io/github/fabx-dev/Apricus/icons")
 
     app = ControlPanel(version)
     app.run(sys.argv)

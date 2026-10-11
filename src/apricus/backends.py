@@ -21,8 +21,8 @@ import subprocess
 from gi.repository import Gio, GLib
 from pydbus import SessionBus
 
-from hidamari.commons import LOGGER_NAME
-from hidamari.utils import (
+from apricus.commons import LOGGER_NAME
+from apricus.utils import (
     gnome_desktop_icon_workaround,
     is_flatpak,
     is_gnome,
@@ -153,7 +153,7 @@ class GnomeWallpaperBackend(WallpaperBackend):
     def prune_cache(self, keep_paths):
         import glob
 
-        from hidamari.commons import CONFIG_DIR
+        from apricus.commons import CONFIG_DIR
 
         for f in glob.glob(os.path.join(CONFIG_DIR, "static-*.png")):
             if os.path.abspath(f) not in keep_paths:
@@ -195,7 +195,7 @@ class WnckWindowStateBackend(WindowStateBackend):
     name = "x11-wnck"
 
     def start(self):
-        from hidamari.utils import WindowHandler
+        from apricus.utils import WindowHandler
 
         self._handler = WindowHandler(self.on_window_state_changed)
 

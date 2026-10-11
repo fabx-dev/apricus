@@ -1,10 +1,10 @@
-"""Tests for hidamari.mediacache (no display, no ffprobe required)."""
+"""Tests for apricus.mediacache (no display, no ffprobe required)."""
 
 import json
 import os
 from unittest.mock import patch
 
-from hidamari import commons, mediacache
+from apricus import commons, mediacache
 
 
 def _use_tmp_cache(tmp_path, monkeypatch):

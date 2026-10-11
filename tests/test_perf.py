@@ -1,13 +1,13 @@
-"""Tests for hidamari.perf (no display required)."""
+"""Tests for apricus.perf (no display required)."""
 
 import os
 import subprocess
 import sys
 import time
 
-from hidamari import perf
-from hidamari.commons import CONFIG_DIR
-from hidamari.player.video_player import VideoPlayer
+from apricus import perf
+from apricus.commons import CONFIG_DIR
+from apricus.player.video_player import VideoPlayer
 
 
 def test_start_time_is_process_start():
@@ -21,11 +21,11 @@ def test_t0_propagates_via_env_to_children():
     t0 = time.monotonic() - 42.0
     code = (
         "import os, time; "
-        "from hidamari import perf; "
+        "from apricus import perf; "
         "print(repr(perf.start_time())); "
         "print(repr(perf.elapsed()))"
     )
-    env = dict(os.environ, HIDAMARI_T0=repr(t0), PYTHONPATH="src")
+    env = dict(os.environ, APRICUS_T0=repr(t0), PYTHONPATH="src")
     out = subprocess.run(
         [sys.executable, "-c", code], capture_output=True, text=True, env=env, check=True
     ).stdout.split()

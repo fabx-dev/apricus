@@ -1,6 +1,6 @@
 #!@PYTHON@
 
-# hidamari.in
+# apricus.in
 # 
 # Copyright (C) 2022 Jeff Shee (jeffshee8969@gmail.com)
 # 
@@ -28,10 +28,10 @@ localedir = '@localedir@'
 
 sys.path.insert(1, pkgdatadir)
 signal.signal(signal.SIGINT, signal.SIG_DFL)
-locale.bindtextdomain('hidamari', localedir)
-locale.textdomain('hidamari')
-gettext.install('hidamari', localedir)
+locale.bindtextdomain('apricus', localedir)
+locale.textdomain('apricus')
+gettext.install('apricus', localedir)
 
 if __name__ == '__main__':
-    from hidamari.__main__ import main
+    from apricus.__main__ import main
     sys.exit(main(VERSION, pkgdatadir, localedir))

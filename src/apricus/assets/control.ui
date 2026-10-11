@@ -5,17 +5,15 @@
   <object class="GtkAboutDialog" id="AboutDialog">
     <property name="can-focus">False</property>
     <property name="type-hint">dialog</property>
-    <property name="program-name">Hidamari</property>
+    <property name="program-name">Apricus</property>
     <property name="copyright" translatable="no">Copyright © 2022 Jeff Shee</property>
-    <property name="comments" translatable="yes">Video wallpaper for Linux. Written in Python. 🐍
-
-Hidamari 日溜まり 【ひだまり】 (n) sunny spot; exposure to the sun</property>
-    <property name="website">https://github.com/jeffshee/hidamari</property>
+    <property name="comments" translatable="yes">Live wallpaper for Linux. Apricus (lat.) — sunny, exposed to the sun.</property>
+    <property name="website">https://github.com/fabx-dev/apricus</property>
     <property name="website-label" translatable="no">GitHub</property>
-    <property name="authors">Jeff Shee https://github.com/jeffshee
-All Contributors https://github.com/jeffshee/hidamari/graphs/contributors</property>
-    <property name="artists">Freepik https://www.freepik.com</property>
-    <property name="logo-icon-name">io.github.jeffshee.Hidamari</property>
+    <property name="authors">fabx-dev https://github.com/fabx-dev
+Based on Hidamari by Jeff Shee https://github.com/jeffshee/hidamari</property>
+    <property name="artists">Apricus icon: original</property>
+    <property name="logo-icon-name">io.github.fabx-dev.Apricus</property>
     <child internal-child="vbox">
       <object class="GtkBox">
         <property name="can-focus">False</property>
@@ -277,7 +275,7 @@ All Contributors https://github.com/jeffshee/hidamari/graphs/contributors</prope
             <property name="can-focus">True</property>
             <property name="receives-default">True</property>
             <property name="action-name">app.about</property>
-            <property name="text" translatable="yes">About Hidamari</property>
+            <property name="text" translatable="yes">About Apricus</property>
           </object>
           <packing>
             <property name="expand">False</property>
@@ -291,7 +289,7 @@ All Contributors https://github.com/jeffshee/hidamari/graphs/contributors</prope
             <property name="can-focus">True</property>
             <property name="receives-default">True</property>
             <property name="action-name">app.quit</property>
-            <property name="text" translatable="yes">Quit Hidamari</property>
+            <property name="text" translatable="yes">Quit Apricus</property>
           </object>
           <packing>
             <property name="expand">False</property>
@@ -312,7 +310,7 @@ All Contributors https://github.com/jeffshee/hidamari/graphs/contributors</prope
     <property name="can-focus">False</property>
     <property name="default-width">1024</property>
     <property name="default-height">576</property>
-    <property name="icon-name">io.github.jeffshee.Hidamari</property>
+    <property name="icon-name">io.github.fabx-dev.Apricus</property>
     <child>
       <object class="GtkStack" id="stack1">
         <property name="visible">True</property>
@@ -377,7 +375,7 @@ Videos located in Hidamari folder</property>
                     <property name="visible">True</property>
                     <property name="can-focus">True</property>
                     <property name="receives-default">True</property>
-                    <property name="tooltip-text" translatable="yes">Open Hidamari folder</property>
+                    <property name="tooltip-text" translatable="yes">Open video folder</property>
                     <property name="halign">center</property>
                     <property name="valign">center</property>
                     <property name="action-name">app.local_video_dir</property>

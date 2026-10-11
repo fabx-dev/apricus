@@ -3,9 +3,9 @@ import logging
 import os
 import sys
 
-from hidamari import perf, server  # perf first: import captures process-start T0
-from hidamari.commons import LOGGER_NAME, VIDEO_WALLPAPER_DIR
-from hidamari.utils import (
+from apricus import perf, server  # perf first: import captures process-start T0
+from apricus.commons import LOGGER_NAME, VIDEO_WALLPAPER_DIR
+from apricus.utils import (
     is_flatpak,
     is_gnome,
     is_wayland,
@@ -16,20 +16,20 @@ logger = logging.getLogger(LOGGER_NAME)
 
 
 # TODO: Add locale support
-def main(version="devel", pkgdatadir="/usr/share/hidamari", localedir="/usr/share/locale"):
+def main(version="devel", pkgdatadir="/usr/share/apricus", localedir="/usr/share/locale"):
     # Make sure that X11 is the backend. Revert Wayland to XWayland.
     os.environ["GDK_BACKEND"] = "x11"
     # Suppress VLC Log
     os.environ["VLC_VERBOSE"] = "-1"
 
-    parser = argparse.ArgumentParser(description=f"Hidamari v{version}")
+    parser = argparse.ArgumentParser(description=f"Apricus v{version}")
     parser.add_argument(
         "-p",
         "--pause",
         dest="p",
         type=int,
         default=0,
-        help="Add pause before launching Hidamari. [sec]",
+        help="Add pause before launching Apricus. [sec]",
     )
     parser.add_argument(
         "-b", "--background", action="store_true", help="Launch only the live wallpaper."
@@ -62,13 +62,13 @@ def main(version="devel", pkgdatadir="/usr/share/hidamari", localedir="/usr/shar
 
     if args.fast:
         args.background = True
-        os.environ["HIDAMARI_FAST"] = "1"
+        os.environ["APRICUS_FAST"] = "1"
 
     # Setup logger
     if args.debug:
         logging.basicConfig(level=logging.DEBUG)
         # Propagate to forkserver children (they are fresh interpreters).
-        os.environ["HIDAMARI_DEBUG"] = "1"
+        os.environ["APRICUS_DEBUG"] = "1"
 
     # Log system information
     sys_info = []
@@ -78,11 +78,11 @@ def main(version="devel", pkgdatadir="/usr/share/hidamari", localedir="/usr/shar
     sys_info.append(f"is_flatpak = {is_flatpak()}")
     sys_info.append("--------------------------")
     sys_info_str = "\n".join(sys_info)
-    logger.info(f"Hidamari v{version}\n{sys_info_str}")
+    logger.info(f"Apricus v{version}\n{sys_info_str}")
     logger.info(f"[Args] {vars(args)}")
     perf.mark("main: imports done")
 
-    # Make Hidamari folder if not exist
+    # Make video folder if not exist
     os.makedirs(VIDEO_WALLPAPER_DIR, exist_ok=True)
 
     # Clear sys.argv as it has influence to the Gtk.Application

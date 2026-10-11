@@ -1,4 +1,4 @@
-project('hidamari',
+project('apricus',
           version: '3.7',
           license: ['GPL-3.0'],
     meson_version: '>= 0.59.0',

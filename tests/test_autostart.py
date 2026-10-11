@@ -3,15 +3,15 @@
 import os
 from unittest.mock import patch
 
-from hidamari import utils
+from apricus import utils
 
 
 def test_systemd_unit_content(tmp_path, monkeypatch):
-    monkeypatch.setattr(utils.shutil, "which", lambda name: "/usr/bin/hidamari")
+    monkeypatch.setattr(utils.shutil, "which", lambda name: "/usr/bin/apricus")
     monkeypatch.setattr(utils.sys, "prefix", "/usr")
     monkeypatch.setattr(utils.sys, "executable", "/usr/bin/python3")
     content = utils.systemd_unit_content()
-    assert "ExecStart=/usr/bin/hidamari --fast -b" in content
+    assert "ExecStart=/usr/bin/apricus --fast -b" in content
     assert "After=graphical-session.target" in content
     assert "Restart=on-failure" in content
     assert "WantedBy=graphical-session.target" in content
@@ -20,7 +20,7 @@ def test_systemd_unit_content(tmp_path, monkeypatch):
 def test_setup_systemd_enable_writes_unit(tmp_path, monkeypatch):
     unit_dir = tmp_path / "systemd" / "user"
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
-    monkeypatch.setattr(utils.shutil, "which", lambda name: "/usr/bin/hidamari")
+    monkeypatch.setattr(utils.shutil, "which", lambda name: "/usr/bin/apricus")
     calls = []
 
     def fake_run(cmd, **kwargs):
@@ -58,12 +58,12 @@ def test_setup_systemd_failure_is_false_not_raise(tmp_path, monkeypatch):
 
 
 def test_systemd_unit_uses_venv_python_inside_venv(tmp_path, monkeypatch):
-    monkeypatch.setattr(utils.shutil, "which", lambda name: "/tmp/fake/bin/hidamari")
+    monkeypatch.setattr(utils.shutil, "which", lambda name: "/tmp/fake/bin/apricus")
     monkeypatch.setattr(utils.sys, "prefix", "/tmp/fake")
     monkeypatch.setattr(utils.sys, "base_prefix", "/usr")
     monkeypatch.setattr(utils.sys, "executable", "/tmp/fake/bin/python")
     content = utils.systemd_unit_content()
-    assert "ExecStart=/tmp/fake/bin/python /tmp/fake/bin/hidamari --fast -b" in content
+    assert "ExecStart=/tmp/fake/bin/python /tmp/fake/bin/apricus --fast -b" in content
 
 
 def test_fast_env_skips_refresh(monkeypatch):

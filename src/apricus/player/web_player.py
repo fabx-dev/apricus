@@ -12,7 +12,7 @@ gi.require_version("WebKit2", "4.1")
 from gi.repository import Gdk, Gtk, WebKit2
 from pydbus import SessionBus
 
-from hidamari.commons import (
+from apricus.commons import (
     CONFIG_KEY_DATA_SOURCE,
     CONFIG_KEY_MODE,
     CONFIG_KEY_MUTE,
@@ -21,9 +21,9 @@ from hidamari.commons import (
     LOGGER_NAME,
     MODE_WEBPAGE,
 )
-from hidamari.menu import build_menu
-from hidamari.player.base_player import BasePlayer
-from hidamari.utils import ConfigUtil, setup_logging
+from apricus.menu import build_menu
+from apricus.player.base_player import BasePlayer
+from apricus.utils import ConfigUtil, setup_logging
 
 logger = logging.getLogger(LOGGER_NAME)
 
@@ -89,7 +89,7 @@ class WebWindow(Gtk.ApplicationWindow):
 class WebPlayer(BasePlayer):
     """
     <node>
-    <interface name='io.github.jeffshee.hidamari.player'>
+    <interface name='io.github.fabx_dev.apricus.player'>
         <property name="mode" type="s" access="read"/>
         <property name="data_source" type="s" access="readwrite"/>
         <property name="volume" type="i" access="readwrite"/>

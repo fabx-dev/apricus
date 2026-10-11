@@ -2,9 +2,9 @@
 
 from unittest.mock import patch
 
-from hidamari.monitor import assign_keys
-from hidamari.player.video_player import VideoPlayer
-from hidamari.utils import ConfigUtil
+from apricus.monitor import assign_keys
+from apricus.player.video_player import VideoPlayer
+from apricus.utils import ConfigUtil
 
 
 def test_unique_models_keep_bare_model():
@@ -45,7 +45,7 @@ def test_migrate_legacy_duplicate_keys():
         {"name": "Dell", "key": "Dell#1", "x": 1920, "y": 0},
     ]
     cfg = {"data_source": {"Dell": "/old.mp4", "Default": "/def.mp4"}}
-    with patch("hidamari.monitor.MonitorInfo.monitors", return_value=fake_infos):
+    with patch("apricus.monitor.MonitorInfo.monitors", return_value=fake_infos):
         cu._migrateLegacyMonitorKeys(cfg)
     assert cfg["data_source"] == {
         "Default": "/def.mp4",
@@ -59,7 +59,7 @@ def test_migrate_unique_model_is_noop():
     cu.save = lambda cfg: None
     cfg = {"data_source": {"Solo": "/s.mp4", "Default": "/def.mp4"}}
     with patch(
-        "hidamari.monitor.MonitorInfo.monitors",
+        "apricus.monitor.MonitorInfo.monitors",
         return_value=[{"name": "Solo", "key": "Solo", "x": 0, "y": 0}],
     ):
         cu._migrateLegacyMonitorKeys(cfg)

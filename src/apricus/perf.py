@@ -2,16 +2,16 @@ import logging
 import os
 import time
 
-from hidamari.commons import LOGGER_NAME
+from apricus.commons import LOGGER_NAME
 
 logger = logging.getLogger(LOGGER_NAME)
 
-# Captured at import time. `hidamari.perf` must be imported before any other
-# `hidamari` module so T0 is the true process start (see `__main__.py`).
-# Forkserver children inherit HIDAMARI_T0 from the server so their marks are
+# Captured at import time. `apricus.perf` must be imported before any other
+# `apricus` module so T0 is the true process start (see `__main__.py`).
+# Forkserver children inherit APRICUS_T0 from the server so their marks are
 # on the same login-timescale clock (see server.HidamariServer).
 try:
-    _T0 = float(os.environ.get("HIDAMARI_T0", "0")) or time.monotonic()
+    _T0 = float(os.environ.get("APRICUS_T0", "0")) or time.monotonic()
 except ValueError:
     _T0 = time.monotonic()
 

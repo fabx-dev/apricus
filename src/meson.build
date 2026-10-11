@@ -1,9 +1,9 @@
 pkgdatadir = join_paths(get_option('prefix'), get_option('datadir'), meson.project_name())
 gnome = import('gnome')
 
-gnome.compile_resources('hidamari',
-  'hidamari.gresource.xml',
-  source_dir: 'hidamari',
+gnome.compile_resources('apricus',
+  'apricus.gresource.xml',
+  source_dir: 'apricus',
   gresource_bundle: true,
   install: true,
   install_dir: pkgdatadir,
@@ -18,15 +18,15 @@ conf.set('localedir', join_paths(get_option('prefix'), get_option('localedir')))
 conf.set('pkgdatadir', pkgdatadir)
 
 configure_file(
-  input: 'hidamari.in',
-  output: 'hidamari',
+  input: 'apricus.in',
+  output: 'apricus',
   configuration: conf,
   install: true,
   install_dir: get_option('bindir')
 )
 
-# Install the `hidamari` package (dev and installed trees share this layout).
-install_subdir('hidamari',
+# Install the `apricus` package (dev and installed trees share this layout).
+install_subdir('apricus',
   install_dir: pkgdatadir,
   exclude_directories: ['__pycache__', 'gui/__pycache__', 'player/__pycache__'],
 )

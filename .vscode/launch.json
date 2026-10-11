@@ -5,10 +5,10 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Launch Hidamari",
+            "name": "Launch Apricus",
             "type": "python",
             "request": "launch",
-            "module": "hidamari",
+            "module": "apricus",
             "justMyCode": true,
             "cwd": "${workspaceFolder}/src",
             "args": ["-d"]
@@ -17,7 +17,7 @@
             "name": "Launch Control Panel",
             "type": "python",
             "request": "launch",
-            "module": "hidamari.gui.control",
+            "module": "apricus.gui.control",
             "justMyCode": true,
             "cwd": "${workspaceFolder}/src"
         }

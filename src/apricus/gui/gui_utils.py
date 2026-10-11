@@ -9,8 +9,8 @@ import gi
 gi.require_version("GnomeDesktop", "4.0")
 from gi.repository import GdkPixbuf, Gio, GLib, GnomeDesktop
 
-from hidamari.commons import LOGGER_NAME
-from hidamari.utils import is_flatpak
+from apricus.commons import LOGGER_NAME
+from apricus.utils import is_flatpak
 
 logger = logging.getLogger(LOGGER_NAME)
 

@@ -1,20 +1,25 @@
 import os
 import subprocess
 
-LOGGER_NAME = "Hidamari"
+LOGGER_NAME = "Apricus"
 
-PROJECT = "io.github.jeffshee.Hidamari"
-DBUS_NAME_SERVER = f"{PROJECT}.server"
-DBUS_NAME_PLAYER = f"{PROJECT}.player"
+PROJECT = "io.github.fabx-dev.Apricus"
+# D-Bus domain identifiers (bus names, interfaces, Gtk app IDs, GSettings
+# schema) forbid dashes, so they use the underscore variant. Everything
+# user-facing (desktop file, icon, Flatpak) keeps PROJECT.
+DBUS_PROJECT = "io.github.fabx_dev.Apricus"
+DBUS_NAME_SERVER = f"{DBUS_PROJECT}.server"
+DBUS_NAME_PLAYER = f"{DBUS_PROJECT}.player"
 
-# gettext text domain (matches po/meson.build and the installed hidamari.mo)
-TRANSLATION_DOMAIN = "hidamari"
+# gettext text domain (matches po/meson.build and the installed apricus.mo)
+TRANSLATION_DOMAIN = "apricus"
 
 HOME = os.environ.get("HOME")
 try:
     xdg_video_dir = subprocess.check_output(
         "xdg-user-dir VIDEOS", shell=True, encoding="UTF-8"
     ).replace("\n", "")
+    # Kept from Hidamari for compatibility (existing video libraries stay put).
     VIDEO_WALLPAPER_DIR = os.path.join(xdg_video_dir, "Hidamari")
 except FileNotFoundError:
     # xdg-user-dir not found, use $HOME/Hidamari for Video directory instead
@@ -24,26 +29,28 @@ xdg_config_home = os.environ.get("XDG_CONFIG_HOME", os.path.join(HOME, ".config"
 AUTOSTART_DIR = os.path.join(xdg_config_home, "autostart")
 AUTOSTART_DESKTOP_PATH = os.path.join(AUTOSTART_DIR, f"{PROJECT}.desktop")
 AUTOSTART_DESKTOP_CONTENT = """[Desktop Entry]
-Name=Hidamari
-Exec=hidamari -b
-Icon=io.github.jeffshee.Hidamari
+Name=Apricus
+Exec=apricus -b
+Icon=io.github.fabx-dev.Apricus
 Terminal=false
 Type=Application
 Categories=GTK;Utility;
 StartupNotify=true
 """
 AUTOSTART_DESKTOP_CONTENT_FLATPAK = """[Desktop Entry]
-Name=Hidamari
-Exec=/usr/bin/flatpak run --command=hidamari io.github.jeffshee.Hidamari -b
-Icon=io.github.jeffshee.Hidamari
+Name=Apricus
+Exec=/usr/bin/flatpak run --command=apricus io.github.fabx-dev.Apricus -b
+Icon=io.github.fabx-dev.Apricus
 Terminal=false
 Type=Application
 Categories=GTK;Utility;
 StartupNotify=true
-X-Flatpak=io.github.jeffshee.Hidamari
+X-Flatpak=io.github.fabx-dev.Apricus
 """
 
-CONFIG_DIR = os.path.join(xdg_config_home, "hidamari")
+CONFIG_DIR = os.path.join(xdg_config_home, "apricus")
+# Previous Hidamari install location; imported once on first run.
+LEGACY_CONFIG_PATH = os.path.join(xdg_config_home, "hidamari", "config.json")
 CONFIG_PATH = os.path.join(CONFIG_DIR, "config.json")
 
 MODE_NULL = "MODE_NULL"
@@ -81,7 +88,7 @@ CONFIG_TEMPLATE = {
     CONFIG_KEY_FIRST_TIME: True,
 }
 
-from hidamari.monitor import MonitorInfo
+from apricus.monitor import MonitorInfo
 
 
 # initialize config according to monitors.

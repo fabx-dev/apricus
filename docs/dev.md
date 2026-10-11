@@ -95,7 +95,7 @@ This removes exactly what `make install` installed (from the same `PREFIX`).
 ## Build as Flatpak
 First, please make sure you have `flatpak` and `flatpak-builder` installed on your system. For more details, please refer to the [Flatpak official documentation](https://docs.flatpak.org/en/latest/first-build.html).
 
-All Flatpak packaging files live under [`pkgs/flatpak`](../pkgs/flatpak/), including the manifest `io.github.jeffshee.Hidamari.json`, the bundled build modules (`vlc.json`, `pypi-deps.json`), VLC patches (`libvlc/`), and the `shared-modules` submodule.
+All Flatpak packaging files live under [`pkgs/flatpak`](../pkgs/flatpak/), including the manifest `io.github.fabx-dev.Apricus.json`, the bundled build modules (`vlc.json`, `pypi-deps.json`), VLC patches (`libvlc/`), and the `shared-modules` submodule.
 
 ### Environment Setup
 For Flatpak development, VSCode with the Flatpak extension (`bilelmoussaoui.flatpak-vscode`) is recommended. Alternatively, GNOME Builder is also useful when building Flatpak applications.
@@ -104,7 +104,7 @@ When cloning the Hidamari repo, you should also pull the submodules (`shared-mod
 
 To do so, use `--recurse-submodules` when cloning:
 ```bash
-git clone --recurse-submodules https://github.com/jeffshee/hidamari.git
+git clone --recurse-submodules https://github.com/fabx-dev/apricus.git
 ```
 Alternatively, if you've already cloned the repo, use the following command:
 ```bash

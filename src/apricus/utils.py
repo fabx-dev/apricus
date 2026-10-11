@@ -14,7 +14,7 @@ gi.require_version("Wnck", "3.0")
 import pydbus
 from gi.repository import Gio, GLib, Wnck
 
-from hidamari.commons import (
+from apricus.commons import (
     AUTOSTART_DESKTOP_CONTENT,
     AUTOSTART_DESKTOP_CONTENT_FLATPAK,
     AUTOSTART_DESKTOP_PATH,
@@ -25,6 +25,7 @@ from hidamari.commons import (
     CONFIG_PATH,
     CONFIG_TEMPLATE,
     CONFIG_VERSION,
+    LEGACY_CONFIG_PATH,
     LOGGER_NAME,
     MODE_VIDEO,
     TRANSLATION_DOMAIN,
@@ -40,9 +41,9 @@ def setup_logging():
     The parent configures logging in `__main__`, but forkserver children are
     fresh interpreters: without this, all their INFO/DEBUG logs are silently
     dropped and only WARNING+ surfaces via the last-resort handler. Debug
-    mode propagates through the HIDAMARI_DEBUG env var (see `__main__`).
+    mode propagates through the APRICUS_DEBUG env var (see `__main__`).
     """
-    level = logging.DEBUG if os.environ.get("HIDAMARI_DEBUG") == "1" else logging.INFO
+    level = logging.DEBUG if os.environ.get("APRICUS_DEBUG") == "1" else logging.INFO
     logging.basicConfig(level=level)
 
 
@@ -83,7 +84,7 @@ def is_wayland():
 
 def is_flatpak():
     """
-    Check if Hidamari is a Flatpak
+    Check if Apricus is running as a Flatpak
     Reference:
     https://gitlab.gnome.org/jrb/crosswords/-/blob/master/src/crosswords-init.c#L179
     """
@@ -107,8 +108,8 @@ def setup_autostart(autostart):
         # Request Autostart
         xdp.request_background(
             None,  # parent
-            "Autostart Hidamari in background",  # reason
-            ["hidamari", "-b"],  # commandline
+            "Autostart Apricus in background",  # reason
+            ["apricus", "-b"],  # commandline
             Xdp.BackgroundFlags.AUTOSTART if autostart else Xdp.BackgroundFlags.NONE,  # flags
             None,  # cancellable
             lambda portal, result, user_data: logger.debug(
@@ -133,7 +134,7 @@ def setup_autostart(autostart):
             os.remove(AUTOSTART_DESKTOP_PATH)
 
 
-SYSTEMD_UNIT_NAME = "hidamari.service"
+SYSTEMD_UNIT_NAME = "apricus.service"
 
 
 def _systemd_user_dir():
@@ -153,15 +154,15 @@ def systemd_unit_content():
     used explicitly, because the installed script's system-python shebang
     may lack venv-only deps.
     """
-    script = shutil.which("hidamari") or os.path.join(
-        os.path.expanduser("~"), ".local", "bin", "hidamari"
+    script = shutil.which("apricus") or os.path.join(
+        os.path.expanduser("~"), ".local", "bin", "apricus"
     )
     if sys.prefix != getattr(sys, "base_prefix", sys.prefix):
         exec_start = f"{sys.executable} {script} --fast -b"
     else:
         exec_start = f"{script} --fast -b"
     return f"""[Unit]
-Description=Apricus live wallpaper (Hidamari)
+Description=Apricus live wallpaper
 After=graphical-session.target
 PartOf=graphical-session.target
 
@@ -252,7 +253,7 @@ def gnome_extension_is_installed(extension_name: str):
 
 def gnome_desktop_icon_workaround():
     """
-    Workaround for GNOME desktop icon extensions not displaying the icons on top of Hidamari.
+    Workaround for GNOME desktop icon extensions not displaying the icons on top of Apricus.
     Call this right after the wallpaper is shown.
     """
     if not is_gnome():
@@ -483,7 +484,7 @@ class ConfigUtil:
         `Model#i`: copy the legacy value to every new key missing one, then
         drop the legacy entry. `Default` is never touched.
         """
-        from hidamari.monitor import MonitorInfo
+        from apricus.monitor import MonitorInfo
 
         data_source = config.get(CONFIG_KEY_DATA_SOURCE, {})
         if not isinstance(data_source, dict):
@@ -548,6 +549,18 @@ class ConfigUtil:
                     break
 
     def load(self):
+        if not os.path.isfile(CONFIG_PATH) and os.path.isfile(LEGACY_CONFIG_PATH):
+            # First run after migrating from Hidamari: adopt its config so the
+            # setup (videos, volume, flags) carries over untouched.
+            try:
+                os.makedirs(CONFIG_DIR, exist_ok=True)
+                with open(LEGACY_CONFIG_PATH, encoding="utf-8") as f:
+                    legacy = json.load(f)
+                with open(CONFIG_PATH, "w", encoding="utf-8") as f:
+                    json.dump(legacy, f, indent=3)
+                logger.info(f"[Config] Imported Hidamari config from {LEGACY_CONFIG_PATH}")
+            except (OSError, ValueError) as e:
+                logger.warning(f"[Config] Legacy import failed: {e}")
         if os.path.isfile(CONFIG_PATH):
             with open(CONFIG_PATH) as f:
                 json_str = f.read()

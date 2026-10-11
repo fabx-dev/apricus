@@ -10,8 +10,8 @@ import setproctitle
 from gi.repository import GLib
 from pydbus import SessionBus
 
-from hidamari import perf
-from hidamari.commons import (
+from apricus import perf
+from apricus.commons import (
     CONFIG_KEY_BLUR_RADIUS,
     CONFIG_KEY_DATA_SOURCE,
     CONFIG_KEY_MODE,
@@ -29,21 +29,21 @@ from hidamari.commons import (
     MODE_VIDEO,
     MODE_WEBPAGE,
 )
-from hidamari.gui.control import main as gui_main
-from hidamari.menu import show_systray_icon
-from hidamari.monitor import Monitors
-from hidamari.player.video_player import main as video_player_main
-from hidamari.player.web_player import main as web_player_main
-from hidamari.utils import ConfigUtil, EndSessionHandler, get_video_paths
+from apricus.gui.control import main as gui_main
+from apricus.menu import show_systray_icon
+from apricus.monitor import Monitors
+from apricus.player.video_player import main as video_player_main
+from apricus.player.web_player import main as web_player_main
+from apricus.utils import ConfigUtil, EndSessionHandler, get_video_paths
 
 loop = GLib.MainLoop()
 logger = logging.getLogger(LOGGER_NAME)
 
 
-class HidamariServer:
+class ApricusServer:
     """
     <node>
-    <interface name='io.github.jeffshee.hidamari.server'>
+    <interface name='io.github.fabx_dev.apricus.server'>
         <method name='null'/>
         <method name='video'>
             <arg type='s' name='video_path' direction='in'/>
@@ -75,10 +75,10 @@ class HidamariServer:
     """
 
     def __init__(self, version, pkgdatadir, localedir, args):
-        setproctitle.setproctitle("hidamari-server")
+        setproctitle.setproctitle("apricus-server")
 
         # Share the login-timescale T0 with all forkserver children.
-        os.environ["HIDAMARI_T0"] = repr(perf.start_time())
+        os.environ["APRICUS_T0"] = repr(perf.start_time())
 
         self.version = version
         self.pkgdatadir = pkgdatadir
@@ -149,11 +149,11 @@ class HidamariServer:
 
         if mode in [MODE_VIDEO, MODE_STREAM]:
             self.player_process = Process(
-                name=f"hidamari-player-{self._player_count}", target=video_player_main
+                name=f"apricus-player-{self._player_count}", target=video_player_main
             )
         elif mode == MODE_WEBPAGE:
             self.player_process = Process(
-                name=f"hidamari-player-{self._player_count}", target=web_player_main
+                name=f"apricus-player-{self._player_count}", target=web_player_main
             )
         elif mode == MODE_NULL:
             pass
@@ -175,7 +175,7 @@ class HidamariServer:
                         self.sys_icon_process.kill()
                         self.sys_icon_process.join(timeout=1)
                 self.sys_icon_process = Process(
-                    name="hidamari-systray",
+                    name="apricus-systray",
                     target=show_systray_icon,
                     args=(mode, self.localedir),
                 )
@@ -243,7 +243,7 @@ class HidamariServer:
     def show_gui(self):
         """Show main GUI"""
         self.gui_process = Process(
-            name="hidamari-gui",
+            name="apricus-gui",
             target=gui_main,
             args=(
                 self.version,
@@ -380,7 +380,7 @@ def main(version, pkgdatadir, localedir, args):
         # Pause before launching
         time.sleep(args.p)
         bus = SessionBus()
-        server = HidamariServer(version, pkgdatadir, localedir, args)
+        server = ApricusServer(version, pkgdatadir, localedir, args)
         try:
             bus.publish(DBUS_NAME_SERVER, server)
             loop.run()

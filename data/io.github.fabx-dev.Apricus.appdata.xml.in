@@ -1,29 +1,28 @@
 <?xml version='1.0' encoding='utf-8'?>
 <component type="desktop-application">
   <!--Created with jdAppStreamEdit 9.2-->
-  <id>io.github.jeffshee.Hidamari</id>
-  <name>Hidamari</name>
-  <summary>Video wallpaper for Linux</summary>
-  <developer id="io.github.jeffshee">
-    <name>Jeff Shee</name>
+  <id>io.github.fabx-dev.Apricus</id>
+  <name>Apricus</name>
+  <summary>Live wallpaper for Linux</summary>
+  <developer id="io.github.fabx-dev">
+    <name>fabx-dev</name>
   </developer>
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>GPL-3.0-or-later</project_license>
-  <update_contact>jeffshee8969@gmail.com</update_contact>
+  
   <description>
-    <p>Video wallpaper for Linux. Written in Python. 🐍</p>
-    <p>Hidamari 日溜まり【ひだまり】(n) sunny spot; exposure to the sun</p>
-    <p>Similar functionality to Xwinwrap + mpv or Komorebi, with more features.</p>
+    <p>Live wallpaper for Linux. Apricus (lat.) — sunny, exposed to the sun.</p>
+    <p>Community fork of Hidamari by Jeff Shee, with real Wayland support, fast login startup and multi-desktop support on the roadmap.</p>
   </description>
   <screenshots>
     <screenshot type="default">
-      <image type="source">https://raw.githubusercontent.com/jeffshee/hidamari/master/res/screenshot-1.png</image>
+      <image type="source">https://raw.githubusercontent.com/fabx-dev/apricus/master/res/screenshot-1.png</image>
     </screenshot>
     <screenshot>
-      <image type="source">https://raw.githubusercontent.com/jeffshee/hidamari/master/res/screenshot-2.png</image>
+      <image type="source">https://raw.githubusercontent.com/fabx-dev/apricus/master/res/screenshot-2.png</image>
     </screenshot>
     <screenshot>
-      <image type="source">https://raw.githubusercontent.com/jeffshee/hidamari/master/res/screenshot-3.png</image>
+      <image type="source">https://raw.githubusercontent.com/fabx-dev/apricus/master/res/screenshot-3.png</image>
     </screenshot>
   </screenshots>
   <releases>
@@ -119,9 +118,9 @@
       </description>
     </release>
   </releases>
-  <url type="homepage">https://github.com/jeffshee/hidamari</url>
-  <url type="bugtracker">https://github.com/jeffshee/hidamari/issues</url>
-  <url type="donation">https://www.buymeacoffee.com/jeffshee</url>
+  <url type="homepage">https://github.com/fabx-dev/apricus</url>
+  <url type="bugtracker">https://github.com/fabx-dev/apricus/issues</url>
+  
   <categories>
     <category>GTK</category>
     <category>Utility</category>
@@ -131,7 +130,7 @@
     <control>keyboard</control>
   </recommends>
   <content_rating type="oars-1.1"/>
-  <launchable type="desktop-id">io.github.jeffshee.Hidamari.desktop</launchable>
+  <launchable type="desktop-id">io.github.fabx-dev.Apricus.desktop</launchable>
   <keywords>
     <keyword>Live Wallpaper</keyword>
     <keyword>Video Wallpaper</keyword>

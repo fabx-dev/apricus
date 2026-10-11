@@ -1,12 +1,12 @@
-"""Tests for HidamariServer.feeling_lucky (no display required)."""
+"""Tests for ApricusServer.feeling_lucky (no display required)."""
 
 from unittest.mock import patch
 
-from hidamari import server as srv
+from apricus import server as srv
 
 
 def _server_stub():
-    s = srv.HidamariServer.__new__(srv.HidamariServer)
+    s = srv.ApricusServer.__new__(srv.ApricusServer)
     s.config = {"mode": "MODE_VIDEO", "data_source": {"M1": "/a.mp4", "Default": "/a.mp4"}}
     calls = []
     s.video = lambda path, monitor=None: calls.append(path)

@@ -17,9 +17,9 @@ from gi.repository import Gdk, GLib, Gtk
 from PIL import Image, ImageFilter
 from pydbus import SessionBus
 
-from hidamari import mediacache, perf
-from hidamari.backends import create_wallpaper_backend, create_window_state_backend
-from hidamari.commons import (
+from apricus import mediacache, perf
+from apricus.backends import create_wallpaper_backend, create_window_state_backend
+from apricus.commons import (
     CONFIG_DIR,
     CONFIG_KEY_DATA_SOURCE,
     CONFIG_KEY_FADE_DURATION_SEC,
@@ -35,14 +35,14 @@ from hidamari.commons import (
     MODE_STREAM,
     MODE_VIDEO,
 )
-from hidamari.menu import build_menu
-from hidamari.player.base_player import BasePlayer
-from hidamari.utils import (
+from apricus.menu import build_menu
+from apricus.player.base_player import BasePlayer
+from apricus.utils import (
     ActiveHandler,
     ConfigUtil,
     setup_logging,
 )
-from hidamari.yt_utils import get_best_audio, get_formats, get_optimal_video
+from apricus.yt_utils import get_best_audio, get_formats, get_optimal_video
 
 logger = logging.getLogger(LOGGER_NAME)
 
@@ -311,7 +311,7 @@ class PlayerWindow(Gtk.ApplicationWindow):
 class VideoPlayer(BasePlayer):
     """
     <node>
-    <interface name='io.github.jeffshee.hidamari.player'>
+    <interface name='io.github.fabx_dev.apricus.player'>
         <property name="mode" type="s" access="read"/>
         <property name="data_source" type="s" access="readwrite"/>
         <property name="volume" type="i" access="readwrite"/>
@@ -442,7 +442,7 @@ class VideoPlayer(BasePlayer):
         # model; duplicates get Model#i). Order matches self.windows.
         key_of = {}
         if self.windows:
-            from hidamari.monitor import assign_keys
+            from apricus.monitor import assign_keys
 
             keyed = assign_keys(
                 [
@@ -608,7 +608,7 @@ class VideoPlayer(BasePlayer):
         else:
             perf.mark("player: static cache miss")
         # Refresh the frame in background unless fast login startup.
-        if os.environ.get("HIDAMARI_FAST") == "1":
+        if os.environ.get("APRICUS_FAST") == "1":
             perf.mark("player: static refresh skipped (fast mode)")
             return
         self._static_token = getattr(self, "_static_token", 0) + 1

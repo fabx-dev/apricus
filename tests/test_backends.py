@@ -1,9 +1,9 @@
-"""Tests for hidamari.backends (no display required)."""
+"""Tests for apricus.backends (no display required)."""
 
 from unittest.mock import patch
 
-from hidamari import backends
-from hidamari.backends import (
+from apricus import backends
+from apricus.backends import (
     GnomeShellWindowStateBackend,
     GnomeWallpaperBackend,
     NullWallpaperBackend,
@@ -70,7 +70,7 @@ def test_gnome_backend_flatpak_path(monkeypatch):
 
 
 def test_gnome_prune_cache(tmp_path, monkeypatch):
-    from hidamari import commons
+    from apricus import commons
 
     monkeypatch.setattr(commons, "CONFIG_DIR", str(tmp_path))
     keep = tmp_path / "static-keep.png"
@@ -137,7 +137,7 @@ def test_wnck_backend_delegates_cleanup(monkeypatch):
 
     monkeypatch.setattr(backends, "WindowHandler", FakeHandler, raising=False)
     # Wnck backend imports WindowHandler lazily from utils; patch utils instead
-    import hidamari.utils as U
+    import apricus.utils as U
 
     monkeypatch.setattr(U, "WindowHandler", FakeHandler)
     wb = WnckWindowStateBackend(lambda s: None)

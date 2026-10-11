@@ -1,9 +1,9 @@
 {
-    "app-id": "io.github.jeffshee.Hidamari",
+    "app-id": "io.github.fabx-dev.Apricus",
     "runtime": "org.gnome.Platform",
     "runtime-version": "50",
     "sdk": "org.gnome.Sdk",
-    "command": "hidamari",
+    "command": "apricus",
     "finish-args": [
         "--share=network",
         "--share=ipc",
@@ -124,7 +124,7 @@
             ]
         },
         {
-            "name": "hidamari",
+            "name": "apricus",
             "builddir": true,
             "buildsystem": "meson",
             "sources": [

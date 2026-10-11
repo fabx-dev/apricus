@@ -11,12 +11,12 @@ gi.require_version("Gdk", "3.0")
 from gi.repository import Gdk, Gio, Gtk
 from pydbus import SessionBus
 
-from hidamari.commons import DBUS_NAME_PLAYER, LOGGER_NAME, PROJECT
-from hidamari.utils import gnome_desktop_icon_workaround
+from apricus.commons import DBUS_NAME_PLAYER, DBUS_PROJECT, LOGGER_NAME
+from apricus.utils import gnome_desktop_icon_workaround
 
 logger = logging.getLogger(LOGGER_NAME)
 
-APP_ID = f"{PROJECT}.player"
+APP_ID = f"{DBUS_PROJECT}.player"
 
 
 class DummyWindow(Gtk.ApplicationWindow):
@@ -27,7 +27,7 @@ class DummyWindow(Gtk.ApplicationWindow):
 class BasePlayer(Gtk.Application):
     """
     <node>
-    <interface name='io.github.jeffshee.hidamari.player'>
+    <interface name='io.github.fabx_dev.apricus.player'>
         <property name="mode" type="s" access="read"/>
         <property name="data_source" type="s" access="readwrite"/>
         <property name="volume" type="i" access="readwrite"/>

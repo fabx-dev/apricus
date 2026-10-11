@@ -12,13 +12,13 @@ from gi.repository import AppIndicator3 as AppIndicator
 from gi.repository import GLib, Gtk
 from pydbus import SessionBus
 
-from hidamari.commons import DBUS_NAME_SERVER, LOGGER_NAME, MODE_VIDEO, MODE_WEBPAGE, PROJECT
-from hidamari.utils import init_translations, setup_logging
+from apricus.commons import DBUS_NAME_SERVER, LOGGER_NAME, MODE_VIDEO, MODE_WEBPAGE, PROJECT
+from apricus.utils import init_translations, setup_logging
 
 logger = logging.getLogger(LOGGER_NAME)
 
 APP_INDICATOR_ID = PROJECT
-APP_INDICATOR_ICON = "io.github.jeffshee.Hidamari"
+APP_INDICATOR_ICON = "io.github.fabx-dev.Apricus"
 
 # Reuse SessionBus instance to avoid creating multiple connections
 _session_bus = None
@@ -94,7 +94,7 @@ def start_action(f: callable):
 def build_menu(mode):
     menu = Gtk.Menu()
     #
-    item_show = Gtk.MenuItem(label=_("Show Hidamari"))
+    item_show = Gtk.MenuItem(label=_("Show Apricus"))
     item_show.connect("activate", lambda *_: start_action(on_item_show))
     #
     item_mute = Gtk.MenuItem(label=_("Toggle Mute Audio"))
@@ -109,7 +109,7 @@ def build_menu(mode):
     item_lucky = Gtk.MenuItem(label=_("I'm Feeling Lucky"))
     item_lucky.connect("activate", lambda *_: start_action(on_item_lucky))
     #
-    item_quit = Gtk.MenuItem(label=_("Quit Hidamari"))
+    item_quit = Gtk.MenuItem(label=_("Quit Apricus"))
     item_quit.connect("activate", lambda *_: start_action(on_item_quit))
     #
     # Filter out unsupported action in current mode

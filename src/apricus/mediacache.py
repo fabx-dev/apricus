@@ -11,8 +11,8 @@ import logging
 import os
 import subprocess
 
-from hidamari import commons
-from hidamari.commons import LOGGER_NAME
+from apricus import commons
+from apricus.commons import LOGGER_NAME
 
 logger = logging.getLogger(LOGGER_NAME)
 

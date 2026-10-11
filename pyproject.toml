@@ -1,7 +1,7 @@
 [project]
-name = "hidamari"
+name = "apricus"
 version = "3.7"
-description = "Video wallpaper for Linux. Written in Python."
+description = "Live wallpaper for Linux. Written in Python."
 readme = "README.md"
 license = "GPL-3.0-or-later"
 requires-python = ">=3.10"
