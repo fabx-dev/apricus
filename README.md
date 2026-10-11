@@ -1,4 +1,4 @@
-<p align="center"><img src="res/hidamari.svg" width="256"></p>
+<p align="center"><img src="res/apricus.svg" width="256"></p>
 
 <p align="center">Live wallpaper for Linux. Written in Python.</p>
 <p align="center">Apricus (lat.) — sunny, exposed to the sun.</p>
