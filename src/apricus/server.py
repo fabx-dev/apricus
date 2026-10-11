@@ -141,6 +141,11 @@ class ApricusServer:
             # always update default source
             self.config[CONFIG_KEY_DATA_SOURCE]["Default"] = data_source
 
+        # Persist before spawning: the player process reads the config from
+        # disk, so runtime mode switches via D-Bus must not rely on callers
+        # saving first (the GUI used to mask this by saving itself).
+        self._save_config()
+
         # Quit current then create a new player
         self._quit_player()
 
