@@ -10,11 +10,9 @@
 # Apricus
 
 Apricus is a community fork of [Hidamari](https://github.com/jeffshee/hidamari)
-by Jeff Shee (GPL-3.0, same license). Hidamari is a great app with a
-maintenance bottleneck: 130+ open issues, open PRs sitting for months, and an
-upstream focus that moved to Hanabi. Apricus continues the codebase with an
-emphasis on **stability, Wayland support, startup performance, and
-multi-desktop support**.
+by Jeff Shee (GPL-3.0, same license). It picks up where Hidamari left off
+and pushes live wallpapers on Linux forward: **real Wayland support,
+multi-desktop support, fast login startup, and a robust player**.
 
 > Status: active development. The `master` branch tracks upstream v3.7;
 > current work happens on feature branches (see `PLAN.md`).
