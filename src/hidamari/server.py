@@ -159,6 +159,7 @@ class HidamariServer:
             self.player_process.start()
             self._player_count += 1
             perf.mark(f"server: player process started [{mode}]")
+            logger.info(f"[Server] player pid={self.player_process.pid}")
 
         # Refresh systray icon if the mode changed
         if self.config[CONFIG_KEY_SYSTRAY]:

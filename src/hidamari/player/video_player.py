@@ -788,6 +788,13 @@ class VideoPlayer(BasePlayer):
 
 
 def main():
+    # Dump Python tracebacks on C-level crashes (segfaults in VLC/Gtk).
+    # Invaluable for diagnosing silent player deaths; always on, negligible cost.
+    import faulthandler
+    import os
+
+    faulthandler.enable()
+    logger.info(f"[Player] pid={os.getpid()}")
     bus = SessionBus()
     app = VideoPlayer()
     try:
