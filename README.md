@@ -1,93 +1,91 @@
-<p align="center"><img src="https://raw.githubusercontent.com/jeffshee/hidamari/master/res/hidamari.svg" width="256"></p>
+<p align="center"><img src="res/hidamari.svg" width="256"></p>
 
-<p align="center">Video wallpaper for Linux. Written in Python. 🐍</p>  
-<p align="center">Hidamari 日溜まり【ひだまり】(n) sunny spot; exposure to the sun</p>
+<p align="center">Live wallpaper for Linux. Written in Python.</p>
+<p align="center">Apricus (lat.) — sunny, exposed to the sun.</p>
 
-# Hidamari　ーひだまりー
-If you like my project, please consider buying me a coffee!! (⁎˃ ꇴ ˂⁎)ｯ
+<p align="center">
+<a href="https://github.com/fabx-dev/apricus/actions/workflows/ci.yml"><img src="https://github.com/fabx-dev/apricus/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+</p>
 
-[![Github-sponsors](https://img.shields.io/badge/sponsor-30363D?style=for-the-badge&logo=GitHub-Sponsors&logoColor=#EA4AAA)](https://github.com/sponsors/jeffshee)
-[![Ko-Fi](https://img.shields.io/badge/Ko--fi-F16061?style=for-the-badge&logo=ko-fi&logoColor=white)](https://ko-fi.com/jeffshee)
-[![BuyMeACoffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-ffdd00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/jeffshee)
+# Apricus
 
-Also please don't forget to click that star button! 🌟  
-Your support is truly appreciated!
+Apricus is a community fork of [Hidamari](https://github.com/jeffshee/hidamari)
+by Jeff Shee (GPL-3.0, same license). Hidamari is a great app with a
+maintenance bottleneck: 130+ open issues, open PRs sitting for months, and an
+upstream focus that moved to Hanabi. Apricus continues the codebase with an
+emphasis on **stability, Wayland support, startup performance, and
+multi-desktop support**.
 
-## Join our Discord!
+> Status: active development. The `master` branch tracks upstream v3.7;
+> current work happens on feature branches (see `PLAN.md`).
 
-[![Discord](https://img.shields.io/badge/Discord-%235865F2.svg?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/mP7yg4gX7g)
+## Features
 
-## For GNOME user 🐾
-Please also check my new project [Hanabi](https://github.com/jeffshee/gnome-ext-hanabi)! While the project is still in its infancy, it has the potential to become more integrated with GNOME Shell
+- Autostart after login
+- Static wallpaper from video frame, with blur effect <sup>1</sup>
+- Pause on maximized window / fullscreen <sup>2</sup>
+- Volume control, mute/pause in two clicks
+- I'm feeling lucky (random video)
+- Hardware accelerated decoding via VLC <sup>3</sup>
+- Multi-monitor support, per-monitor video
+- Streaming URL support via yt-dlp <sup>4</sup>
+- Webpage as wallpaper <sup>5</sup>
 
-## Features 🔥
+<sup>1</sup> Currently GNOME only.
+<sup>2</sup> Window-state detection is currently X11 only; Wayland support is on the roadmap.
+<sup>3</sup> VLC backend; HW acceleration varies by driver (NVIDIA + Wayland is fragile).
+<sup>4</sup> Tested with YouTube.
+<sup>5</sup> Anything from a plain page to WebGL content.
 
-There are several solutions to achieve video as wallpaper on Linux, for example:
+## What changed vs upstream
 
-1. [Xwinwrap + mpv](https://www.linuxuprising.com/2019/05/livestream-wallpaper-for-your-gnome.html)
-2. [Komorebi](https://github.com/cheesecakeufo/komorebi)
+See [PLAN.md](PLAN.md) for the full roadmap. So far (branch `fase-1b`):
 
-Hidamari offers similar feature as above, with additional features listed below:
+- Startup timing instrumentation (`hidamari.perf`, `[Perf]` marks)
+- Stable per-monitor config keys (duplicate models get `Model#i`, with legacy migration)
+- `feeling_lucky` no longer crashes on an empty library (upstream #272)
+- Correct dark-mode wallpaper restore, `ffprobe` timeouts, headless-safe imports
+- CI (lint + format check + pytest) and a headless-safe test suite
 
-- [x] Autostart after login
-- [x] Apply static wallpaper with blur effect <sup>1</sup>
-- [x] Detect maximized window and fullscreen mode <sup>2</sup>
-- [x] Volume control
-- [x] Mute/Pause the playback anytime with just 2 clicks!
-- [x] I'm feeling lucky <sup>3</sup>
-- [x] Hardware accelerated video decoding! <sup>4</sup>
-- [x] Gnome Wayland support!
-- [x] Multi-monitor support!
-- [x] Streaming URL support! <sup>5</sup>
-- [x] Webpage as wallpaper! <sup>6</sup>
-- [ ] You name it! =)
+## Installation (from source)
 
-<sup>1</sup> Video frame can be applied as system wallpaper, look great in <i>GNOME</i> (currently GNOME exclusive, support for other DE might be added if requested...)  
-<sup>2</sup> Automatically pauses playback when maximized window or full screen mode is detected (currently X11 only...)  
-<sup>3</sup> Randomly select and play a video  
-<sup>4</sup> Use <i>vlc</i> as backend (currently HW acceleration doesn't work with Nvidia+Wayland combination...)     
-<sup>5</sup> Use <i>yt-dlp</i> as backend, tested with YouTube videos  
-<sup>6</sup> Theoretically it can be anything from a normal webpage to <i>Unity/Godot WebGL games</i>, be creative!
+Prerequisites per distro are listed in [docs/dev.md](docs/dev.md). Then:
 
-## Installation ⏬
-### Flatpak 📦
-It is available on Flathub!
-
-<a href='https://flathub.org/apps/details/io.github.jeffshee.Hidamari'><img width='240' alt='Download Hidamari on Flathub' src='https://flathub.org/assets/badges/flathub-badge-en.png'/></a>
-
-#### Command line instructions
-Install:  
-Make sure to follow the [setup guide](https://flatpak.org/setup/) before installing
-```
-flatpak install flathub io.github.jeffshee.Hidamari
-```
-Run:  
-```
-flatpak run io.github.jeffshee.Hidamari
+```bash
+git clone --recurse-submodules https://github.com/fabx-dev/apricus.git
+cd apricus
+make sync      # dev environment (uses system PyGObject)
+make install   # installs into ~/.local (no sudo)
 ```
 
-### Unofficial package
-These are maintained by the community!
-| Distro     | URL                                     | Maintainer                            |
-|------------|-----------------------------------------|---------------------------------------|
-| Arch Linux | [![AUR](https://img.shields.io/aur/version/hidamari?style=for-the-badge)](https://aur.archlinux.org/packages/hidamari) | None |
+Run it (via the dev env, in debug mode):
 
-## Screenshot 📸
+```bash
+make run
+```
 
-![](https://raw.githubusercontent.com/jeffshee/hidamari/master/res/screenshot-1.png)
-![](https://raw.githubusercontent.com/jeffshee/hidamari/master/res/screenshot-2.png)
-![](https://raw.githubusercontent.com/jeffshee/hidamari/master/res/screenshot-3.png)
+Put videos in the Hidamari folder (`~/Video/Hidamari` or `~/Videos/Hidamari`
+depending on distro) and pick them from the GUI. A Flatpak package is planned
+but not published yet.
 
-## Please!! 🙏
+## Development
 
-Collaboration is welcome! Let's make it better together~  
-Feel free to open an issue if you have any problem or suggestion 🤗  
+```bash
+make lint     # ruff check
+make format   # ruff format
+uv run pytest tests/ -q
+```
 
-## Contributors ✨
+`PLAN.md` is the roadmap. Issues and pull requests are welcome.
 
-<a href="https://github.com/jeffshee/hidamari/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=jeffshee/hidamari" />
-</a>
+## Credits
 
-Made with [contributors-img](https://contrib.rocks).  
-Icons made by [Freepik](http://www.freepik.com/) from [Flaticon](https://www.flaticon.com)
+- Upstream project: [jeffshee/hidamari](https://github.com/jeffshee/hidamari)
+- Icons: [Freepik](http://www.freepik.com/) from [Flaticon](https://www.flaticon.com)
+- License: GPL-3.0-or-later (see `COPYING`)
+
+## Screenshots
+
+![](res/screenshot-1.png)
+![](res/screenshot-2.png)
+![](res/screenshot-3.png)
