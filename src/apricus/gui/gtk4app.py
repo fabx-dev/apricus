@@ -12,6 +12,7 @@ apricus.menu or apricus.monitor (they pin GTK3/Gdk3 namespaces).
 """
 
 import logging
+import os
 import sys
 
 import gi
@@ -49,6 +50,7 @@ class ControlPanel(Adw.Application):
         self.version = version
         self.window = None
         self.config = ConfigUtil().load()
+        self.playlist_paths = list((self.config.get("playlist") or {}).get("Default", []))
 
     def do_activate(self):
         if self.window is None:
@@ -69,6 +71,10 @@ class ControlPanel(Adw.Application):
             toolbar.set_content(self.stack)
             self.window.set_content(toolbar)
         self._refresh_all()
+        # Dev/test aid: preselect a tab (e.g. screenshots).
+        initial_tab = os.environ.get("APRICUS_GTK4_TAB")
+        if initial_tab is not None:
+            self.stack.set_visible_child_name(initial_tab)
         self.window.present()
 
     def _server(self):
@@ -159,20 +165,140 @@ class ControlPanel(Adw.Application):
         self._refresh_all()
 
     def _playlist_page(self):
-        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
-        box.set_margin_top(24)
-        box.set_margin_bottom(24)
-        box.set_margin_start(24)
-        box.set_margin_end(24)
+        from apricus.gui.gtk4lib import VideoItem
+
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        box.set_margin_top(16)
+        box.set_margin_bottom(16)
+        box.set_margin_start(16)
+        box.set_margin_end(16)
         self.playlist_status = Gtk.Label(label="")
         self.playlist_status.set_xalign(0)
         box.append(self.playlist_status)
+        scrolled = Gtk.ScrolledWindow()
+        scrolled.set_vexpand(True)
+        scrolled.set_hexpand(True)
+        self.queue_store = Gio.ListStore.new(VideoItem)
+        self.queue_selection = Gtk.SingleSelection.new(self.queue_store)
+        self.queue_selection.set_autoselect(False)
+        self.queue_selection.set_can_unselect(True)
+        listview = Gtk.ListView(model=self.queue_selection, factory=self._queue_factory())
+        scrolled.set_child(listview)
+        box.append(scrolled)
+        row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        row.set_halign(Gtk.Align.CENTER)
+        up_btn = Gtk.Button(label="Up")
+        up_btn.connect("clicked", self.on_queue_up)
+        down_btn = Gtk.Button(label="Down")
+        down_btn.connect("clicked", self.on_queue_down)
+        rm_btn = Gtk.Button(label="Remove")
+        rm_btn.connect("clicked", self.on_queue_remove)
+        clear_btn = Gtk.Button(label="Clear")
+        clear_btn.connect("clicked", self.on_queue_clear)
+        self.shuffle_check = Gtk.CheckButton(label="Shuffle")
+        self.shuffle_check.connect("toggled", self.on_shuffle_toggled)
         apply_btn = Gtk.Button(label="Apply playlist")
         apply_btn.add_css_class("suggested-action")
-        apply_btn.set_halign(Gtk.Align.CENTER)
         apply_btn.connect("clicked", self.on_playlist_apply)
-        box.append(apply_btn)
+        for w in (up_btn, down_btn, rm_btn, clear_btn, self.shuffle_check, apply_btn):
+            row.append(w)
+        box.append(row)
         return box
+
+    def _queue_factory(self):
+        from apricus.gui.gtk4lib import VideoItem  # noqa: F401 (type reference)
+
+        factory = Gtk.SignalListItemFactory()
+
+        def _setup(_factory, item):
+            row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+            num = Gtk.Label()
+            num.set_width_chars(3)
+            name = Gtk.Label()
+            name.set_xalign(0)
+            name.set_hexpand(True)
+            from gi.repository import Pango
+
+            name.set_ellipsize(Pango.EllipsizeMode.END)
+            row.append(num)
+            row.append(name)
+            item.set_child(row)
+            item._num = num
+            item._name = name
+
+        def _bind(_factory, item):
+            video = item.get_item()
+            if video is None:
+                return
+            store = self.queue_store
+            pos = -1
+            for i in range(store.get_n_items()):
+                if store.get_item(i) is video:
+                    pos = i
+                    break
+            item._num.set_text(str(pos + 1))
+            item._name.set_text(video.name)
+
+        factory.connect("setup", _setup)
+        factory.connect("bind", _bind)
+        return factory
+
+    def _queue_selected_index(self):
+        selected = self.queue_selection.get_selected()
+        if selected == Gtk.INVALID_LIST_POSITION:
+            return None
+        return selected
+
+    def _reload_queue_store(self):
+        from apricus.gui.gtk4lib import VideoItem
+
+        items = [VideoItem(p) for p in self.playlist_paths]
+        self.queue_store.splice(0, self.queue_store.get_n_items(), items)
+
+    def on_queue_up(self, *_args):
+        idx = self._queue_selected_index()
+        if idx is not None and idx > 0:
+            paths = self.playlist_paths
+            paths[idx - 1], paths[idx] = paths[idx], paths[idx - 1]
+            self._reload_queue_store()
+            self.queue_selection.set_selected(idx - 1)
+
+    def on_queue_down(self, *_args):
+        idx = self._queue_selected_index()
+        if idx is not None and idx < len(self.playlist_paths) - 1:
+            paths = self.playlist_paths
+            paths[idx + 1], paths[idx] = paths[idx], paths[idx + 1]
+            self._reload_queue_store()
+            self.queue_selection.set_selected(idx + 1)
+
+    def on_queue_remove(self, *_args):
+        idx = self._queue_selected_index()
+        if idx is not None:
+            del self.playlist_paths[idx]
+            self._reload_queue_store()
+
+    def on_queue_clear(self, *_args):
+        self.playlist_paths = []
+        self._reload_queue_store()
+        self._refresh_playlist_status()
+
+    def on_shuffle_toggled(self, check):
+        self.config["playlist_shuffle"] = bool(check.get_active())
+        from apricus.utils import ConfigUtil
+
+        ConfigUtil().save(self.config)
+
+    def _refresh_playlist_status(self):
+        n = len(self.playlist_paths)
+        server = self._server()
+        mode = server.mode if server is not None else self.config.get(CONFIG_KEY_MODE)
+        if n == 0:
+            text = "Queue empty — add videos from Library"
+        elif mode == MODE_PLAYLIST:
+            text = f"{n} videos in queue (muted by design)"
+        else:
+            text = f"{n} videos in queue (paused)"
+        self.playlist_status.set_text(text)
 
     def _settings_page(self):
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
@@ -207,6 +333,14 @@ class ControlPanel(Adw.Application):
             f"Apricus {self.version} — mode: {mode}\n{n_videos} videos in library"
         )
         self._reload_library_store()
+        self._reload_queue_store()
+        self._refresh_playlist_status()
+        is_playlist = mode == MODE_PLAYLIST
+        self.mute_switch.set_state(bool(self.config.get(CONFIG_KEY_MUTE)))
+        self.volume_scale.set_value(int(self.config.get(CONFIG_KEY_VOLUME, 50)))
+        self.volume_scale.set_sensitive(not is_playlist)
+        self.mute_switch.set_sensitive(not is_playlist)
+        self.shuffle_check.set_active(bool(self.config.get("playlist_shuffle")))
         playlist = (self.config.get("playlist") or {}).get("Default", [])
         self.playlist_status.set_text(
             f"{len(playlist)} videos in queue"
