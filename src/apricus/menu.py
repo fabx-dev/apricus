@@ -7,8 +7,6 @@ import gi
 import setproctitle
 
 gi.require_version("Gtk", "3.0")
-gi.require_version("AppIndicator3", "0.1")
-from gi.repository import AppIndicator3 as AppIndicator
 from gi.repository import GLib, Gtk
 from pydbus import SessionBus
 
@@ -124,6 +122,11 @@ def build_menu(mode):
 
 
 def show_systray_icon(mode, localedir="/usr/share/locale"):
+    # Lazily loaded: importing menu (player context menus) must never require
+    # the AppIndicator typelib.
+    gi.require_version("AppIndicator3", "0.1")
+    from gi.repository import AppIndicator3 as AppIndicator
+
     setproctitle.setproctitle(mp.current_process().name)
     setup_logging()
     init_translations(localedir)

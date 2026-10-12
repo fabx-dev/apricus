@@ -9,10 +9,24 @@ import sys
 from pprint import pformat
 
 import gi
-
-gi.require_version("Wnck", "3.0")
 import pydbus
-from gi.repository import Gio, GLib, Wnck
+from gi.repository import Gio, GLib
+
+_Wnck = None
+
+
+def wnck():
+    """Lazily loaded Wnck (X11-only): importing utils must never require a
+    display server or the Wnck typelib (headless tools, tests, future
+    Wayland-native processes)."""
+    global _Wnck
+    if _Wnck is None:
+        gi.require_version("Wnck", "3.0")
+        from gi.repository import Wnck
+
+        _Wnck = Wnck
+    return _Wnck
+
 
 from apricus.commons import (
     AUTOSTART_DESKTOP_CONTENT,
@@ -418,7 +432,7 @@ class WindowHandler:
 
     def __init__(self, on_window_state_changed: callable):
         self.on_window_state_changed = on_window_state_changed
-        self.screen = Wnck.Screen.get_default()
+        self.screen = wnck().Screen.get_default()
         self.screen.force_update()
 
         # Store signal handler IDs for cleanup
@@ -457,12 +471,13 @@ class WindowHandler:
         is_changed = False
 
         is_any_maximized, is_any_fullscreen = False, False
+        W = wnck().Window
         for window in self.screen.get_windows():
-            base_state = not Wnck.Window.is_minimized(window) and Wnck.Window.is_on_workspace(
+            base_state = not W.is_minimized(window) and W.is_on_workspace(
                 window, self.screen.get_active_workspace()
             )
-            is_maximized = Wnck.Window.is_maximized(window) and base_state
-            is_fullscreen = Wnck.Window.is_fullscreen(window) and base_state
+            is_maximized = W.is_maximized(window) and base_state
+            is_fullscreen = W.is_fullscreen(window) and base_state
             if is_maximized is True:
                 is_any_maximized = True
             if is_fullscreen is True:
