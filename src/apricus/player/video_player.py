@@ -126,11 +126,6 @@ class VLCWidget(Gtk.DrawingArea):
         self.instance = vlc.Instance(vlc_options)
         self.player = self.instance.media_player_new()
 
-        # Cover pixbuf painted until the first real frame lands (kills the
-        # theme-background flash on switches). Cleared on TimeChanged.
-        self._cover = None
-        self.connect("draw", self._on_draw_cover)
-
         def handle_embed(*args):
             self.player.set_xwindow(self.get_window().get_xid())
             return True
@@ -138,25 +133,6 @@ class VLCWidget(Gtk.DrawingArea):
         # Embed and set size.
         self.connect("realize", handle_embed)
         self.set_size_request(width, height)
-
-    def set_cover(self, pixbuf):
-        self._cover = pixbuf
-        self.queue_draw()
-
-    def clear_cover(self):
-        if self._cover is not None:
-            self._cover = None
-            self.queue_draw()
-
-    def _on_draw_cover(self, widget, cr):
-        if self._cover is None:
-            return False
-        alloc = self.get_allocation()
-        x = (alloc.width - self._cover.get_width()) // 2
-        y = (alloc.height - self._cover.get_height()) // 2
-        Gdk.cairo_set_source_pixbuf(cr, self._cover, x, y)
-        cr.paint()
-        return True
 
     def cleanup(self):
         """Cleanup VLC resources to prevent memory leaks"""
@@ -184,12 +160,21 @@ class PlayerWindow(Gtk.ApplicationWindow):
         # Opaque black until the first frame lands: otherwise the theme
         # background flashes through on every video switch.
         self.override_background_color(Gtk.StateFlags.NORMAL, Gdk.RGBA(0, 0, 0, 1))
+        # Cover image painted over the video area until the real first frame
+        # lands (pure GtkImage overlay: no cairo callbacks involved).
+        self.__overlay = Gtk.Overlay()
+        self.__cover_image = Gtk.Image()
+        self.__cover_image.set_no_show_all(True)
+        self.__overlay.add(self.__vlc_widget)
+        self.__overlay.add_overlay(self.__cover_image)
+        self.__overlay.set_overlay_pass_through(self.__cover_image, True)
         # Playlist state (used only in MODE_PLAYLIST).
         self._queue = []
         self._queue_index = 0
         self._transitioning = False
-        self.add(self.__vlc_widget)
+        self.add(self.__overlay)
         self.__vlc_widget.show()
+        self.__overlay.show()
 
         # These are to allow us to right click. VLC can't hijack mouse input, and probably not key inputs either in
         # Case we want to add keyboard shortcuts later on.
@@ -335,7 +320,7 @@ class PlayerWindow(Gtk.ApplicationWindow):
         self.__vlc_widget.player.add_slave(vlc.MediaSlaveType(1), audio, True)
 
     def set_cover(self, image_path):
-        """Paint a cached frame until the real first frame lands."""
+        """Show a cached frame until the real first frame lands."""
         self._cover_token = getattr(self, "_cover_token", 0) + 1
         token = self._cover_token
         try:
@@ -344,16 +329,17 @@ class PlayerWindow(Gtk.ApplicationWindow):
             pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(image_path, w, h, True)
         except (GLib.Error, OSError):
             return
-        self.__vlc_widget.set_cover(pixbuf)
+        self.__cover_image.set_from_pixbuf(pixbuf)
+        self.__cover_image.show()
         GLib.timeout_add_seconds(5, self._clear_cover_timeout, token)
 
     def _clear_cover_timeout(self, token):
         if token == getattr(self, "_cover_token", None):
-            self.__vlc_widget.clear_cover()
+            self.__cover_image.hide()
         return False
 
     def _on_first_time_changed(self, _event):
-        self.__vlc_widget.clear_cover()
+        self.__cover_image.hide()
         if self._first_frame_reported:
             return
         self._first_frame_reported = True
