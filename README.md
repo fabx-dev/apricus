@@ -128,6 +128,11 @@ welcome.
 
 ## Screenshots
 
+![Video library](res/apricus-library.png)
+![Playlist](res/apricus-playlist.png)
+
+Legacy Hidamari screenshots (pre-rebrand UI):
+
 ![](res/screenshot-1.png)
 ![](res/screenshot-2.png)
 ![](res/screenshot-3.png)
