@@ -10,7 +10,7 @@
         "--device=dri",
         "--socket=x11",
         "--socket=pulseaudio",
-        "--filesystem=xdg-videos/Hidamari:create",
+        "--filesystem=xdg-videos:ro",
         "--talk-name=org.gnome.Shell.Extensions",
         "--talk-name=org.gnome.SessionManager",
         "--talk-name=org.gnome.ScreenSaver",
