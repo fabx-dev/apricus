@@ -5,4 +5,4 @@ Icon=io.github.fabx_dev.Apricus
 Terminal=false
 Type=Application
 Categories=GTK;Utility;
-StartupNotify=true
+StartupNotify=false

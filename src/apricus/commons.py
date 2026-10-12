@@ -35,7 +35,7 @@ Icon=io.github.fabx_dev.Apricus
 Terminal=false
 Type=Application
 Categories=GTK;Utility;
-StartupNotify=true
+StartupNotify=false
 """
 AUTOSTART_DESKTOP_CONTENT_FLATPAK = """[Desktop Entry]
 Name=Apricus
@@ -44,7 +44,7 @@ Icon=io.github.fabx_dev.Apricus
 Terminal=false
 Type=Application
 Categories=GTK;Utility;
-StartupNotify=true
+StartupNotify=false
 X-Flatpak=io.github.fabx_dev.Apricus
 """
 
