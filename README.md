@@ -122,7 +122,15 @@ library folder — nothing is assumed or auto-created. (An existing Hidamari
 library is reused automatically for compatibility.)
 
 A Flatpak (`io.github.fabx_dev.Apricus`) builds locally with `make flatpak`;
-Flathub publishing is planned.
+a ready-made bundle is attached to each
+[GitHub release](https://github.com/fabx-dev/apricus/releases) — install with:
+
+```bash
+flatpak install --user apricus-1.0.flatpak
+```
+
+Flathub publishing is planned once the project has an established userbase
+(Flathub currently rejects duplicate fork submissions without one).
 
 Optional login autostart via systemd (instead of the `.desktop` file):
 
