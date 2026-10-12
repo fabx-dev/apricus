@@ -25,6 +25,30 @@
         }
     },
     "modules": [
+        {
+            "name": "utf8cpp",
+            "builddir": true,
+            "buildsystem": "cmake-ninja",
+            "config-opts": [
+                "-DCMAKE_BUILD_TYPE=RelWithDebInfo",
+                "-DUTF8_TESTS=OFF",
+                "-DUTF8_SAMPLES=OFF",
+                "-DUTF8_INSTALL=ON"
+            ],
+            "sources": [
+                {
+                    "type": "archive",
+                    "url": "https://github.com/nemtrif/utfcpp/archive/refs/tags/v3.2.5.tar.gz",
+                    "sha256": "14fd1b3c466814cb4c40771b7f207b61d2c7a0aa6a5e620ca05c00df27f25afd",
+                    "x-checker-data": {
+                        "type": "json",
+                        "url": "https://api.github.com/repos/nemtrif/utfcpp/releases/latest",
+                        "version-query": ".tag_name",
+                        "url-query": ".tarball_url"
+                    }
+                }
+            ]
+        },
         "shared-modules/intltool/intltool-0.51.json",
         "shared-modules/glu/glu-9.json",
         {
