@@ -47,10 +47,6 @@
                         "version-pattern": "libebml-(1\\.4\\.\\d+)\\.tar\\.xz",
                         "url-template": "https://dl.matroska.org/downloads/libebml/libebml-$version.tar.xz"
                     }
-                },
-                {
-                    "type": "patch",
-                    "path": "libvlc/cmake-min-version.patch"
                 }
             ]
         },
@@ -74,10 +70,6 @@
                         "version-pattern": "libmatroska-(1\\.7\\.\\d+)\\.tar\\.xz",
                         "url-template": "https://dl.matroska.org/downloads/libmatroska/libmatroska-$version.tar.xz"
                     }
-                },
-                {
-                    "type": "patch",
-                    "path": "libvlc/cmake-min-version.patch"
                 }
             ]
         },
