@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: apricus\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-12 02:01+0200\n"
+"POT-Creation-Date: 2026-10-12 02:12+0200\n"
 "PO-Revision-Date: 2026-07-10 01:30+0900\n"
 "Last-Translator: Jeff Shee <jeffshee8969@gmail.com>\n"
 "Language-Team: Japanese\n"
@@ -82,76 +82,85 @@ msgstr ""
 "動画が選択されていません。\n"
 "まず動画を1つ選択してください。"
 
-#: src/apricus/gui/control.py:366
+#: src/apricus/gui/control.py:367
 msgid "Please choose a HTML file"
 msgstr "HTML ファイルを選択してください"
 
-#: src/apricus/gui/control.py:397
+#: src/apricus/gui/control.py:398
 msgid "#"
 msgstr ""
 
-#: src/apricus/gui/control.py:397
+#: src/apricus/gui/control.py:398
 #, fuzzy
 msgid "Video"
 msgstr "ローカル動画"
 
-#: src/apricus/gui/control.py:411
+#: src/apricus/gui/control.py:412
 #, python-brace-format
 msgid "Playlist ({n}, paused)"
 msgstr ""
 
-#: src/apricus/gui/control.py:413
+#: src/apricus/gui/control.py:414
 #, python-brace-format
 msgid "Playlist ({n})"
 msgstr ""
 
-#: src/apricus/gui/control.py:413 src/apricus/assets/control.ui:1113
+#: src/apricus/gui/control.py:414 src/apricus/assets/control.ui:1113
 msgid "Playlist"
 msgstr ""
 
-#: src/apricus/gui/control.py:430
+#: src/apricus/gui/control.py:431
 #, python-brace-format
 msgid "Added {a}, {d} already in queue (total {n})"
 msgstr ""
 
-#: src/apricus/gui/control.py:434
+#: src/apricus/gui/control.py:435
 #, python-brace-format
 msgid "Added {a} to queue (total {n})"
 msgstr ""
 
-#: src/apricus/gui/control.py:436
+#: src/apricus/gui/control.py:437
 #, python-brace-format
 msgid "Already in queue (total {n})"
 msgstr ""
 
-#: src/apricus/gui/control.py:447 src/apricus/assets/control.ui:456
+#: src/apricus/gui/control.py:449 src/apricus/assets/control.ui:456
 msgid "No selection"
 msgstr ""
 
-#: src/apricus/gui/control.py:449
+#: src/apricus/gui/control.py:451
 #, fuzzy
 msgid "1 video selected"
 msgstr "動画が選択されていません"
 
-#: src/apricus/gui/control.py:451
+#: src/apricus/gui/control.py:453
 #, fuzzy, python-brace-format
 msgid "{n} videos selected"
 msgstr "動画が選択されていません"
 
-#: src/apricus/gui/control.py:462
+#: src/apricus/gui/control.py:460
+msgid "This video is already the active wallpaper"
+msgstr ""
+
+#: src/apricus/gui/control.py:463
+#, fuzzy
+msgid "Apply the selected video as wallpaper"
+msgstr "静止画壁紙を適用"
+
+#: src/apricus/gui/control.py:485
 #, python-brace-format
 msgid "Add to playlist ({n})"
 msgstr ""
 
-#: src/apricus/gui/control.py:462 src/apricus/assets/control.ui:487
+#: src/apricus/gui/control.py:485 src/apricus/assets/control.ui:487
 msgid "Add to playlist"
 msgstr ""
 
-#: src/apricus/gui/control.py:477
+#: src/apricus/gui/control.py:500
 msgid "Selecting videos"
 msgstr ""
 
-#: src/apricus/gui/control.py:480
+#: src/apricus/gui/control.py:503
 msgid ""
 " ・Click a video to select it\n"
 " ・Ctrl+click adds or removes single videos\n"
@@ -159,15 +168,15 @@ msgid ""
 " ・Right-click a video to set it on a monitor"
 msgstr ""
 
-#: src/apricus/gui/control.py:593
+#: src/apricus/gui/control.py:616
 msgid "Disabled in playlist mode (muted by design)"
 msgstr ""
 
-#: src/apricus/gui/control.py:595 src/apricus/assets/control.ui:154
+#: src/apricus/gui/control.py:618 src/apricus/assets/control.ui:154
 msgid "Volume control"
 msgstr "音量調整"
 
-#: src/apricus/gui/control.py:686
+#: src/apricus/gui/control.py:709
 #, python-brace-format
 msgid ""
 "Failed to access {url}. Error:\n"
@@ -176,12 +185,12 @@ msgstr ""
 "{url} にアクセスできませんでした。エラー:\n"
 "{error}"
 
-#: src/apricus/gui/control.py:691
+#: src/apricus/gui/control.py:714
 #, python-brace-format
 msgid "Failed to access {url}. Error code: {code}"
 msgstr "{url} にアクセスできませんでした。エラーコード: {code}"
 
-#: src/apricus/gui/control.py:707
+#: src/apricus/gui/control.py:730
 #, python-brace-format
 msgid ""
 "Failed to stream {url}. Error:\n"
@@ -190,17 +199,17 @@ msgstr ""
 "{url} のストリーミングに失敗しました。エラー:\n"
 "{error}"
 
-#: src/apricus/gui/control.py:795
+#: src/apricus/gui/control.py:818
 #, fuzzy
 msgid "Choose a video folder to begin"
 msgstr "Hidamari フォルダーを開く"
 
-#: src/apricus/gui/control.py:797
+#: src/apricus/gui/control.py:820
 #, python-brace-format
 msgid "Videos in {folder} ({count})"
 msgstr ""
 
-#: src/apricus/gui/control.py:801
+#: src/apricus/gui/control.py:824
 #, fuzzy, python-brace-format
 msgid "No videos in {folder}"
 msgstr "Hidamari フォルダーを開く"

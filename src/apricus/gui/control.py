@@ -358,6 +358,7 @@ class ControlPanel(Gtk.Application):
         if self.server is not None:
             # monitor=None: player reloads the full saved config (single restart)
             self.server.video(video_path, server_monitor)
+        self._on_gallery_selection_changed()
 
     def on_local_web_page_apply(self, *_args):
         file_chooser: Gtk.FileChooserButton = self.builder.get_object("FileChooser")
@@ -441,8 +442,9 @@ class ControlPanel(Gtk.Application):
     def _on_gallery_selection_changed(self, *_args):
         self._update_playlist_add_label()
         count_label = self.builder.get_object("LabelSelectionCount")
-        if count_label is not None and self.icon_view is not None:
-            n = len(self.icon_view.get_selected_items())
+        selected = self.icon_view.get_selected_items() if self.icon_view is not None else []
+        n = len(selected)
+        if count_label is not None:
             if n == 0:
                 count_label.set_text(_("No selection"))
             elif n == 1:
@@ -451,8 +453,29 @@ class ControlPanel(Gtk.Application):
                 count_label.set_text(_("{n} videos selected").format(n=n))
         apply_button = self.builder.get_object("ButtonApply")
         if apply_button is not None and self.icon_view is not None:
-            # Monitor assignment applies to a single video.
-            apply_button.set_sensitive(len(self.icon_view.get_selected_items()) == 1)
+            # Monitor assignment applies to a single video; disabled when
+            # there is nothing new to do (already the active wallpaper).
+            if n == 1 and self._is_already_applied(selected[0].get_indices()[0]):
+                apply_button.set_sensitive(False)
+                apply_button.set_tooltip_text(_("This video is already the active wallpaper"))
+            else:
+                apply_button.set_sensitive(n == 1)
+                apply_button.set_tooltip_text(_("Apply the selected video as wallpaper"))
+
+    def _is_already_applied(self, index):
+        """True when the selected video is already showing everywhere.
+
+        Only meaningful in single-video mode: with a playlist/stream/webpage
+        active, applying still changes the mode, so it is never a no-op.
+        """
+        if self.config[CONFIG_KEY_MODE] != MODE_VIDEO:
+            return False
+        if index >= len(self.video_paths):
+            return False
+        video = self.video_paths[index]
+        sources = self.config.get(CONFIG_KEY_DATA_SOURCE) or {}
+        keys = [k for k in self.monitors.get_monitors()] or ["Default"]
+        return all(sources.get(k, sources.get("Default")) == video for k in keys)
 
     def _update_playlist_add_label(self):
         button = self.builder.get_object("ButtonPlaylistAdd")

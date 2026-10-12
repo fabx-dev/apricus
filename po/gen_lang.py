@@ -104,6 +104,8 @@ T["it"] = {
     "Queue paused — a single video is playing": "Coda in pausa — è in riproduzione un singolo video",
     "Resume playlist": "Riprendi playlist",
     "Discard queue": "Scarta la coda",
+    "Apply the selected video as wallpaper": "Applica il video selezionato come sfondo",
+    "This video is already the active wallpaper": "Questo video è già lo sfondo attivo",
 }
 T["de"] = {
     "Set For {monitor}": "Für {monitor} festlegen",
@@ -198,6 +200,8 @@ T["de"] = {
     "Queue paused — a single video is playing": "Warteschlange pausiert — ein einzelnes Video läuft",
     "Resume playlist": "Playlist fortsetzen",
     "Discard queue": "Warteschlange verwerfen",
+    "Apply the selected video as wallpaper": "Das gewählte Video als Hintergrund anwenden",
+    "This video is already the active wallpaper": "Dieses Video ist bereits der aktive Hintergrund",
 }
 T["fr"] = {
     "Set For {monitor}": "Définir pour {monitor}",
@@ -292,6 +296,8 @@ T["fr"] = {
     "Queue paused — a single video is playing": "File en pause — une seule vidéo est en lecture",
     "Resume playlist": "Reprendre la playlist",
     "Discard queue": "Abandonner la file",
+    "Apply the selected video as wallpaper": "Appliquer la vidéo sélectionnée comme fond d'écran",
+    "This video is already the active wallpaper": "Cette vidéo est déjà le fond d'écran actif",
 }
 T["es"] = {
     "Set For {monitor}": "Establecer para {monitor}",
@@ -386,6 +392,8 @@ T["es"] = {
     "Queue paused — a single video is playing": "Cola en pausa — se está reproduciendo un solo vídeo",
     "Resume playlist": "Reanudar playlist",
     "Discard queue": "Descartar la cola",
+    "Apply the selected video as wallpaper": "Aplicar el vídeo seleccionado como fondo",
+    "This video is already the active wallpaper": "Este vídeo ya es el fondo activo",
 }
 
 
