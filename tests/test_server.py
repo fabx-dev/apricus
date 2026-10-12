@@ -11,6 +11,7 @@ def _server_stub():
     calls = []
     s.video = lambda path, monitor=None: calls.append(path)
     s._save_config = lambda: None
+    s._load_config = lambda: None
     return s, calls
 
 

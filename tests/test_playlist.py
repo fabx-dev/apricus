@@ -20,6 +20,7 @@ def _server_stub():
     }
     saved = []
     s._save_config = lambda: saved.append(True)
+    s._load_config = lambda: None
     setups = []
 
     def fake_setup(self, mode, data_source=None, monitor=None):
