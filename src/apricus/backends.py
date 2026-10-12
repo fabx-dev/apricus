@@ -117,17 +117,13 @@ class GnomeWallpaperBackend(WallpaperBackend):
         uri = Path(image_path).resolve().as_uri()
         if self._flatpak:
             try:
-                for key in ("picture-uri", "picture-uri-dark"):
+                for schema, key in [
+                    ("org.gnome.desktop.background", "picture-uri"),
+                    ("org.gnome.desktop.background", "picture-uri-dark"),
+                    ("org.gnome.desktop.screensaver", "picture-uri"),
+                ]:
                     subprocess.run(
-                        [
-                            "flatpak-spawn",
-                            "--host",
-                            "gsettings",
-                            "set",
-                            "org.gnome.desktop.background",
-                            key,
-                            uri,
-                        ],
+                        ["flatpak-spawn", "--host", "gsettings", "set", schema, key, uri],
                         shell=False,
                     )
             except subprocess.CalledProcessError as e:
@@ -136,6 +132,10 @@ class GnomeWallpaperBackend(WallpaperBackend):
             gso = self._settings()
             gso.set_string("picture-uri", uri)
             gso.set_string("picture-uri-dark", uri)
+            try:
+                Gio.Settings.new("org.gnome.desktop.screensaver").set_string("picture-uri", uri)
+            except Exception as e:
+                logger.debug(f"[StaticWallpaper] screensaver wallpaper skipped: {e}")
 
     def restore_original(self):
         if self._flatpak:

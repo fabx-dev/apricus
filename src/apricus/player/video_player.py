@@ -641,9 +641,9 @@ class VideoPlayer(BasePlayer):
             if first:
                 self.set_static_wallpaper(first)
             else:
-                self.set_original_wallpaper()
+                self.wallpaper.prune_cache(self._live_cache_paths())
         else:
-            self.set_original_wallpaper()
+            self.wallpaper.prune_cache(self._live_cache_paths())
 
     @staticmethod
     def _queue_for(playlist, key, model):
@@ -857,10 +857,6 @@ class VideoPlayer(BasePlayer):
             return True
         return False
 
-    def set_original_wallpaper(self):
-        self.wallpaper.restore_original()
-        self.wallpaper.prune_cache(self._live_cache_paths())
-
     def _live_cache_paths(self):
         # Static caches for the currently configured videos (instant
         # wallpaper on next login). Legacy random-named caches match
@@ -879,10 +875,10 @@ class VideoPlayer(BasePlayer):
 
     def quit_player(self, restore_wallpaper=True, dbus_context=None):
         _authorize("player.quit", dbus_context)
-        if restore_wallpaper:
-            self.set_original_wallpaper()
-        else:
-            self.wallpaper.prune_cache(self._live_cache_paths())
+        # NOTE: we intentionally do NOT restore the pre-Apricus wallpaper:
+        # the last static frame stays as the desktop background across
+        # logins, so re-entering the session never shows a bare default.
+        self.wallpaper.prune_cache(self._live_cache_paths())
 
         # Cleanup handlers
         if self.active_handler:
