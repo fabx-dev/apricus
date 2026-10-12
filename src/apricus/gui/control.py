@@ -345,7 +345,7 @@ class ControlPanel(Gtk.Application):
             for key, mon in self.monitors.get_monitors().items():
                 paths[key] = video_path
                 mon.set_wallpaper(video_path)
-            server_monitor = None
+            server_monitor = ""
         else:
             paths[monitor.key] = video_path
             self.monitors.get_monitor(monitor.key).set_wallpaper(video_path)

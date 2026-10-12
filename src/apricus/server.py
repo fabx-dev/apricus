@@ -201,7 +201,7 @@ class ApricusServer:
         if player:
             player.quit_player()
 
-    def video(self, video_path=None, monitor=None):
+    def video(self, video_path=None, monitor=""):
         self._setup_player(MODE_VIDEO, video_path, monitor)
 
     def stream(self, stream_url=None):
