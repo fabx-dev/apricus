@@ -98,13 +98,15 @@ CONFIG_TEMPLATE = {
     CONFIG_KEY_SHUFFLE: False,
 }
 
-from apricus.monitor import MonitorInfo
-
 
 # initialize config according to monitors.
 # Must not require a display at import time (headless tools/tests import
 # this module); missing monitors are backfilled by _checkMissingMonitors.
+# The monitor import is lazy so GTK4 processes can import commons without
+# pinning the Gdk 3.0 namespace.
 def _default_data_sources():
+    from apricus.monitor import MonitorInfo
+
     data_sources = {}
     try:
         for monitor in MonitorInfo().monitors():
@@ -119,6 +121,8 @@ CONFIG_TEMPLATE[CONFIG_KEY_DATA_SOURCE] = _default_data_sources()
 
 
 def _default_playlist():
+    from apricus.monitor import MonitorInfo
+
     playlist = {}
     try:
         for monitor in MonitorInfo().monitors():

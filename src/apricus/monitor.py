@@ -1,7 +1,13 @@
 import gi
 
-gi.require_version("Gdk", "3.0")
-from gi.repository import Gdk
+
+def _gdk():
+    """Lazily loaded Gdk (GTK4 migration): importing monitor must never pin
+    a Gdk major version at module scope."""
+    gi.require_version("Gdk", "3.0")
+    from gi.repository import Gdk
+
+    return Gdk
 
 
 class Monitor:
@@ -55,12 +61,12 @@ def assign_keys(infos):
 class MonitorInfo:
     @staticmethod
     def get_unique_monitor_count():
-        display = Gdk.Display.get_default()
+        display = _gdk().Display.get_default()
         return display.get_n_monitors()
 
     @staticmethod
     def monitors():
-        display = Gdk.Display.get_default()
+        display = _gdk().Display.get_default()
         if display is None:
             # Headless (CI, tests): no monitors to report.
             return []
