@@ -25,6 +25,7 @@ from pydbus import SessionBus
 from apricus.commons import (
     CONFIG_KEY_MODE,
     CONFIG_KEY_MUTE,
+    CONFIG_KEY_PLAYLIST,
     CONFIG_KEY_VOLUME,
     DBUS_NAME_SERVER,
     LOGGER_NAME,
@@ -145,24 +146,59 @@ class ControlPanel(Adw.Application):
         if len(paths) == 1:
             server.video(paths[0], "")
             self._refresh_all()
+        elif len(paths) > 1:
+            # Single-video apply has no multi-selection semantics (unlike the
+            # playlist queue). Unlike the GTK3 panel — which silently applies
+            # only the first item — say so explicitly instead of failing
+            # silently.
+            self._show_apply_needs_single(len(paths))
+
+    def _show_apply_needs_single(self, count):
+        dialog = Adw.AlertDialog(
+            heading="Apply needs a single video",
+            body=(
+                f"You selected {count} videos, but Apply sets one wallpaper.\n"
+                "Select just one video to apply it, or add them to the "
+                "playlist to play them all in a loop."
+            ),
+        )
+        dialog.add_response("ok", "OK")
+        dialog.set_default_response("ok")
+        dialog.connect("response", lambda *_: dialog.close())
+        dialog.present(self.window)
+
+    def _persist_queue_to_config(self):
+        playlist = self.config.get(CONFIG_KEY_PLAYLIST) or {}
+        self.config[CONFIG_KEY_PLAYLIST] = playlist
+        playlist["Default"] = list(self.playlist_paths)
+        ConfigUtil().save(self.config)
+
+    def _apply_queue(self):
+        """Persist the edited queue, hand it to the server, reload, refresh.
+
+        The in-memory queue (edited via Up/Down/Remove/Clear/Add) is the
+        source of truth, mirroring the GTK3 panel: the server persists it
+        again on playlist() and plays it.
+        """
+        if not self.playlist_paths:
+            return
+        logger.info(f"[GUI4] Playlist apply ({len(self.playlist_paths)} videos)")
+        self._persist_queue_to_config()
+        server = self._server()
+        if server is not None:
+            server.playlist(self.playlist_paths, "all")
+        self.config = ConfigUtil().load()
+        self.playlist_paths = list((self.config.get(CONFIG_KEY_PLAYLIST) or {}).get("Default", []))
+        self._refresh_all()
 
     def on_library_add(self, *_args):
-        server = self._server()
         paths = self._lib_selected_paths(self.video_selection, self.video_store)
         if not paths:
             return
-        playlist = list((self.config.get("playlist") or {}).get("Default", []))
         for path in paths:
-            if path not in playlist:
-                playlist.append(path)
-        self.config["playlist"]["Default"] = playlist
-        from apricus.utils import ConfigUtil
-
-        ConfigUtil().save(self.config)
-        if server is not None:
-            server.playlist(playlist, "all")
-        self.config = ConfigUtil().load()
-        self._refresh_all()
+            if path not in self.playlist_paths:
+                self.playlist_paths.append(path)
+        self._apply_queue()
 
     def _playlist_page(self):
         from apricus.gui.gtk4lib import VideoItem
@@ -369,14 +405,7 @@ class ControlPanel(Adw.Application):
         self._refresh_all()
 
     def on_playlist_apply(self, *_args):
-        server = self._server()
-        if server is None:
-            return
-        playlist = (self.config.get("playlist") or {}).get("Default", [])
-        if playlist:
-            server.playlist(playlist, "all")
-        self.config = ConfigUtil().load()
-        self._refresh_all()
+        self._apply_queue()
 
     def on_mute_toggled(self, _switch, state):
         server = self._server()
