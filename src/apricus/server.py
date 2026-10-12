@@ -357,9 +357,15 @@ class ApricusServer:
         if self.gui_process and self.gui_process.is_alive():
             logger.debug("[Server] GUI already running")
             return
+        # GTK4 migration: opt-in via env until the new panel is complete.
+        # Lazy import: Gtk 3 and Gtk 4 namespaces cannot coexist in one process.
+        if os.environ.get("APRICUS_GTK4") == "1":
+            from apricus.gui.gtk4app import main as gui_target
+        else:
+            gui_target = gui_main
         self.gui_process = Process(
             name="apricus-gui",
-            target=gui_main,
+            target=gui_target,
             args=(
                 self.version,
                 self.pkgdatadir,
