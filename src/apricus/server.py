@@ -36,7 +36,7 @@ from apricus.menu import show_systray_icon
 from apricus.monitor import Monitors
 from apricus.player.video_player import main as video_player_main
 from apricus.player.web_player import main as web_player_main
-from apricus.utils import ConfigUtil, EndSessionHandler, get_video_paths
+from apricus.utils import ConfigUtil, EndSessionHandler, _authorize, get_video_paths
 
 loop = GLib.MainLoop()
 logger = logging.getLogger(LOGGER_NAME)
@@ -265,20 +265,24 @@ class ApricusServer:
         if player:
             player.quit_player(restore_wallpaper)
 
-    def video(self, video_path=None, monitor=""):
+    def video(self, video_path=None, monitor="", dbus_context=None):
+        _authorize("video", dbus_context)
         if video_path and (video_path.startswith("-") or not os.path.isfile(video_path)):
             logger.warning(f"[Server] Rejected video path: {video_path}")
             return
         self._setup_player(MODE_VIDEO, video_path, monitor)
 
-    def stream(self, stream_url=None):
+    def stream(self, stream_url=None, dbus_context=None):
+        _authorize("stream", dbus_context)
         self._setup_player(MODE_STREAM, stream_url)
 
-    def webpage(self, webpage_url=None):
+    def webpage(self, webpage_url=None, dbus_context=None):
+        _authorize("webpage", dbus_context)
         self._setup_player(MODE_WEBPAGE, webpage_url)
 
-    def playlist(self, video_paths=None, monitor=None):
+    def playlist(self, video_paths=None, monitor=None, dbus_context=None):
         """Play a queue of videos, looping. Muted by design (PipeWire safety)."""
+        _authorize("playlist", dbus_context)
         self._load_config()
         video_paths = [p for p in (video_paths or []) if p]
         if not video_paths:
@@ -298,18 +302,21 @@ class ApricusServer:
         self._setup_player(MODE_PLAYLIST)
 
     @staticmethod
-    def pause_playback():
+    def pause_playback(dbus_context=None):
+        _authorize("pause_playback", dbus_context)
         player = get_instance(DBUS_NAME_PLAYER)
         if player:
             player.pause_playback()
 
     @staticmethod
-    def start_playback():
+    def start_playback(dbus_context=None):
+        _authorize("start_playback", dbus_context)
         player = get_instance(DBUS_NAME_PLAYER)
         if player:
             player.start_playback()
 
-    def reload(self):
+    def reload(self, dbus_context=None):
+        _authorize("reload", dbus_context)
         if self.config[CONFIG_KEY_MODE] == MODE_VIDEO:
             self.video()
         elif self.config[CONFIG_KEY_MODE] == MODE_STREAM:
@@ -323,8 +330,9 @@ class ApricusServer:
         else:
             raise ValueError("[Server] Unknown mode")
 
-    def feeling_lucky(self):
+    def feeling_lucky(self, dbus_context=None):
         """Random play a video from the directory"""
+        _authorize("feeling_lucky", dbus_context)
         self._load_config()
         monitors = Monitors().get_monitors()
         video_dir = resolve_video_dir(self.config)
@@ -343,8 +351,9 @@ class ApricusServer:
             self._save_config()
             self.video(video_path)
 
-    def show_gui(self):
+    def show_gui(self, dbus_context=None):
         """Show main GUI (singleton: reuse the live one if present)."""
+        _authorize("show_gui", dbus_context)
         if self.gui_process and self.gui_process.is_alive():
             logger.debug("[Server] GUI already running")
             return
@@ -359,7 +368,8 @@ class ApricusServer:
         )
         self.gui_process.start()
 
-    def quit(self):
+    def quit(self, dbus_context=None):
+        _authorize("quit", dbus_context)
         try:
             self._quit_player()
         except GLib.Error:

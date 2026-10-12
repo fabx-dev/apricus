@@ -41,6 +41,32 @@ from apricus.commons import (
 logger = logging.getLogger(LOGGER_NAME)
 
 
+def _caller_uid(sender):
+    """UID owning a bus name, via the daemon (SO_PEERCRED, not spoofable)."""
+    bus = pydbus.SessionBus()
+    daemon = bus.get("org.freedesktop.DBus")
+    return daemon.GetConnectionUnixUser(sender)
+
+
+def _authorize(action, dbus_context=None):
+    """Log the caller of a mutating method; reject foreign UIDs.
+
+    dbus_context is None on direct (non-D-Bus) calls: trusted.
+    Property writes go through pydbus internals without context and are
+    intentionally out of scope (documented limitation).
+    """
+    if dbus_context is None:
+        return
+    sender = dbus_context.sender
+    try:
+        uid = _caller_uid(sender)
+    except Exception as e:
+        raise PermissionError(f"{action}: cannot identify caller {sender}: {e}") from e
+    logger.info(f"[Server] {action} from {sender} (uid={uid})")
+    if uid != os.getuid():
+        raise PermissionError(f"{action}: foreign uid {uid} rejected")
+
+
 def setup_logging():
     """Configure logging in forkserver-spawned children (player/gui/systray).
 

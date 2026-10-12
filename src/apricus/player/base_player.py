@@ -148,7 +148,7 @@ class BasePlayer(Gtk.Application):
     def start_playback(self):
         pass
 
-    def quit_player(self, restore_wallpaper=True):
+    def quit_player(self, restore_wallpaper=True, dbus_context=None):
         self.quit()
 
 

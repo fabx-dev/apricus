@@ -83,3 +83,35 @@ def test_save_is_atomic_and_backed_up(tmp_path, monkeypatch):
     with patch("apricus.monitor.MonitorInfo.monitors", return_value=[]):
         loaded = cu.load()
     assert loaded["audio_volume"] == 11
+
+
+class FakeContext:
+    def __init__(self, sender):
+        self.sender = sender
+
+
+def test_authorize_allows_direct_calls():
+    from apricus.utils import _authorize
+
+    assert _authorize("video", None) is None
+
+
+def test_authorize_allows_same_uid(monkeypatch):
+    import os
+
+    import apricus.utils as U
+
+    monkeypatch.setattr(U, "_caller_uid", lambda sender: os.getuid())
+    U._authorize("video", FakeContext(":1.42"))
+
+
+def test_authorize_rejects_foreign_uid(monkeypatch):
+    import os
+
+    import pytest
+
+    import apricus.utils as U
+
+    monkeypatch.setattr(U, "_caller_uid", lambda sender: os.getuid() + 999)
+    with pytest.raises(PermissionError):
+        U._authorize("quit", FakeContext(":1.99"))

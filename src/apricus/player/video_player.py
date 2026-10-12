@@ -43,6 +43,7 @@ from apricus.player.base_player import BasePlayer
 from apricus.utils import (
     ActiveHandler,
     ConfigUtil,
+    _authorize,
     setup_logging,
 )
 from apricus.yt_utils import get_best_audio, get_formats, get_optimal_video
@@ -504,8 +505,9 @@ class VideoPlayer(BasePlayer):
         self.config[CONFIG_KEY_DATA_SOURCE] = data_source
         self._apply_source(data_source, setup_handlers=True)
 
-    def switch_media(self, mode):
+    def switch_media(self, mode, dbus_context=None):
         """Hot-switch source inside the live player (no respawn)."""
+        _authorize("player.switch_media", dbus_context)
         GLib.idle_add(self._switch_media_main, mode)
 
     def _switch_media_main(self, mode):
@@ -838,7 +840,7 @@ class VideoPlayer(BasePlayer):
         self.wallpaper.apply_static(static_wallpaper_path)
         return False
 
-    def preview_static(self, video_path):
+    def preview_static(self, video_path, dbus_context=None):
         """Apply the cached static frame for an upcoming video, if present.
 
         Called by the server *before* the current player quits, so a video
@@ -847,6 +849,7 @@ class VideoPlayer(BasePlayer):
         """
         if not self.wallpaper.supports_static or not video_path:
             return False
+        _authorize("player.preview_static", dbus_context)
         cached = self._static_cache_path(video_path)
         if os.path.isfile(cached):
             self._apply_static_wallpaper(cached)
@@ -874,7 +877,8 @@ class VideoPlayer(BasePlayer):
     def reload_config(self):
         self.config = ConfigUtil().load()
 
-    def quit_player(self, restore_wallpaper=True):
+    def quit_player(self, restore_wallpaper=True, dbus_context=None):
+        _authorize("player.quit", dbus_context)
         if restore_wallpaper:
             self.set_original_wallpaper()
         else:
