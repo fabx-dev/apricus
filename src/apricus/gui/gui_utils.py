@@ -60,21 +60,24 @@ def generate_thumbnail(filename):
     return factory.lookup(uri, mtime)
 
 
-def _set_thumbnail(list_store, idx, video_path, thumbnail):
+def _set_thumbnail(list_store, idx, video_path, thumbnail, token=0, current_token=None):
     # Runs on the GTK main thread (via idle_add): ListStore is not thread-safe.
+    if current_token is not None and current_token() != token:
+        return False
     try:
         list_store[idx][0] = GdkPixbuf.Pixbuf.new_from_file_at_size(thumbnail, -1, 96)
-    except (GLib.Error, OSError) as e:
+    except (GLib.Error, OSError, IndexError) as e:
         logger.debug("[Thumbnail] Skipped %s: %s", os.path.basename(video_path), e)
     return False
 
 
-def get_thumbnail(video_path, list_store, idx):
+def get_thumbnail(video_path, list_store, idx, token=0, current_token=None):
     # Best-effort: a preview thumbnail must never crash the GUI. On failure the
     # generic video icon set by the caller stays in place. (In the Flatpak the
     # sandboxed thumbnailer can fail; that's fine, we just skip the preview.)
-    # Heavy work (thumbnail lookup/generation) runs in the caller's worker
-    # thread; the ListStore update is marshalled to the main thread.
+    # Heavy work (thumbnail lookup/generation) runs in a pool worker thread;
+    # the ListStore update is marshalled to the main thread. Stale results
+    # (gallery rebuilt while workers were in flight) are dropped via token.
     try:
         info = Gio.File.new_for_path(video_path).query_info(
             "thumbnail::path", Gio.FileQueryInfoFlags.NONE, None
@@ -83,7 +86,11 @@ def get_thumbnail(video_path, list_store, idx):
             video_path
         )
         if thumbnail:
-            GLib.idle_add(_set_thumbnail, list_store, idx, video_path, thumbnail)
+            if current_token is not None and current_token() != token:
+                return
+            GLib.idle_add(
+                _set_thumbnail, list_store, idx, video_path, thumbnail, token, current_token
+            )
     except (GLib.Error, OSError, subprocess.SubprocessError) as e:
         logger.debug("[Thumbnail] Skipped %s: %s", os.path.basename(video_path), e)
 

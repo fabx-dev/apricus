@@ -76,16 +76,32 @@ class GnomeWallpaperBackend(WallpaperBackend):
         if self._flatpak:
             try:
                 self.original_wallpaper_uri = subprocess.check_output(
-                    "flatpak-spawn --host gsettings get org.gnome.desktop.background picture-uri",
-                    shell=True,
+                    [
+                        "flatpak-spawn",
+                        "--host",
+                        "gsettings",
+                        "get",
+                        "org.gnome.desktop.background",
+                        "picture-uri",
+                    ],
+                    shell=False,
                     encoding="UTF-8",
+                    timeout=5,
                 )
                 self.original_wallpaper_uri_dark = subprocess.check_output(
-                    "flatpak-spawn --host gsettings get org.gnome.desktop.background picture-uri-dark",
-                    shell=True,
+                    [
+                        "flatpak-spawn",
+                        "--host",
+                        "gsettings",
+                        "get",
+                        "org.gnome.desktop.background",
+                        "picture-uri-dark",
+                    ],
+                    shell=False,
                     encoding="UTF-8",
+                    timeout=5,
                 )
-            except subprocess.CalledProcessError as e:
+            except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
                 logger.error(f"[StaticWallpaper] {e}")
         else:
             gso = self._settings()

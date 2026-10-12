@@ -22,10 +22,13 @@ from apricus.commons import (
     CONFIG_DIR,
     CONFIG_KEY_BLUR_RADIUS,
     CONFIG_KEY_DATA_SOURCE,
+    CONFIG_KEY_FADE_DURATION_SEC,
+    CONFIG_KEY_FADE_INTERVAL,
     CONFIG_KEY_MUTE_WHEN_MAXIMIZED,
     CONFIG_KEY_PLAYLIST,
     CONFIG_KEY_SHUFFLE,
     CONFIG_KEY_VIDEO_DIR,
+    CONFIG_KEY_VOLUME,
     CONFIG_PATH,
     CONFIG_TEMPLATE,
     CONFIG_VERSION,
@@ -194,21 +197,25 @@ def setup_systemd_autostart(enable):
             os.makedirs(_systemd_user_dir(), exist_ok=True)
             with open(unit_path, mode="w") as f:
                 f.write(systemd_unit_content())
-            subprocess.run(["systemctl", "--user", "daemon-reload"], check=True)
+            subprocess.run(["systemctl", "--user", "daemon-reload"], check=True, timeout=15)
             subprocess.run(
-                ["systemctl", "--user", "enable", "--now", SYSTEMD_UNIT_NAME], check=True
+                ["systemctl", "--user", "enable", "--now", SYSTEMD_UNIT_NAME],
+                check=True,
+                timeout=15,
             )
             logger.info(f"[Utils] systemd autostart enabled ({unit_path})")
         else:
             subprocess.run(
-                ["systemctl", "--user", "disable", "--now", SYSTEMD_UNIT_NAME], check=False
+                ["systemctl", "--user", "disable", "--now", SYSTEMD_UNIT_NAME],
+                check=False,
+                timeout=15,
             )
             if os.path.isfile(unit_path):
                 os.remove(unit_path)
-            subprocess.run(["systemctl", "--user", "daemon-reload"], check=False)
+            subprocess.run(["systemctl", "--user", "daemon-reload"], check=False, timeout=15)
             logger.info("[Utils] systemd autostart disabled")
         return True
-    except (OSError, subprocess.CalledProcessError) as e:
+    except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
         logger.warning(f"[Utils] systemd autostart failed: {e}")
         return False
 
@@ -224,10 +231,14 @@ def get_video_paths(video_dir=None):
     # parent folder shows exactly its own videos and nothing else.
     for filename in os.listdir(directory):
         filepath = os.path.join(directory, filename)
-        file = Gio.file_new_for_path(filepath)
-        info = file.query_info("standard::content-type", Gio.FileQueryInfoFlags.NONE, None)
-        mime_type = info.get_content_type()
-        if "video" in mime_type:
+        try:
+            file = Gio.file_new_for_path(filepath)
+            info = file.query_info("standard::content-type", Gio.FileQueryInfoFlags.NONE, None)
+            mime_type = info.get_content_type()
+        except GLib.Error as e:
+            logger.debug(f"[Utils] Skipped {filename}: {e}")
+            continue
+        if mime_type and "video" in mime_type:
             file_list.append(filepath)
     return sorted(file_list)
 
@@ -275,12 +286,15 @@ def gnome_desktop_icon_workaround():
         "zorin-desktop-icons@zorinos.com",
     ]
     for ext in extension_list:
-        # Check if installed and enabled
-        if gnome_extension_is_installed(ext) and gnome_extension_is_enabled(ext):
-            # Reload the extension
-            logger.info(f"[Utils] Apply workaround for {ext}")
-            gnome_extension_set_disable(ext)
-            gnome_extension_set_enable(ext)
+        try:
+            # Check if installed and enabled
+            if gnome_extension_is_installed(ext) and gnome_extension_is_enabled(ext):
+                # Reload the extension
+                logger.info(f"[Utils] Apply workaround for {ext}")
+                gnome_extension_set_disable(ext)
+                gnome_extension_set_enable(ext)
+        except GLib.Error as e:
+            logger.warning(f"[Utils] Desktop icon workaround failed for {ext}: {e}")
 
 
 """
@@ -608,6 +622,7 @@ class ConfigUtil:
                     self._migrateLegacyMonitorKeys(config)
                     self._checkDefaultSource(config)
                     self._checkMissingMonitors(config, CONFIG_TEMPLATE)
+                    self._clamp_config(config)
                     if self._check(config):
                         logs = []
                         logs.append("--------- Config ---------")
@@ -618,7 +633,41 @@ class ConfigUtil:
                         return config
                 except json.decoder.JSONDecodeError:
                     logger.debug("[Config] JSONDecodeError")
+                    # Atomic saves make this rare, but a corrupt file must
+                    # never wipe the setup: try the backup generation first.
+                    bak_path = CONFIG_PATH + ".bak"
+                    if os.path.isfile(bak_path):
+                        try:
+                            with open(bak_path, encoding="utf-8") as f:
+                                config = json.load(f)
+                            if self._check(config):
+                                logger.info(f"[Config] Recovered from {bak_path}")
+                                return config
+                        except (OSError, ValueError):
+                            pass
         return self._invalid()
+
+    @staticmethod
+    def _clamp_config(config):
+        """Validate user-editable numerics: a hand-edited config must never
+        crash the player (ZeroDivisionError on fade_interval=0, overflow
+        volume, negative durations). Repairs in place."""
+        try:
+            volume = int(config.get(CONFIG_KEY_VOLUME, 50))
+        except (TypeError, ValueError):
+            volume = 50
+        config[CONFIG_KEY_VOLUME] = max(0, min(100, volume))
+        try:
+            interval = float(config.get(CONFIG_KEY_FADE_INTERVAL, 0.1))
+        except (TypeError, ValueError):
+            interval = 0.1
+        config[CONFIG_KEY_FADE_INTERVAL] = min(1.0, max(0.05, interval)) if interval > 0 else 0.1
+        try:
+            duration = float(config.get(CONFIG_KEY_FADE_DURATION_SEC, 1.5))
+        except (TypeError, ValueError):
+            duration = 1.5
+        config[CONFIG_KEY_FADE_DURATION_SEC] = min(5.0, max(0.0, duration))
+        return config
 
     def save(self, config):
         old_config = None
@@ -634,12 +683,20 @@ class ConfigUtil:
         # Skip if the config is identical
         if old_config == config:
             return
-        with open(CONFIG_PATH, "w") as f:
+        # Atomic write: a kill between truncate and content no longer wipes
+        # the setup. Keep one backup generation for corrupt-file recovery.
+        os.makedirs(CONFIG_DIR, exist_ok=True)
+        if old_config is not None:
+            try:
+                with open(CONFIG_PATH + ".bak", "w", encoding="utf-8") as f:
+                    json.dump(old_config, f, indent=3)
+            except OSError as e:
+                logger.warning(f"[Config] Backup failed: {e}")
+        tmp_path = CONFIG_PATH + ".tmp"
+        with open(tmp_path, "w", encoding="utf-8") as f:
             json_str = json.dumps(config, indent=3)
             print(json_str, file=f)
-            logs = []
-            logs.append("--------- Config ---------")
-            logs.append(pformat(config, indent=3))
-            logs.append("--------------------------")
-            logs_str = "\n".join(logs)
-            logger.debug(f"[Config] Saved {CONFIG_PATH}\n{logs_str}")
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp_path, CONFIG_PATH)
+        logger.debug(f"[Config] Saved {CONFIG_PATH} (mode={config.get('mode')})")

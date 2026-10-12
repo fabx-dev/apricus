@@ -61,7 +61,16 @@ def setup_render_device():
 class WebWindow(Gtk.ApplicationWindow):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.__webview = WebKit2.WebView()
+        # Hardened defaults: a wallpaper must not read local files on behalf
+        # of remote pages (nor vice versa). JavaScript stays on: most
+        # wallpaper pages need it.
+        settings = WebKit2.Settings(
+            allow_file_access_from_file_urls=False,
+            allow_universal_access_from_file_urls=False,
+            enable_media_stream=False,
+            enable_webaudio=False,
+        )
+        self.__webview = WebKit2.WebView.new_with_settings(settings)
         self.add(self.__webview)
         self.__webview.show()
 

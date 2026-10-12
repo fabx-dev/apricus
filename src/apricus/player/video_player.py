@@ -576,7 +576,11 @@ class VideoPlayer(BasePlayer):
 
         elif self.mode == MODE_STREAM:
             source = data_source["Default"]
-            formats = get_formats(source)
+            try:
+                formats = get_formats(source)
+            except Exception as e:
+                logger.warning(f"[Stream] Cannot resolve {source}: {e}")
+                return
             max_height = (
                 max(self.windows, key=lambda m: m.get_geometry().height).get_geometry().height
             )
@@ -789,22 +793,27 @@ class VideoPlayer(BasePlayer):
         ss = time.strftime("%H:%M:%S", time.gmtime(duration / 3.14))
         # Keep a proper image extension so ffmpeg infers the muxer.
         tmp_path = f"{cached}.tmp.png"
-        ret = subprocess.run(
-            [
-                "ffmpeg",
-                "-y",
-                "-ss",
-                ss,
-                "-i",
-                video,
-                "-vframes",
-                "1",
-                tmp_path,
-            ],
-            shell=False,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.STDOUT,
-        )
+        try:
+            ret = subprocess.run(
+                [
+                    "ffmpeg",
+                    "-y",
+                    "-ss",
+                    ss,
+                    "-i",
+                    video,
+                    "-vframes",
+                    "1",
+                    tmp_path,
+                ],
+                shell=False,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.STDOUT,
+                timeout=60,
+            )
+        except subprocess.TimeoutExpired:
+            logger.warning("[StaticWallpaper] ffmpeg timed out")
+            return
         if ret.returncode != 0 or not os.path.isfile(tmp_path):
             logger.warning("[StaticWallpaper] frame extraction failed")
             return

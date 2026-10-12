@@ -2,8 +2,11 @@ import yt_dlp as youtube_dl
 
 
 def get_formats(raw_url):
-    with youtube_dl.YoutubeDL({"noplaylist": True}) as ydl:
-        formats = ydl.extract_info(raw_url, download=False)["formats"]
+    with youtube_dl.YoutubeDL({"noplaylist": True, "socket_timeout": 15}) as ydl:
+        info = ydl.extract_info(raw_url, download=False) or {}
+    formats = info.get("formats") or []
+    if not formats:
+        raise ValueError(f"No playable formats for {raw_url}")
     return formats
 
 

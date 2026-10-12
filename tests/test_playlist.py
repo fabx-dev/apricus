@@ -107,3 +107,11 @@ def test_v4_config_loads_without_wipe(tmp_path, monkeypatch):
     assert loaded["version"] == 5
     assert loaded["audio_volume"] == 42
     assert loaded["playlist"]["Default"] == []
+
+
+def test_playlist_capped():
+    s, setups = _server_stub()
+    big = [f"/v{i}.mp4" for i in range(600)]
+    s.playlist(big, monitor="all")
+    assert len(s.config["playlist"]["Default"]) == 500
+    assert setups == ["MODE_PLAYLIST"]

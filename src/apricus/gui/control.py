@@ -3,7 +3,7 @@ import multiprocessing as mp
 import os
 import subprocess
 import sys
-import threading
+from concurrent.futures import ThreadPoolExecutor
 from gettext import gettext as _
 
 # TODO: Port to Gtk4/adwaita someday...
@@ -164,7 +164,7 @@ class ControlPanel(Gtk.Application):
             ("feeling_lucky", self.on_feeling_lucky),
             (
                 "config",
-                lambda *_: subprocess.run(["xdg-open", os.path.realpath(CONFIG_PATH)]),
+                lambda *_: subprocess.run(["xdg-open", os.path.realpath(CONFIG_PATH)], timeout=10),
             ),
             ("about", self.on_about),
             ("quit", self.on_quit),
@@ -285,7 +285,10 @@ class ControlPanel(Gtk.Application):
         if video_dir is None:
             self.on_choose_video_dir()
             return
-        subprocess.run(["xdg-open", os.path.realpath(video_dir)])
+        try:
+            subprocess.run(["xdg-open", os.path.realpath(video_dir)], timeout=10)
+        except (OSError, subprocess.SubprocessError) as e:
+            logger.warning(f"[GUI] xdg-open failed: {e}")
 
     def on_choose_video_dir(self, *_args):
         current = resolve_video_dir(self.config)
@@ -703,7 +706,8 @@ class ControlPanel(Gtk.Application):
     def _check_url(self, url):
         # Check if the url is valid
         try:
-            response = requests.get(url)
+            response = requests.get(url, timeout=10, stream=True)
+            response.close()
         except requests.exceptions.RequestException as e:
             logger.error(f"[GUI] Failed to access {url}. Error:\n{e}")
             self._show_error(_("Failed to access {url}. Error:\n{error}").format(url=url, error=e))
@@ -721,9 +725,9 @@ class ControlPanel(Gtk.Application):
     def _check_yt_dlp(self, raw_url):
         # Check if the url is valid (yt_dlp)
         try:
-            with yt_dlp.YoutubeDL({"noplaylist": True}) as ydl:
+            with yt_dlp.YoutubeDL({"noplaylist": True, "socket_timeout": 15}) as ydl:
                 ydl.extract_info(raw_url, download=False)
-        except yt_dlp.utils.DownloadError as e:
+        except (yt_dlp.utils.DownloadError, ValueError) as e:
             s = " ".join(str(e).split(" ")[1:])
             logger.error(f"[GUI] Failed to stream {raw_url}. Error:\n{s}")
             self._show_error(
@@ -836,12 +840,19 @@ class ControlPanel(Gtk.Application):
             self.icon_view.connect("selection-changed", self._on_gallery_selection_changed)
             self._icon_view_signals_wired = True
         self._on_gallery_selection_changed()
+        # Bounded worker pool (not one thread per video) + generation token:
+        # refreshes drop stale results instead of piling up workers.
+        self._thumb_token = getattr(self, "_thumb_token", 0) + 1
+        token = self._thumb_token
+        if getattr(self, "_thumb_pool", None) is None:
+            self._thumb_pool = ThreadPoolExecutor(max_workers=4, thread_name_prefix="thumb")
+        pool = self._thumb_pool
         for idx, video_path in enumerate(self.video_paths):
             pixbuf = Gtk.IconTheme().get_default().load_icon("video-x-generic", 96, 0)
             list_store.append([pixbuf, os.path.basename(video_path)])
-            thread = threading.Thread(target=get_thumbnail, args=(video_path, list_store, idx))
-            thread.daemon = True
-            thread.start()
+            pool.submit(
+                get_thumbnail, video_path, list_store, idx, token, lambda: self._thumb_token
+            )
 
 
 def _find_gresource(pkgdatadir):

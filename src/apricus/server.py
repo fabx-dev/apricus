@@ -102,8 +102,9 @@ class ApricusServer:
 
         signal.signal(signal.SIGINT, lambda *_: self.quit())
         signal.signal(signal.SIGTERM, lambda *_: self.quit())
-        # SIGSEGV as a fail-safe
-        signal.signal(signal.SIGSEGV, lambda *_: self.quit())
+        # No SIGSEGV handler: after a real segfault the interpreter state is
+        # undefined and quit() (D-Bus + joins) is not reentrant. Crashes in
+        # native code are diagnosed via faulthandler in the player.
         # Monitoring EndSession (OS reboot, shutdown, etc.)
         EndSessionHandler(self.quit)
 
@@ -265,6 +266,9 @@ class ApricusServer:
             player.quit_player(restore_wallpaper)
 
     def video(self, video_path=None, monitor=""):
+        if video_path and (video_path.startswith("-") or not os.path.isfile(video_path)):
+            logger.warning(f"[Server] Rejected video path: {video_path}")
+            return
         self._setup_player(MODE_VIDEO, video_path, monitor)
 
     def stream(self, stream_url=None):
@@ -280,6 +284,9 @@ class ApricusServer:
         if not video_paths:
             logger.warning("[Server] Empty playlist, ignoring")
             return
+        if len(video_paths) > 500:
+            logger.warning(f"[Server] Playlist capped at 500 items ({len(video_paths)} given)")
+            video_paths = video_paths[:500]
         playlist = self.config.setdefault(CONFIG_KEY_PLAYLIST, {})
         if monitor and monitor != "all":
             playlist[monitor] = list(video_paths)
@@ -337,7 +344,10 @@ class ApricusServer:
             self.video(video_path)
 
     def show_gui(self):
-        """Show main GUI"""
+        """Show main GUI (singleton: reuse the live one if present)."""
+        if self.gui_process and self.gui_process.is_alive():
+            logger.debug("[Server] GUI already running")
+            return
         self.gui_process = Process(
             name="apricus-gui",
             target=gui_main,
