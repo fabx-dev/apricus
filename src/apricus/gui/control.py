@@ -406,7 +406,20 @@ class ControlPanel(Gtk.Application):
         box = self.builder.get_object("PlaylistBox")
         if stack is not None and box is not None:
             n = len(self.playlist_paths)
-            stack.child_set_property(box, "title", f"Playlist ({n})" if n else "Playlist")
+            paused = n and self.config[CONFIG_KEY_MODE] != MODE_PLAYLIST
+            if paused:
+                title = _("Playlist ({n}, paused)").format(n=n)
+            else:
+                title = _("Playlist ({n})").format(n=n) if n else _("Playlist")
+            stack.child_set_property(box, "title", title)
+        self._update_paused_banner()
+
+    def _update_paused_banner(self):
+        revealer = self.builder.get_object("PlaylistPausedRevealer")
+        if revealer is None:
+            return
+        paused = bool(self.playlist_paths) and self.config[CONFIG_KEY_MODE] != MODE_PLAYLIST
+        revealer.set_reveal_child(paused)
 
     def _show_playlist_confirm(self, added, dupes):
         label = self.builder.get_object("PlaylistConfirmLabel")

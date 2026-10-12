@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: apricus\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-12 01:50+0200\n"
+"POT-Creation-Date: 2026-10-12 02:01+0200\n"
 "PO-Revision-Date: 2026-07-10 01:30+0900\n"
 "Last-Translator: Jeff Shee <jeffshee8969@gmail.com>\n"
 "Language-Team: Japanese\n"
@@ -95,49 +95,63 @@ msgstr ""
 msgid "Video"
 msgstr "ローカル動画"
 
-#: src/apricus/gui/control.py:417
+#: src/apricus/gui/control.py:411
+#, python-brace-format
+msgid "Playlist ({n}, paused)"
+msgstr ""
+
+#: src/apricus/gui/control.py:413
+#, python-brace-format
+msgid "Playlist ({n})"
+msgstr ""
+
+#: src/apricus/gui/control.py:413 src/apricus/assets/control.ui:1113
+msgid "Playlist"
+msgstr ""
+
+#: src/apricus/gui/control.py:430
 #, python-brace-format
 msgid "Added {a}, {d} already in queue (total {n})"
 msgstr ""
 
-#: src/apricus/gui/control.py:421
+#: src/apricus/gui/control.py:434
 #, python-brace-format
 msgid "Added {a} to queue (total {n})"
 msgstr ""
 
-#: src/apricus/gui/control.py:423
+#: src/apricus/gui/control.py:436
 #, python-brace-format
 msgid "Already in queue (total {n})"
 msgstr ""
 
-#: src/apricus/gui/control.py:434 src/apricus/assets/control.ui:456
+#: src/apricus/gui/control.py:447 src/apricus/assets/control.ui:456
 msgid "No selection"
 msgstr ""
 
-#: src/apricus/gui/control.py:436
+#: src/apricus/gui/control.py:449
 #, fuzzy
 msgid "1 video selected"
 msgstr "動画が選択されていません"
 
-#: src/apricus/gui/control.py:438
+#: src/apricus/gui/control.py:451
 #, fuzzy, python-brace-format
 msgid "{n} videos selected"
 msgstr "動画が選択されていません"
 
-#: src/apricus/gui/control.py:449
+#: src/apricus/gui/control.py:462
 #, python-brace-format
 msgid "Add to playlist ({n})"
 msgstr ""
 
-#: src/apricus/gui/control.py:449 src/apricus/assets/control.ui:487
+#: src/apricus/gui/control.py:462 src/apricus/assets/control.ui:487
 msgid "Add to playlist"
 msgstr ""
 
-#: src/apricus/gui/control.py:464
+#: src/apricus/gui/control.py:477
 msgid "Selecting videos"
 msgstr ""
 
-#: src/apricus/gui/control.py:467
+#: src/apricus/gui/control.py:480
 msgid ""
 " ・Click a video to select it\n"
 " ・Ctrl+click adds or removes single videos\n"
@@ -145,15 +159,15 @@ msgid ""
 " ・Right-click a video to set it on a monitor"
 msgstr ""
 
-#: src/apricus/gui/control.py:580
+#: src/apricus/gui/control.py:593
 msgid "Disabled in playlist mode (muted by design)"
 msgstr ""
 
-#: src/apricus/gui/control.py:582 src/apricus/assets/control.ui:154
+#: src/apricus/gui/control.py:595 src/apricus/assets/control.ui:154
 msgid "Volume control"
 msgstr "音量調整"
 
-#: src/apricus/gui/control.py:673
+#: src/apricus/gui/control.py:686
 #, python-brace-format
 msgid ""
 "Failed to access {url}. Error:\n"
@@ -162,12 +176,12 @@ msgstr ""
 "{url} にアクセスできませんでした。エラー:\n"
 "{error}"
 
-#: src/apricus/gui/control.py:678
+#: src/apricus/gui/control.py:691
 #, python-brace-format
 msgid "Failed to access {url}. Error code: {code}"
 msgstr "{url} にアクセスできませんでした。エラーコード: {code}"
 
-#: src/apricus/gui/control.py:694
+#: src/apricus/gui/control.py:707
 #, python-brace-format
 msgid ""
 "Failed to stream {url}. Error:\n"
@@ -176,17 +190,17 @@ msgstr ""
 "{url} のストリーミングに失敗しました。エラー:\n"
 "{error}"
 
-#: src/apricus/gui/control.py:782
+#: src/apricus/gui/control.py:795
 #, fuzzy
 msgid "Choose a video folder to begin"
 msgstr "Hidamari フォルダーを開く"
 
-#: src/apricus/gui/control.py:784
+#: src/apricus/gui/control.py:797
 #, python-brace-format
 msgid "Videos in {folder} ({count})"
 msgstr ""
 
-#: src/apricus/gui/control.py:788
+#: src/apricus/gui/control.py:801
 #, fuzzy, python-brace-format
 msgid "No videos in {folder}"
 msgstr "Hidamari フォルダーを開く"
@@ -202,7 +216,7 @@ msgid "Toggle Mute Audio"
 msgstr "音声ミュートの切り替え"
 
 #.
-#: src/apricus/menu.py:103 src/apricus/assets/control.ui:1096
+#: src/apricus/menu.py:103 src/apricus/assets/control.ui:1155
 msgid "Toggle Play/Pause"
 msgstr "再生 / 一時停止の切り替え"
 
@@ -212,7 +226,7 @@ msgid "Reload"
 msgstr "再読み込み"
 
 #.
-#: src/apricus/menu.py:109 src/apricus/assets/control.ui:1115
+#: src/apricus/menu.py:109 src/apricus/assets/control.ui:1174
 msgid "I'm Feeling Lucky"
 msgstr "おまかせ再生"
 
@@ -403,32 +417,40 @@ msgstr ""
 "<span size=\"x-large\"><b>ストリーミング</b></span>\n"
 "ストリーミングサービスの動画"
 
-#: src/apricus/assets/control.ui:966
+#: src/apricus/assets/control.ui:945
+msgid "Queue paused — a single video is playing"
+msgstr ""
+
+#: src/apricus/assets/control.ui:958
+msgid "Resume playlist"
+msgstr ""
+
+#: src/apricus/assets/control.ui:971
+msgid "Discard queue"
+msgstr ""
+
+#: src/apricus/assets/control.ui:1025
 msgid "Up"
 msgstr ""
 
-#: src/apricus/assets/control.ui:979
+#: src/apricus/assets/control.ui:1038
 msgid "Down"
 msgstr ""
 
-#: src/apricus/assets/control.ui:992
+#: src/apricus/assets/control.ui:1051
 msgid "Remove"
 msgstr ""
 
-#: src/apricus/assets/control.ui:1005
+#: src/apricus/assets/control.ui:1064
 msgid "Clear"
 msgstr ""
 
-#: src/apricus/assets/control.ui:1018
+#: src/apricus/assets/control.ui:1077
 msgid "Shuffle"
 msgstr ""
 
-#: src/apricus/assets/control.ui:1031
+#: src/apricus/assets/control.ui:1090
 msgid "Apply playlist"
-msgstr ""
-
-#: src/apricus/assets/control.ui:1054
-msgid "Playlist"
 msgstr ""
 
 #, fuzzy, python-brace-format

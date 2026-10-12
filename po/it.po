@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: apricus\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-12 01:50+0200\n"
+"POT-Creation-Date: 2026-10-12 02:01+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: Fabrizio <fabx-dev>\n"
 "Language-Team: Italian\n"
@@ -84,43 +84,55 @@ msgstr "#"
 msgid "Video"
 msgstr "Video"
 
-#: src/apricus/gui/control.py:417
+#: src/apricus/gui/control.py:411
+msgid "Playlist ({n}, paused)"
+msgstr "Playlist ({n}, in pausa)"
+
+#: src/apricus/gui/control.py:413
+msgid "Playlist ({n})"
+msgstr "Playlist ({n})"
+
+#: src/apricus/gui/control.py:413 src/apricus/assets/control.ui:1113
+msgid "Playlist"
+msgstr "Playlist"
+
+#: src/apricus/gui/control.py:430
 msgid "Added {a}, {d} already in queue (total {n})"
 msgstr "Aggiunti {a}, {d} già in coda (totale {n})"
 
-#: src/apricus/gui/control.py:421
+#: src/apricus/gui/control.py:434
 msgid "Added {a} to queue (total {n})"
 msgstr "Aggiunti {a} alla coda (totale {n})"
 
-#: src/apricus/gui/control.py:423
+#: src/apricus/gui/control.py:436
 msgid "Already in queue (total {n})"
 msgstr "Già in coda (totale {n})"
 
-#: src/apricus/gui/control.py:434 src/apricus/assets/control.ui:456
+#: src/apricus/gui/control.py:447 src/apricus/assets/control.ui:456
 msgid "No selection"
 msgstr "Nessuna selezione"
 
-#: src/apricus/gui/control.py:436
+#: src/apricus/gui/control.py:449
 msgid "1 video selected"
 msgstr "1 video selezionato"
 
-#: src/apricus/gui/control.py:438
+#: src/apricus/gui/control.py:451
 msgid "{n} videos selected"
 msgstr "{n} video selezionati"
 
-#: src/apricus/gui/control.py:449
+#: src/apricus/gui/control.py:462
 msgid "Add to playlist ({n})"
 msgstr "Aggiungi alla playlist ({n})"
 
-#: src/apricus/gui/control.py:449 src/apricus/assets/control.ui:487
+#: src/apricus/gui/control.py:462 src/apricus/assets/control.ui:487
 msgid "Add to playlist"
 msgstr "Aggiungi alla playlist"
 
-#: src/apricus/gui/control.py:464
+#: src/apricus/gui/control.py:477
 msgid "Selecting videos"
 msgstr "Selezionare i video"
 
-#: src/apricus/gui/control.py:467
+#: src/apricus/gui/control.py:480
 msgid " ・Click a video to select it\n ・Ctrl+click adds or removes single videos\n ・Shift+click selects a whole range\n ・Right-click a video to set it on a monitor"
 msgstr ""
 " ・Fai clic su un video per selezionarlo\n"
@@ -128,39 +140,39 @@ msgstr ""
 " ・Maiusc+clic seleziona un intervallo intero\n"
 " ・Tasto destro su un video per impostarlo su un monitor"
 
-#: src/apricus/gui/control.py:580
+#: src/apricus/gui/control.py:593
 msgid "Disabled in playlist mode (muted by design)"
 msgstr "Disabilitato in modalità playlist (muta per scelta)"
 
-#: src/apricus/gui/control.py:582 src/apricus/assets/control.ui:154
+#: src/apricus/gui/control.py:595 src/apricus/assets/control.ui:154
 msgid "Volume control"
 msgstr "Controllo volume"
 
-#: src/apricus/gui/control.py:673
+#: src/apricus/gui/control.py:686
 msgid "Failed to access {url}. Error:\n{error}"
 msgstr ""
 "Impossibile accedere a {url}. Errore:\n"
 "{error}"
 
-#: src/apricus/gui/control.py:678
+#: src/apricus/gui/control.py:691
 msgid "Failed to access {url}. Error code: {code}"
 msgstr "Impossibile accedere a {url}. Codice di errore: {code}"
 
-#: src/apricus/gui/control.py:694
+#: src/apricus/gui/control.py:707
 msgid "Failed to stream {url}. Error:\n{error}"
 msgstr ""
 "Impossibile riprodurre {url} in streaming. Errore:\n"
 "{error}"
 
-#: src/apricus/gui/control.py:782
+#: src/apricus/gui/control.py:795
 msgid "Choose a video folder to begin"
 msgstr "Scegli una cartella video per iniziare"
 
-#: src/apricus/gui/control.py:784
+#: src/apricus/gui/control.py:797
 msgid "Videos in {folder} ({count})"
 msgstr "Video in {folder} ({count})"
 
-#: src/apricus/gui/control.py:788
+#: src/apricus/gui/control.py:801
 msgid "No videos in {folder}"
 msgstr "Nessun video in {folder}"
 
@@ -172,7 +184,7 @@ msgstr "Mostra Apricus"
 msgid "Toggle Mute Audio"
 msgstr "Attiva/disattiva l'audio"
 
-#: src/apricus/menu.py:103 src/apricus/assets/control.ui:1096
+#: src/apricus/menu.py:103 src/apricus/assets/control.ui:1155
 msgid "Toggle Play/Pause"
 msgstr "Riproduci/Pausa"
 
@@ -180,7 +192,7 @@ msgstr "Riproduci/Pausa"
 msgid "Reload"
 msgstr "Ricarica"
 
-#: src/apricus/menu.py:109 src/apricus/assets/control.ui:1115
+#: src/apricus/menu.py:109 src/apricus/assets/control.ui:1174
 msgid "I'm Feeling Lucky"
 msgstr "Mi sento fortunato"
 
@@ -346,30 +358,38 @@ msgstr ""
 "<span size=\"x-large\"><b>Playlist</b></span>\n"
 "Riproduzione continua dei tuoi video (senza audio)"
 
-#: src/apricus/assets/control.ui:966
+#: src/apricus/assets/control.ui:945
+msgid "Queue paused — a single video is playing"
+msgstr "Coda in pausa — è in riproduzione un singolo video"
+
+#: src/apricus/assets/control.ui:958
+msgid "Resume playlist"
+msgstr "Riprendi playlist"
+
+#: src/apricus/assets/control.ui:971
+msgid "Discard queue"
+msgstr "Scarta la coda"
+
+#: src/apricus/assets/control.ui:1025
 msgid "Up"
 msgstr "Su"
 
-#: src/apricus/assets/control.ui:979
+#: src/apricus/assets/control.ui:1038
 msgid "Down"
 msgstr "Giù"
 
-#: src/apricus/assets/control.ui:992
+#: src/apricus/assets/control.ui:1051
 msgid "Remove"
 msgstr "Rimuovi"
 
-#: src/apricus/assets/control.ui:1005
+#: src/apricus/assets/control.ui:1064
 msgid "Clear"
 msgstr "Svuota"
 
-#: src/apricus/assets/control.ui:1018
+#: src/apricus/assets/control.ui:1077
 msgid "Shuffle"
 msgstr "Casuale"
 
-#: src/apricus/assets/control.ui:1031
+#: src/apricus/assets/control.ui:1090
 msgid "Apply playlist"
 msgstr "Applica playlist"
-
-#: src/apricus/assets/control.ui:1054
-msgid "Playlist"
-msgstr "Playlist"

@@ -99,6 +99,11 @@ T["it"] = {
     "Selecting videos": "Selezionare i video",
     "How to select videos": "Come selezionare i video",
     " ・Click a video to select it\n ・Ctrl+click adds or removes single videos\n ・Shift+click selects a whole range\n ・Right-click a video to set it on a monitor": " ・Fai clic su un video per selezionarlo\n ・Ctrl+clic aggiunge o toglie singoli video\n ・Maiusc+clic seleziona un intervallo intero\n ・Tasto destro su un video per impostarlo su un monitor",
+    "Playlist ({n})": "Playlist ({n})",
+    "Playlist ({n}, paused)": "Playlist ({n}, in pausa)",
+    "Queue paused — a single video is playing": "Coda in pausa — è in riproduzione un singolo video",
+    "Resume playlist": "Riprendi playlist",
+    "Discard queue": "Scarta la coda",
 }
 T["de"] = {
     "Set For {monitor}": "Für {monitor} festlegen",
@@ -188,6 +193,11 @@ T["de"] = {
     "Selecting videos": "Videos auswählen",
     "How to select videos": "So wählst du Videos aus",
     " ・Click a video to select it\n ・Ctrl+click adds or removes single videos\n ・Shift+click selects a whole range\n ・Right-click a video to set it on a monitor": " ・Video anklicken zum Auswählen\n ・Strg+Klick fügt einzelne Videos hinzu oder entfernt sie\n ・Umschalt+Klick wählt einen ganzen Bereich\n ・Rechtsklick auf ein Video, um es einem Monitor zuzuweisen",
+    "Playlist ({n})": "Playlist ({n})",
+    "Playlist ({n}, paused)": "Playlist ({n}, pausiert)",
+    "Queue paused — a single video is playing": "Warteschlange pausiert — ein einzelnes Video läuft",
+    "Resume playlist": "Playlist fortsetzen",
+    "Discard queue": "Warteschlange verwerfen",
 }
 T["fr"] = {
     "Set For {monitor}": "Définir pour {monitor}",
@@ -277,6 +287,11 @@ T["fr"] = {
     "Selecting videos": "Sélectionner des vidéos",
     "How to select videos": "Comment sélectionner des vidéos",
     " ・Click a video to select it\n ・Ctrl+click adds or removes single videos\n ・Shift+click selects a whole range\n ・Right-click a video to set it on a monitor": " ・Cliquez sur une vidéo pour la sélectionner\n ・Ctrl+clic ajoute ou retire des vidéos une par une\n ・Maj+clic sélectionne toute une plage\n ・Clic droit sur une vidéo pour l'assigner à un moniteur",
+    "Playlist ({n})": "Playlist ({n})",
+    "Playlist ({n}, paused)": "Playlist ({n}, en pause)",
+    "Queue paused — a single video is playing": "File en pause — une seule vidéo est en lecture",
+    "Resume playlist": "Reprendre la playlist",
+    "Discard queue": "Abandonner la file",
 }
 T["es"] = {
     "Set For {monitor}": "Establecer para {monitor}",
@@ -366,6 +381,11 @@ T["es"] = {
     "Selecting videos": "Seleccionar vídeos",
     "How to select videos": "Cómo seleccionar vídeos",
     " ・Click a video to select it\n ・Ctrl+click adds or removes single videos\n ・Shift+click selects a whole range\n ・Right-click a video to set it on a monitor": " ・Haz clic en un vídeo para seleccionarlo\n ・Ctrl+clic añade o quita vídeos sueltos\n ・Mayús+clic selecciona un rango entero\n ・Clic derecho en un vídeo para asignarlo a un monitor",
+    "Playlist ({n})": "Playlist ({n})",
+    "Playlist ({n}, paused)": "Playlist ({n}, en pausa)",
+    "Queue paused — a single video is playing": "Cola en pausa — se está reproduciendo un solo vídeo",
+    "Resume playlist": "Reanudar playlist",
+    "Discard queue": "Descartar la cola",
 }
 
 
