@@ -40,7 +40,13 @@
                 {
                     "type": "archive",
                     "url": "https://dl.matroska.org/downloads/libebml/libebml-1.4.5.tar.xz",
-                    "sha256": "4971640b0592da29c2d426f303e137a9b0b3d07e1b81d069c1e56a2f49ab221b"
+                    "sha256": "4971640b0592da29c2d426f303e137a9b0b3d07e1b81d069c1e56a2f49ab221b",
+                    "x-checker-data": {
+                        "type": "html",
+                        "url": "https://dl.matroska.org/downloads/libebml/",
+                        "version-pattern": "libebml-(1\\.4\\.\\d+)\\.tar\\.xz",
+                        "url-template": "https://dl.matroska.org/downloads/libebml/libebml-$version.tar.xz"
+                    }
                 },
                 {
                     "type": "patch",
@@ -61,7 +67,13 @@
                 {
                     "type": "archive",
                     "url": "https://dl.matroska.org/downloads/libmatroska/libmatroska-1.7.1.tar.xz",
-                    "sha256": "572a3033b8d93d48a6a858e514abce4b2f7a946fe1f02cbfeca39bfd703018b3"
+                    "sha256": "572a3033b8d93d48a6a858e514abce4b2f7a946fe1f02cbfeca39bfd703018b3",
+                    "x-checker-data": {
+                        "type": "html",
+                        "url": "https://dl.matroska.org/downloads/libmatroska/",
+                        "version-pattern": "libmatroska-(1\\.7\\.\\d+)\\.tar\\.xz",
+                        "url-template": "https://dl.matroska.org/downloads/libmatroska/libmatroska-$version.tar.xz"
+                    }
                 },
                 {
                     "type": "patch",
@@ -76,7 +88,13 @@
                 {
                     "type": "archive",
                     "url": "https://download.videolan.org/videolan/dav1d/1.5.3/dav1d-1.5.3.tar.xz",
-                    "sha256": "732010aa5ef461fa93355ed2c6c5fedb48ddc4b74e697eaabe8907eaeb943011"
+                    "sha256": "732010aa5ef461fa93355ed2c6c5fedb48ddc4b74e697eaabe8907eaeb943011",
+                    "x-checker-data": {
+                        "type": "html",
+                        "url": "https://download.videolan.org/videolan/dav1d/",
+                        "version-pattern": "(1\\.5\\.\\d+)/",
+                        "url-template": "https://download.videolan.org/videolan/dav1d/$version/dav1d-$version.tar.xz"
+                    }
                 }
             ]
         },
@@ -97,7 +115,13 @@
                 {
                     "type": "archive",
                     "url": "https://ffmpeg.org/releases/ffmpeg-4.4.7.tar.xz",
-                    "sha256": "39e7d6d0af050a0a8aae737d610d77264e67b9657f3a346f72bba03312565e2a"
+                    "sha256": "39e7d6d0af050a0a8aae737d610d77264e67b9657f3a346f72bba03312565e2a",
+                    "x-checker-data": {
+                        "type": "html",
+                        "url": "https://ffmpeg.org/releases/",
+                        "version-pattern": "ffmpeg-(4\\.4\\.\\d+)\\.tar\\.xz",
+                        "url-template": "https://ffmpeg.org/releases/ffmpeg-$version.tar.xz"
+                    }
                 }
             ]
         },
@@ -196,7 +220,13 @@
                 {
                     "type": "archive",
                     "url": "https://download.videolan.org/videolan/vlc/3.0.23/vlc-3.0.23.tar.xz",
-                    "sha256": "e891cae6aa3ccda69bf94173d5105cbc55c7a7d9b1d21b9b21666e69eff3e7e0"
+                    "sha256": "e891cae6aa3ccda69bf94173d5105cbc55c7a7d9b1d21b9b21666e69eff3e7e0",
+                    "x-checker-data": {
+                        "type": "html",
+                        "url": "https://download.videolan.org/videolan/vlc/",
+                        "version-pattern": "(3\\.0\\.\\d+)/",
+                        "url-template": "https://download.videolan.org/videolan/vlc/$version/vlc-$version.tar.xz"
+                    }
                 },
                 {
                     "type": "patch",
