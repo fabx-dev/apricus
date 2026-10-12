@@ -4,7 +4,11 @@
 """GTK4 + Libadwaita control panel (migration target).
 
 Talks to the UNCHANGED ApricusServer over the existing D-Bus API: no
-backend or protocol changes. Started with APRICUS_GTK4=1 (see __main__).
+backend or protocol changes. Started with APRICUS_GTK4=1 (see server).
+
+Only GTK4-safe modules are imported here: commons, utils (ConfigUtil,
+no Gtk at top level), mediacache. NEVER import apricus.gui.control,
+apricus.menu or apricus.monitor (they pin GTK3/Gdk3 namespaces).
 """
 
 import logging
@@ -17,8 +21,17 @@ gi.require_version("Adw", "1")
 from gi.repository import Adw, Gio, GLib, Gtk
 from pydbus import SessionBus
 
-from apricus.commons import DBUS_NAME_SERVER, LOGGER_NAME, PROJECT
-from apricus.utils import init_translations, setup_logging
+from apricus.commons import (
+    CONFIG_KEY_MODE,
+    CONFIG_KEY_MUTE,
+    CONFIG_KEY_VOLUME,
+    DBUS_NAME_SERVER,
+    LOGGER_NAME,
+    MODE_PLAYLIST,
+    PROJECT,
+    resolve_video_dir,
+)
+from apricus.utils import ConfigUtil, get_video_paths, init_translations, setup_logging
 
 logger = logging.getLogger(LOGGER_NAME)
 
@@ -35,30 +48,27 @@ class ControlPanel(Adw.Application):
         )
         self.version = version
         self.window = None
+        self.config = ConfigUtil().load()
 
     def do_activate(self):
         if self.window is None:
             self.window = Adw.ApplicationWindow(application=self)
             self.window.set_title("Apricus")
-            self.window.set_default_size(480, 320)
-            box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
-            box.set_margin_top(24)
-            box.set_margin_bottom(24)
-            box.set_margin_start(24)
-            box.set_margin_end(24)
-            self.status = Gtk.Label(label="Connecting…")
-            box.append(self.status)
-            btn_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-            btn_row.set_halign(Gtk.Align.CENTER)
-            play = Gtk.Button(label="Play/Pause")
-            play.connect("clicked", self.on_play_pause)
-            quit_btn = Gtk.Button(label="Quit")
-            quit_btn.connect("clicked", lambda *_: self.quit())
-            btn_row.append(play)
-            btn_row.append(quit_btn)
-            box.append(btn_row)
-            self.window.set_content(box)
-        self._refresh_status()
+            self.window.set_default_size(640, 420)
+            self.stack = Adw.ViewStack()
+            self.stack.add_titled(self._library_page(), "library", "Library")
+            self.stack.add_titled(self._playlist_page(), "playlist", "Playlist")
+            self.stack.add_titled(self._settings_page(), "settings", "Settings")
+            switcher = Adw.ViewSwitcher()
+            switcher.set_stack(self.stack)
+            header = Adw.HeaderBar()
+            header.set_title_widget(switcher)
+            # Adw.ApplicationWindow content with a top header bar.
+            toolbar = Adw.ToolbarView()
+            toolbar.add_top_bar(header)
+            toolbar.set_content(self.stack)
+            self.window.set_content(toolbar)
+        self._refresh_all()
         self.window.present()
 
     def _server(self):
@@ -68,12 +78,83 @@ class ControlPanel(Adw.Application):
             logger.error("[GUI4] Couldn't connect to server")
             return None
 
-    def _refresh_status(self):
+    # -- pages ---------------------------------------------------------
+
+    def _library_page(self):
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        box.set_margin_top(24)
+        box.set_margin_bottom(24)
+        box.set_margin_start(24)
+        box.set_margin_end(24)
+        self.library_status = Gtk.Label(label="")
+        self.library_status.set_xalign(0)
+        box.append(self.library_status)
+        row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        row.set_halign(Gtk.Align.CENTER)
+        play = Gtk.Button(label="Play/Pause")
+        play.connect("clicked", self.on_play_pause)
+        quit_btn = Gtk.Button(label="Quit")
+        quit_btn.connect("clicked", lambda *_: self.quit())
+        row.append(play)
+        row.append(quit_btn)
+        box.append(row)
+        return box
+
+    def _playlist_page(self):
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        box.set_margin_top(24)
+        box.set_margin_bottom(24)
+        box.set_margin_start(24)
+        box.set_margin_end(24)
+        self.playlist_status = Gtk.Label(label="")
+        self.playlist_status.set_xalign(0)
+        box.append(self.playlist_status)
+        apply_btn = Gtk.Button(label="Apply playlist")
+        apply_btn.add_css_class("suggested-action")
+        apply_btn.set_halign(Gtk.Align.CENTER)
+        apply_btn.connect("clicked", self.on_playlist_apply)
+        box.append(apply_btn)
+        return box
+
+    def _settings_page(self):
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        box.set_margin_top(24)
+        box.set_margin_bottom(24)
+        box.set_margin_start(24)
+        box.set_margin_end(24)
+        mute_row = Adw.ActionRow()
+        mute_row.set_title("Mute")
+        self.mute_switch = Gtk.Switch()
+        self.mute_switch.set_valign(Gtk.Align.CENTER)
+        self.mute_switch.connect("state-set", self.on_mute_toggled)
+        mute_row.add_suffix(self.mute_switch)
+        box.append(mute_row)
+        vol_row = Adw.ActionRow()
+        vol_row.set_title("Volume")
+        self.volume_scale = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, 0, 100, 1)
+        self.volume_scale.set_hexpand(True)
+        self.volume_scale.set_valign(Gtk.Align.CENTER)
+        self.volume_scale.connect("value-changed", self.on_volume_changed)
+        vol_row.add_suffix(self.volume_scale)
+        box.append(vol_row)
+        return box
+
+    # -- refresh + handlers ---------------------------------------------
+
+    def _refresh_all(self):
         server = self._server()
-        if server is None:
-            self.status.set_text("Server not running")
-        else:
-            self.status.set_text(f"Apricus {self.version} — mode: {server.mode}")
+        mode = server.mode if server is not None else self.config.get(CONFIG_KEY_MODE)
+        n_videos = len(get_video_paths(resolve_video_dir(self.config)))
+        self.library_status.set_text(
+            f"Apricus {self.version} — mode: {mode}\n{n_videos} videos in library"
+        )
+        playlist = (self.config.get("playlist") or {}).get("Default", [])
+        self.playlist_status.set_text(
+            f"{len(playlist)} videos in queue"
+            + (" (muted by design)" if mode == MODE_PLAYLIST else "")
+        )
+        self.mute_switch.set_state(bool(self.config.get(CONFIG_KEY_MUTE)))
+        self.volume_scale.set_value(int(self.config.get(CONFIG_KEY_VOLUME, 50)))
 
     def on_play_pause(self, *_args):
         server = self._server()
@@ -85,7 +166,35 @@ class ControlPanel(Adw.Application):
             server.pause_playback()
         else:
             server.start_playback()
-        self._refresh_status()
+        self._refresh_all()
+
+    def on_playlist_apply(self, *_args):
+        server = self._server()
+        if server is None:
+            return
+        playlist = (self.config.get("playlist") or {}).get("Default", [])
+        if playlist:
+            server.playlist(playlist, "all")
+        self.config = ConfigUtil().load()
+        self._refresh_all()
+
+    def on_mute_toggled(self, _switch, state):
+        server = self._server()
+        if server is not None:
+            server.is_mute = state
+        self.config = ConfigUtil().load()
+        self.config[CONFIG_KEY_MUTE] = state
+        ConfigUtil().save(self.config)
+        return False
+
+    def on_volume_changed(self, scale):
+        volume = int(scale.get_value())
+        server = self._server()
+        if server is not None:
+            server.volume = volume
+        self.config = ConfigUtil().load()
+        self.config[CONFIG_KEY_VOLUME] = volume
+        ConfigUtil().save(self.config)
 
 
 def main(version="devel", pkgdatadir="/usr/share/apricus", localedir="/usr/share/locale"):

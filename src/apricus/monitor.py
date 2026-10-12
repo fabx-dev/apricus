@@ -2,9 +2,14 @@ import gi
 
 
 def _gdk():
-    """Lazily loaded Gdk (GTK4 migration): importing monitor must never pin
-    a Gdk major version at module scope."""
-    gi.require_version("Gdk", "3.0")
+    """Gdk namespace, lazily loaded without pinning a major version.
+
+    GTK3 processes get Gdk 3.0; GTK4 processes reuse the already-loaded
+    Gdk 4.0. Callers must use only APIs present in both (or branch)."""
+    try:
+        gi.require_version("Gdk", "3.0")
+    except ValueError:
+        pass  # another major version already loaded; use it as-is
     from gi.repository import Gdk
 
     return Gdk
@@ -61,40 +66,72 @@ def assign_keys(infos):
 class MonitorInfo:
     @staticmethod
     def get_unique_monitor_count():
-        display = _gdk().Display.get_default()
+        Gdk = _gdk()
+        display = Gdk.Display.get_default()
+        if display is None:
+            return 0
+        if hasattr(display, "get_monitors"):
+            return display.get_monitors().get_n_items()
         return display.get_n_monitors()
 
     @staticmethod
     def monitors():
-        display = _gdk().Display.get_default()
+        Gdk = _gdk()
+        display = Gdk.Display.get_default()
         if display is None:
             # Headless (CI, tests): no monitors to report.
             return []
-        n_monitors = display.get_n_monitors()
+        if hasattr(display, "get_monitors"):
+            # GTK4: monitors exposed as a Gio.ListModel.
+            return assign_keys(MonitorInfo._from_list_model(display.get_monitors()))
+        return assign_keys(MonitorInfo._from_indexed(display))
+
+    @staticmethod
+    def _from_indexed(display):
         monitors = []
-
-        for i in range(n_monitors):
+        for i in range(display.get_n_monitors()):
             monitor = display.get_monitor(i)
-            geometry = monitor.get_geometry()
+            monitors.append(MonitorInfo._describe(monitor))
+        return monitors
+
+    @staticmethod
+    def _from_list_model(model):
+        monitors = []
+        for i in range(model.get_n_items()):
+            monitors.append(MonitorInfo._describe(model.get_item(i)))
+        return monitors
+
+    @staticmethod
+    def _describe(monitor):
+        geometry = monitor.get_geometry()
+        try:
             width_mm = monitor.get_width_mm()
+        except Exception:
+            width_mm = 0
+        try:
             height_mm = monitor.get_height_mm()
-            name = monitor.get_model()
-            is_primary = monitor.is_primary()
-
-            monitors.append(
-                {
-                    "x": geometry.x,
-                    "y": geometry.y,
-                    "width": geometry.width,
-                    "height": geometry.height,
-                    "width_mm": width_mm,
-                    "height_mm": height_mm,
-                    "name": name,
-                    "is_primary": is_primary,
-                }
-            )
-
-        return assign_keys(monitors)
+        except Exception:
+            height_mm = 0
+        for attr in ("get_model", "get_connector", "get_manufacturer"):
+            name = getattr(monitor, attr, lambda: None)()
+            if name:
+                break
+        else:
+            name = "Unknown"
+        try:
+            is_primary = bool(monitor.is_primary())
+        except Exception:
+            is_primary = False
+        return {
+            "x": geometry.x,
+            "y": geometry.y,
+            "width": geometry.width,
+            "height": geometry.height,
+            "width_mm": width_mm,
+            "height_mm": height_mm,
+            "name": name,
+            "is_primary": is_primary,
+        }
 
 
 class Monitors:
