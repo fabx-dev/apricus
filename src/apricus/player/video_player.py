@@ -157,6 +157,9 @@ class PlayerWindow(Gtk.ApplicationWindow):
         self.name = name
         self._mode = mode
         self.__vlc_widget = VLCWidget(width, height, disable_audio=(mode == MODE_PLAYLIST))
+        # Opaque black until the first frame lands: otherwise the theme
+        # background flashes through on every video switch.
+        self.override_background_color(Gtk.StateFlags.NORMAL, Gdk.RGBA(0, 0, 0, 1))
         # Playlist state (used only in MODE_PLAYLIST).
         self._queue = []
         self._queue_index = 0
