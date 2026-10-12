@@ -1,3 +1,6 @@
+# Copyright (C) 2026 fabx-dev
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """Desktop-environment backends (Fase 2).
 
 All DE-specific behavior lives here behind two small interfaces, so the

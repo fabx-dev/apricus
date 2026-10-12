@@ -1,3 +1,6 @@
+# Copyright (C) 2026 fabx-dev
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 import logging
 import os
 import time

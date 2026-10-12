@@ -1,3 +1,6 @@
+# Copyright (C) 2026 fabx-dev
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 #!/usr/bin/env python3
 """Generate it/de/fr/es catalogs from apricus.pot. Run from repo root."""
 import re

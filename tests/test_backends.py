@@ -1,3 +1,6 @@
+# Copyright (C) 2026 fabx-dev
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """Tests for apricus.backends (no display required)."""
 
 from unittest.mock import patch

@@ -1,3 +1,6 @@
+# Copyright (C) 2026 fabx-dev
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """Tests for ConfigUtil legacy Hidamari import (no display required)."""
 
 import json

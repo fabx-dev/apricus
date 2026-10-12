@@ -1,3 +1,6 @@
+# Copyright (C) 2026 fabx-dev
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """Tests for MODE_PLAYLIST config + server + player queue logic (headless)."""
 
 import json

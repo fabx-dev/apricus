@@ -1,3 +1,6 @@
+# Copyright (C) 2026 fabx-dev
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """Sidecar cache for ffprobe results (Fase 1b).
 
 Probing every video on every startup blocks first frame on subprocesses.

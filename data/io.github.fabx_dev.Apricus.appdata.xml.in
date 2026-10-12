@@ -26,6 +26,19 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="4.0" date="2026-10-12" type="stable">
+      <description>
+        <ul>
+          <li>First Apricus release (community fork of Hidamari 3.7)</li>
+          <li>Muted looping playlists with dedicated panel tab</li>
+          <li>In-place video switching: no respawn gap, painted first frame</li>
+          <li>Login-to-first-frame from ~1.7s to ~1.4s (static cache, ffprobe sidecar, fast mode)</li>
+          <li>User systemd autostart unit and configurable video folder</li>
+          <li>Stable per-monitor keys, playlist paused-state, full rebrand</li>
+          <li>Interface in English, Italian, German, French, Spanish and Japanese</li>
+        </ul>
+      </description>
+    </release>
     <release version="3.7" date="2026-07-09" type="stable">
       <description>
         <ul>
