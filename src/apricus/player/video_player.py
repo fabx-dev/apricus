@@ -347,6 +347,9 @@ class VideoPlayer(BasePlayer):
         <property name="is_mute" type="b" access="readwrite"/>
         <property name="is_playing" type="b" access="read"/>
         <property name="is_paused_by_user" type="b" access="readwrite"/>
+        <method name='preview_static'>
+            <arg type='s' name='video_path' direction='in'/>
+        </method>
         <method name='reload_config'/>
         <method name='pause_playback'/>
         <method name='start_playback'/>
@@ -773,6 +776,22 @@ class VideoPlayer(BasePlayer):
 
     def _apply_static_wallpaper(self, static_wallpaper_path):
         self.wallpaper.apply_static(static_wallpaper_path)
+        return False
+
+    def preview_static(self, video_path):
+        """Apply the cached static frame for an upcoming video, if present.
+
+        Called by the server *before* the current player quits, so a video
+        switch shows the new frame instead of the previous one. Cache misses
+        are ignored: the new player refreshes in background as usual.
+        """
+        if not self.wallpaper.supports_static or not video_path:
+            return False
+        cached = self._static_cache_path(video_path)
+        if os.path.isfile(cached):
+            self._apply_static_wallpaper(cached)
+            perf.mark("player: static preview applied")
+            return True
         return False
 
     def set_original_wallpaper(self):

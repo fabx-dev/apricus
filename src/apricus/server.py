@@ -149,6 +149,11 @@ class ApricusServer:
         # saving first (the GUI used to mask this by saving itself).
         self._save_config()
 
+        # Pre-apply the new video's cached static frame so the switch shows
+        # the incoming wallpaper instead of the previous one. Best-effort:
+        # cache misses are refreshed by the new player as usual.
+        self._preview_static(mode, data_source)
+
         # Quit current (keep its wallpaper: the new player overwrites it)
         # then create a new player
         self._quit_player(restore_wallpaper=False)
@@ -197,6 +202,28 @@ class ApricusServer:
                 )
                 self.sys_icon_process.start()
             self._prev_mode = self.mode
+
+    @staticmethod
+    def _preview_static(mode, data_source):
+        video = None
+        if mode == MODE_VIDEO and data_source:
+            video = data_source
+        elif mode == MODE_PLAYLIST:
+            playlist = ConfigUtil().load().get(CONFIG_KEY_PLAYLIST) or {}
+            for queue in [playlist.get("Default")] + [
+                q for k, q in playlist.items() if k != "Default"
+            ]:
+                if isinstance(queue, list) and queue:
+                    video = queue[0]
+                    break
+        if not video:
+            return
+        try:
+            player = get_instance(DBUS_NAME_PLAYER)
+            if player:
+                player.preview_static(video)
+        except GLib.Error:
+            pass
 
     @staticmethod
     def _quit_player(restore_wallpaper=True):
