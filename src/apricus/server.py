@@ -131,6 +131,9 @@ class ApricusServer:
 
     def _setup_player(self, mode, data_source=None, monitor=None):
         """Setup and run player"""
+        # The GUI shares this file: reload so we never persist a stale
+        # in-memory copy over a newer on-disk config (and vice versa).
+        self._load_config()
         logger.info(f"[Mode] {mode}")
         self.config[CONFIG_KEY_MODE] = mode
 
@@ -212,6 +215,7 @@ class ApricusServer:
 
     def playlist(self, video_paths=None, monitor=None):
         """Play a queue of videos, looping. Muted by design (PipeWire safety)."""
+        self._load_config()
         video_paths = [p for p in (video_paths or []) if p]
         if not video_paths:
             logger.warning("[Server] Empty playlist, ignoring")
@@ -254,6 +258,7 @@ class ApricusServer:
 
     def feeling_lucky(self):
         """Random play a video from the directory"""
+        self._load_config()
         monitors = Monitors().get_monitors()
         video_dir = resolve_video_dir(self.config)
         for monitor in monitors:
