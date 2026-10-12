@@ -154,6 +154,13 @@ class ApricusServer:
         # cache misses are refreshed by the new player as usual.
         self._preview_static(mode, data_source)
 
+        # Reuse the live player when staying inside the VLC family: no
+        # unmap/respawn gap, the windows (and their covers) survive.
+        if self._try_switch_media(mode):
+            perf.mark(f"server: player switched in place [{mode}]")
+            self._refresh_systray(mode)
+            return
+
         # Quit current (keep its wallpaper: the new player overwrites it)
         # then create a new player
         self._quit_player(restore_wallpaper=False)
@@ -187,6 +194,9 @@ class ApricusServer:
             logger.info(f"[Server] player pid={self.player_process.pid}")
 
         # Refresh systray icon if the mode changed
+        self._refresh_systray(mode)
+
+    def _refresh_systray(self, mode):
         if self.config[CONFIG_KEY_SYSTRAY]:
             if self._prev_mode != self.mode:
                 if self.sys_icon_process:
@@ -202,6 +212,26 @@ class ApricusServer:
                 )
                 self.sys_icon_process.start()
             self._prev_mode = self.mode
+
+    def _try_switch_media(self, mode):
+        """Hot-switch inside the live VLC player (no unmap/respawn gap).
+
+        Works when both sides are the VLC family (video/stream/playlist);
+        webpage runs a different player class and always respawns.
+        Returns True when the switch was handed off.
+        """
+        if mode not in [MODE_VIDEO, MODE_STREAM, MODE_PLAYLIST]:
+            return False
+        if not (self.player_process and self.player_process.is_alive()):
+            return False
+        try:
+            player = get_instance(DBUS_NAME_PLAYER)
+            if player is None or player.mode not in [MODE_VIDEO, MODE_STREAM, MODE_PLAYLIST]:
+                return False
+            player.switch_media(mode)
+            return True
+        except GLib.Error:
+            return False
 
     @staticmethod
     def _preview_static(mode, data_source):

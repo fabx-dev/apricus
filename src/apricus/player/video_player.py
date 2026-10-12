@@ -14,7 +14,7 @@ import gi
 gi.require_version("Gtk", "3.0")
 gi.require_version("Gdk", "3.0")
 import vlc
-from gi.repository import Gdk, GLib, Gtk
+from gi.repository import Gdk, GdkPixbuf, GLib, Gtk
 from pydbus import SessionBus
 
 from apricus import mediacache, perf
@@ -126,6 +126,11 @@ class VLCWidget(Gtk.DrawingArea):
         self.instance = vlc.Instance(vlc_options)
         self.player = self.instance.media_player_new()
 
+        # Cover pixbuf painted until the first real frame lands (kills the
+        # theme-background flash on switches). Cleared on TimeChanged.
+        self._cover = None
+        self.connect("draw", self._on_draw_cover)
+
         def handle_embed(*args):
             self.player.set_xwindow(self.get_window().get_xid())
             return True
@@ -133,6 +138,25 @@ class VLCWidget(Gtk.DrawingArea):
         # Embed and set size.
         self.connect("realize", handle_embed)
         self.set_size_request(width, height)
+
+    def set_cover(self, pixbuf):
+        self._cover = pixbuf
+        self.queue_draw()
+
+    def clear_cover(self):
+        if self._cover is not None:
+            self._cover = None
+            self.queue_draw()
+
+    def _on_draw_cover(self, widget, cr):
+        if self._cover is None:
+            return False
+        alloc = self.get_allocation()
+        x = (alloc.width - self._cover.get_width()) // 2
+        y = (alloc.height - self._cover.get_height()) // 2
+        Gdk.cairo_set_source_pixbuf(cr, self._cover, x, y)
+        cr.paint()
+        return True
 
     def cleanup(self):
         """Cleanup VLC resources to prevent memory leaks"""
@@ -310,16 +334,29 @@ class PlayerWindow(Gtk.ApplicationWindow):
     def add_audio_track(self, audio):
         self.__vlc_widget.player.add_slave(vlc.MediaSlaveType(1), audio, True)
 
+    def set_cover(self, image_path):
+        """Paint a cached frame until the real first frame lands."""
+        self._cover_token = getattr(self, "_cover_token", 0) + 1
+        token = self._cover_token
+        try:
+            w = self.get_allocated_width() or self.width
+            h = self.get_allocated_height() or self.height
+            pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(image_path, w, h, True)
+        except (GLib.Error, OSError):
+            return
+        self.__vlc_widget.set_cover(pixbuf)
+        GLib.timeout_add_seconds(5, self._clear_cover_timeout, token)
+
+    def _clear_cover_timeout(self, token):
+        if token == getattr(self, "_cover_token", None):
+            self.__vlc_widget.clear_cover()
+        return False
+
     def _on_first_time_changed(self, _event):
+        self.__vlc_widget.clear_cover()
         if self._first_frame_reported:
             return
         self._first_frame_reported = True
-        try:
-            self.__vlc_widget.player.event_manager().event_detach(
-                vlc.EventType.MediaPlayerTimeChanged
-            )
-        except Exception as e:
-            logger.warning(f"[Perf] event_detach failed: {e}")
         perf.mark(f"player: first frame [{self.name}]")
 
     def _on_button_press_event(self, widget, event):
@@ -352,6 +389,9 @@ class VideoPlayer(BasePlayer):
         <property name="is_paused_by_user" type="b" access="readwrite"/>
         <method name='preview_static'>
             <arg type='s' name='video_path' direction='in'/>
+        </method>
+        <method name='switch_media'>
+            <arg type='s' name='mode' direction='in'/>
         </method>
         <method name='reload_config'/>
         <method name='pause_playback'/>
@@ -476,6 +516,19 @@ class VideoPlayer(BasePlayer):
     @data_source.setter
     def data_source(self, data_source):
         self.config[CONFIG_KEY_DATA_SOURCE] = data_source
+        self._apply_source(data_source, setup_handlers=True)
+
+    def switch_media(self, mode):
+        """Hot-switch source inside the live player (no respawn)."""
+        GLib.idle_add(self._switch_media_main, mode)
+
+    def _switch_media_main(self, mode):
+        self.reload_config()
+        self._apply_source(self.config[CONFIG_KEY_DATA_SOURCE], setup_handlers=False)
+        perf.mark(f"player: switched [{mode}]")
+        return False
+
+    def _apply_source(self, data_source, setup_handlers):
 
         # Stable config keys for live monitors (unique models keep the bare
         # model; duplicates get Model#i). Order matches self.windows.
@@ -522,6 +575,11 @@ class VideoPlayer(BasePlayer):
                 # Prevent awful ear-rape with multiple instances.
                 if not monitor.is_primary():
                     media.add_option("no-audio")
+                if self.wallpaper.supports_static:
+                    cover = self._static_cache_path(source)
+                    if os.path.isfile(cover):
+                        window.set_cover(cover)
+                window.stop()
                 window.set_media(media)
                 # No set_position(0.0): a freshly set media starts at 0, and the
                 # extra seek costs a demuxer round-trip on the startup path.
@@ -562,7 +620,10 @@ class VideoPlayer(BasePlayer):
                     continue
                 window._queue = queue
                 window._queue_index = 0
-                window.attach_end_reached(lambda w=window: self._on_media_end(w))
+                window._transitioning = False
+                if not getattr(window, "_end_attached", False):
+                    window.attach_end_reached(lambda w=window: self._on_media_end(w))
+                    window._end_attached = True
                 self._play_queue_item(window)
         else:
             raise ValueError("Invalid mode")
@@ -572,11 +633,12 @@ class VideoPlayer(BasePlayer):
         self.start_playback()
 
         # Everything is initialized. Create handlers if haven't (singleton pattern).
-        if not self.active_handler:
-            self.active_handler = ActiveHandler(self._on_active_changed)
-        if not self.window_state:
-            self.window_state = create_window_state_backend(self._on_window_state_changed)
-            self.window_state.start()
+        if setup_handlers:
+            if not self.active_handler:
+                self.active_handler = ActiveHandler(self._on_active_changed)
+            if not self.window_state:
+                self.window_state = create_window_state_backend(self._on_window_state_changed)
+                self.window_state.start()
 
         if self.config[CONFIG_KEY_STATIC_WALLPAPER] and self.mode == MODE_VIDEO:
             self.set_static_wallpaper()
