@@ -22,29 +22,42 @@ path to Wayland and multi-desktop support**.
 - Instant wallpaper at login: last frame applied immediately, refreshed in background
 - Static wallpaper from the current video frame <sup>1</sup>
 - Pause on maximized window / fullscreen <sup>2</sup>
-- Volume control, mute/pause in two clicks
+- Volume control, mute/pause in two clicks <sup>3</sup>
+- Muted looping playlist with shuffle, per-monitor queues <sup>4</sup>
 - I'm feeling lucky (random video)
-- Hardware accelerated decoding via VLC <sup>3</sup>
-- Multi-monitor support, per-monitor video <sup>4</sup>
-- Video library folder of your choice, shown in the panel <sup>5</sup>
-- Streaming URL support via yt-dlp <sup>6</sup>
-- Webpage as wallpaper <sup>7</sup>
-- Interface in English, Italian, German, French, Spanish and Japanese <sup>8</sup>
+- Hardware accelerated decoding via VLC <sup>5</sup>
+- Multi-monitor support, per-monitor video <sup>6</sup>
+- Video library folder of your choice, shown in the panel <sup>7</sup>
+- Streaming URL support via yt-dlp <sup>8</sup>
+- Webpage as wallpaper <sup>9</sup>
+- Interface in English, Italian, German, French, Spanish and Japanese <sup>10</sup>
 
 <sup>1</sup> Currently GNOME only.
 <sup>2</sup> Window-state detection is currently X11 only. On Wayland the video
 still plays (rendered via XWayland); auto-pause there needs a Shell extension
 companion, which is on the roadmap.
-<sup>3</sup> VLC backend; HW acceleration varies by driver (NVIDIA + Wayland is fragile).
-<sup>4</sup> Duplicate monitor models get stable `Model#i` config keys, so two
+<sup>3</sup> Volume and mute have no effect in playlist mode (muted by design,
+for PipeWire stability) and their controls are greyed out there.
+<sup>4</sup> A queue left over from single-video mode stays saved but paused —
+resumable anytime, never wiped silently.
+<sup>5</sup> VLC backend; HW acceleration varies by driver (NVIDIA + Wayland is fragile).
+<sup>6</sup> Duplicate monitor models get stable `Model#i` config keys, so two
 identical screens no longer overwrite each other.
-<sup>5</sup> Flat scan: each folder shows its own videos. Defaults to the
-Hidamari folder for compatibility.
-<sup>6</sup> Tested with YouTube.
-<sup>7</sup> Anything from a plain page to WebGL content.
-<sup>8</sup> Selected automatically from the system locale.
+<sup>7</sup> Flat scan: each folder shows its own videos. Nothing is assumed:
+on first run you choose the folder, unless a Hidamari library already exists
+(reused automatically).
+<sup>8</sup> Tested with YouTube.
+<sup>9</sup> Anything from a plain page to WebGL content. JavaScript stays on
+(pages need it); local-file access from remote pages is blocked.
+<sup>10</sup> Selected automatically from the system locale.
 
 ## What changed vs upstream
+
+**Playlist (new)**
+- Muted looping queue with its own panel tab (add/remove/reorder/shuffle/
+  apply), per-monitor queues, D-Bus API, config v5 with migration
+- A queue interrupted by a single video stays saved and paused — resumable,
+  never wiped
 
 **Startup & performance**
 - Login-to-first-frame from ~1.7s to ~1.4s (1080p): shared process clock with
@@ -54,6 +67,8 @@ Hidamari folder for compatibility.
   low-contention login startup
 
 **Player**
+- Persistent player: video switches happen in place (no kill/respawn gap),
+  with the new frame painted over the old one until real playback starts
 - Thumbnail loading marshalled to the GTK main thread (fixes intermittent
   native crashes of the control panel)
 - VLC widget cleanup, single-shot monitor sync, logging that works in forked
@@ -65,6 +80,13 @@ Hidamari folder for compatibility.
   empty library (upstream #272)
 - Old configs are migrated, never wiped (video folder default, blur key
   removal, Hidamari import on first run)
+- Server no longer persists stale in-memory configs over newer on-disk ones;
+  D-Bus callers are logged, foreign UIDs rejected
+
+**Security hardening**
+- Timeouts on ffmpeg/requests/yt-dlp/systemctl; atomic config writes with
+  backup and recovery; numeric validation at load; bounded thumbnail pool;
+  capped playlists; validated video paths; hardened WebKit defaults
 
 **Desktop integration**
 - Desktop-environment backends in one place (`apricus.backends`): GNOME vs
