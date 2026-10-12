@@ -149,8 +149,9 @@ class ApricusServer:
         # saving first (the GUI used to mask this by saving itself).
         self._save_config()
 
-        # Quit current then create a new player
-        self._quit_player()
+        # Quit current (keep its wallpaper: the new player overwrites it)
+        # then create a new player
+        self._quit_player(restore_wallpaper=False)
 
         # Terminate old player process and wait for it to finish
         if self.player_process:
@@ -198,11 +199,13 @@ class ApricusServer:
             self._prev_mode = self.mode
 
     @staticmethod
-    def _quit_player():
-        """Quit current player"""
+    def _quit_player(restore_wallpaper=True):
+        """Quit current player. Internal respawns pass restore_wallpaper=False
+        so the desktop keeps the current static frame instead of flashing
+        the pre-Apricus wallpaper between switches."""
         player = get_instance(DBUS_NAME_PLAYER)
         if player:
-            player.quit_player()
+            player.quit_player(restore_wallpaper)
 
     def video(self, video_path=None, monitor=""):
         self._setup_player(MODE_VIDEO, video_path, monitor)

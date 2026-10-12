@@ -350,7 +350,9 @@ class VideoPlayer(BasePlayer):
         <method name='reload_config'/>
         <method name='pause_playback'/>
         <method name='start_playback'/>
-        <method name='quit_player'/>
+        <method name='quit_player'>
+            <arg type='b' name='restore_wallpaper' direction='in'/>
+        </method>
     </interface>
     </node>
     """
@@ -775,9 +777,12 @@ class VideoPlayer(BasePlayer):
 
     def set_original_wallpaper(self):
         self.wallpaper.restore_original()
-        # Prune stale static-wallpaper caches, keeping the ones for the
-        # currently configured videos (instant wallpaper on next login).
-        # Legacy random-named caches (static-XXXXXX.png) match nothing and go.
+        self.wallpaper.prune_cache(self._live_cache_paths())
+
+    def _live_cache_paths(self):
+        # Static caches for the currently configured videos (instant
+        # wallpaper on next login). Legacy random-named caches match
+        # nothing and go.
         keep = set()
         try:
             for video in self.data_source.values():
@@ -785,13 +790,16 @@ class VideoPlayer(BasePlayer):
                     keep.add(os.path.abspath(self._static_cache_path(video)))
         except AttributeError:
             pass
-        self.wallpaper.prune_cache(keep)
+        return keep
 
     def reload_config(self):
         self.config = ConfigUtil().load()
 
-    def quit_player(self):
-        self.set_original_wallpaper()
+    def quit_player(self, restore_wallpaper=True):
+        if restore_wallpaper:
+            self.set_original_wallpaper()
+        else:
+            self.wallpaper.prune_cache(self._live_cache_paths())
 
         # Cleanup handlers
         if self.active_handler:

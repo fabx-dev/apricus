@@ -35,7 +35,9 @@ class BasePlayer(Gtk.Application):
         <property name="is_playing" type="b" access="read"/>
         <method name='pause_playback'/>
         <method name='start_playback'/>
-        <method name='quit_player'/>
+        <method name='quit_player'>
+            <arg type='b' name='restore_wallpaper' direction='in'/>
+        </method>
     </interface>
     </node>
     """
@@ -146,7 +148,7 @@ class BasePlayer(Gtk.Application):
     def start_playback(self):
         pass
 
-    def quit_player(self):
+    def quit_player(self, restore_wallpaper=True):
         self.quit()
 
 
