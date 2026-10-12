@@ -111,7 +111,13 @@
                 {
                     "type": "archive",
                     "url": "https://github.com/haasn/libplacebo/archive/refs/tags/v0.2.1.tar.gz",
-                    "sha256": "d5d920a1745e4209287d32e8b96a85127b61b843304813980e11104cd9f15e82"
+                    "sha256": "d5d920a1745e4209287d32e8b96a85127b61b843304813980e11104cd9f15e82",
+                    "x-checker-data": {
+                        "type": "json",
+                        "url": "https://api.github.com/repos/haasn/libplacebo/releases/latest",
+                        "version-query": ".tag_name | sub(\"^v\"; \"\")",
+                        "url-query": ".tarball_url"
+                    }
                 }
             ]
         },

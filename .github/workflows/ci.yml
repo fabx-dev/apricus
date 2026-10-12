@@ -4,21 +4,27 @@ on:
   push:
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   lint-test:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      # Pinned by SHA (tags are mutable); update deliberately.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Install system deps (PyGObject + GI typelibs)
         run: |
           sudo apt-get update
           sudo apt-get install -y python3-gi gir1.2-gtk-3.0 gir1.2-gdk-3.0 gir1.2-appindicator3-0.1 gir1.2-gnomedesktop-4.0 gir1.2-wnck-3.0 gir1.2-webkit2-4.1
 
-      - uses: astral-sh/setup-uv@v5
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
 
-      - name: Sync dev environment
-        run: make sync
+      - name: Sync dev environment (frozen to uv.lock)
+        run: |
+          uv venv --system-site-packages
+          uv sync --frozen
 
       - name: Lint
         run: make lint
