@@ -124,7 +124,7 @@ class ControlPanel(Adw.Application):
             brand = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
             brand.append(self._app_logo_image(28))
             brand.append(Gtk.Label(label="Apricus"))
-            header.pack_start(brand)
+            header.set_title_widget(brand)
             # Adw.ApplicationWindow content with a top header bar.
             toolbar = Adw.ToolbarView()
             toolbar.add_top_bar(header)
@@ -293,7 +293,7 @@ class ControlPanel(Adw.Application):
         self.source_row = source_row
         box.append(source_row)
         row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        row.set_halign(Gtk.Align.CENTER)
+        row.set_halign(Gtk.Align.FILL)
         apply_btn = Gtk.Button(label="Apply selected")
         apply_btn.add_css_class("suggested-action")
         apply_btn.set_tooltip_text("Use the selected video as live wallpaper")
@@ -319,6 +319,9 @@ class ControlPanel(Adw.Application):
         self.add_split = add_split
         self.video_selection.connect("selection-changed", self._on_lib_selection)
         row.append(apply_btn)
+        lib_spacer = Gtk.Box()
+        lib_spacer.set_hexpand(True)
+        row.append(lib_spacer)
         row.append(add_split)
         play = Gtk.Button(label="Play/Pause")
         play.set_tooltip_text("Toggle playback")
