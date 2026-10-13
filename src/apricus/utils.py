@@ -41,6 +41,8 @@ from apricus.commons import (
     CONFIG_KEY_MUTE_WHEN_MAXIMIZED,
     CONFIG_KEY_PLAYLIST,
     CONFIG_KEY_SHUFFLE,
+    CONFIG_KEY_STREAM_FAVORITES,
+    CONFIG_KEY_STREAM_HISTORY,
     CONFIG_KEY_VIDEO_DIR,
     CONFIG_KEY_VOLUME,
     CONFIG_PATH,
@@ -559,6 +561,32 @@ class ConfigUtil:
         for key in CONFIG_TEMPLATE[CONFIG_KEY_PLAYLIST]:
             playlist.setdefault(key, [])
 
+    @staticmethod
+    def _sanitize_stream_entries(entries):
+        """Keep at most 30 well-formed history entries, newest first."""
+        clean = []
+        seen = set()
+        for entry in entries or []:
+            if not isinstance(entry, dict):
+                continue
+            url = entry.get("url")
+            if not isinstance(url, str) or not url.startswith(("http://", "https://")):
+                continue
+            if len(url) > 2048 or url in seen:
+                continue
+            seen.add(url)
+            clean.append(
+                {
+                    "url": url,
+                    "title": entry.get("title") or "",
+                    "site": entry.get("site") or "",
+                    "kind": entry.get("kind") or "page",
+                    "last_used": entry.get("last_used") or 0,
+                }
+            )
+        clean.sort(key=lambda e: e["last_used"], reverse=True)
+        return clean[:30]
+
     def _migrateLegacyMonitorKeys(self, config: dict):
         """Move per-monitor sources keyed by bare model to stable keys.
 
@@ -648,6 +676,11 @@ class ConfigUtil:
                 json_str = f.read()
                 try:
                     config = json.loads(json_str)
+                    if config.get("version") is None:
+                        # Key lost (e.g. written by an older writer): the
+                        # shape is current, only the stamp is missing. Stamp
+                        # it instead of crashing or mis-migrating.
+                        config["version"] = CONFIG_VERSION
                     # migration to version 4 for data_source type change
                     if config.get("version") <= 3 and CONFIG_VERSION >= 4:
                         self._migrateV3To4(config)
@@ -658,6 +691,15 @@ class ConfigUtil:
                     # video_dir was added after v4 without a version bump:
                     # default it instead of wiping the whole config.
                     config.setdefault(CONFIG_KEY_VIDEO_DIR, None)
+                    # Stream pick-list, same no-bump policy (sanitized).
+                    config[CONFIG_KEY_STREAM_HISTORY] = self._sanitize_stream_entries(
+                        config.get(CONFIG_KEY_STREAM_HISTORY)
+                    )
+                    config[CONFIG_KEY_STREAM_FAVORITES] = [
+                        u
+                        for u in (config.get(CONFIG_KEY_STREAM_FAVORITES) or [])
+                        if isinstance(u, str) and u.startswith(("http://", "https://"))
+                    ][:50]
                     # blur was removed: drop the legacy key, keep the rest.
                     config.pop(CONFIG_KEY_BLUR_RADIUS, None)
                     self._migrateLegacyMonitorKeys(config)

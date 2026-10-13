@@ -53,6 +53,7 @@ class ApricusServer:
         </method>
         <method name='stream'>
             <arg type='s' name='stream_url' direction='in'/>
+            <arg type='s' name='monitor' direction='in'/>
         </method>
         <method name='webpage'>
             <arg type='s' name='webpage_url' direction='in'/>
@@ -140,8 +141,23 @@ class ApricusServer:
 
         # Set data source if specified
         if data_source is not None:
-            if monitor:
+            if monitor and monitor != "all":
                 self.config[CONFIG_KEY_DATA_SOURCE][monitor] = data_source
+            else:
+                if mode in (MODE_VIDEO, MODE_STREAM):
+                    # "All monitors": refresh every stored key plus every
+                    # live one, not just Default. Stale per-monitor entries
+                    # would otherwise shadow Default in the player's
+                    # key→model→Default priority and the wallpaper would
+                    # never change. (Mirrors playlist() and the GTK3 panel.)
+                    # Note: the server (X11) and the player may enumerate
+                    # monitors under different names, so live keys alone are
+                    # not enough — stored keys must go too.
+                    data = self.config[CONFIG_KEY_DATA_SOURCE]
+                    for key in list(data):
+                        data[key] = data_source
+                    for key in Monitors().get_monitors():
+                        data[key] = data_source
             # always update default source
             self.config[CONFIG_KEY_DATA_SOURCE]["Default"] = data_source
 
@@ -272,9 +288,9 @@ class ApricusServer:
             return
         self._setup_player(MODE_VIDEO, video_path, monitor)
 
-    def stream(self, stream_url=None, dbus_context=None):
+    def stream(self, stream_url=None, monitor="", dbus_context=None):
         _authorize("stream", dbus_context)
-        self._setup_player(MODE_STREAM, stream_url)
+        self._setup_player(MODE_STREAM, stream_url, monitor)
 
     def webpage(self, webpage_url=None, dbus_context=None):
         _authorize("webpage", dbus_context)

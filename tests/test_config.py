@@ -115,3 +115,61 @@ def test_authorize_rejects_foreign_uid(monkeypatch):
     monkeypatch.setattr(U, "_caller_uid", lambda sender: os.getuid() + 999)
     with pytest.raises(PermissionError):
         U._authorize("quit", FakeContext(":1.99"))
+
+
+def test_stream_keys_backfilled_without_version_bump(tmp_path, monkeypatch):
+    """Old configs without stream keys load with empty lists (no wipe)."""
+    from unittest.mock import patch
+
+    from apricus import commons
+    from apricus.utils import ConfigUtil
+
+    new_dir = tmp_path / "apricus"
+    new_dir.mkdir()
+    legacy = dict(commons.CONFIG_TEMPLATE)
+    del legacy["stream_history"]
+    del legacy["stream_favorites"]
+    (new_dir / "config.json").write_text(json.dumps(legacy))
+    monkeypatch.setattr(commons, "CONFIG_DIR", str(new_dir))
+    monkeypatch.setattr(commons, "CONFIG_PATH", str(new_dir / "config.json"))
+    import apricus.utils as U
+
+    monkeypatch.setattr(U, "CONFIG_DIR", str(new_dir))
+    monkeypatch.setattr(U, "CONFIG_PATH", str(new_dir / "config.json"))
+
+    with patch("apricus.monitor.MonitorInfo.monitors", return_value=[]):
+        loaded = ConfigUtil().load()
+    assert loaded["stream_history"] == []
+    assert loaded["stream_favorites"] == []
+    assert loaded["version"] == commons.CONFIG_VERSION
+
+
+def test_load_versionless_modern_config_stamps_and_keeps_data(tmp_path, monkeypatch):
+    """A current-shape config that lost its version stamp must load (not
+    raise TypeError) and keep user data instead of mis-migrating."""
+    from unittest.mock import patch
+
+    from apricus import commons
+    from apricus.utils import ConfigUtil
+
+    new_dir = tmp_path / "apricus"
+    new_dir.mkdir()
+    videos = tmp_path / "v"
+    videos.mkdir()
+    versionless = dict(commons.CONFIG_TEMPLATE)
+    del versionless["version"]
+    versionless["video_dir"] = str(videos)
+    versionless["audio_volume"] = 50
+    (new_dir / "config.json").write_text(json.dumps(versionless))
+    monkeypatch.setattr(commons, "CONFIG_DIR", str(new_dir))
+    monkeypatch.setattr(commons, "CONFIG_PATH", str(new_dir / "config.json"))
+    import apricus.utils as U
+
+    monkeypatch.setattr(U, "CONFIG_DIR", str(new_dir))
+    monkeypatch.setattr(U, "CONFIG_PATH", str(new_dir / "config.json"))
+
+    with patch("apricus.monitor.MonitorInfo.monitors", return_value=[]):
+        loaded = ConfigUtil().load()
+    assert loaded["version"] == commons.CONFIG_VERSION
+    assert loaded["video_dir"] == str(videos)
+    assert loaded["audio_volume"] == 50

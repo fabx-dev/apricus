@@ -110,6 +110,41 @@ def make_factory():
     return factory
 
 
+def load_texture_async(video, callback, width=192):
+    """Decode a thumbnail for *video* off-thread, then call
+    ``callback(texture_or_None)`` on the GTK main loop.
+
+    The caller owns staleness checks (recycled rows): capture the bound
+    path and ignore the callback when it no longer matches.
+    """
+
+    def _emit(texture):
+        callback(texture)
+        return False
+
+    if video.texture is not None:
+        GLib.idle_add(_emit, video.texture)
+        return
+
+    def _done(future):
+        def _apply():
+            try:
+                pixbuf = future.result()
+            except Exception as e:  # noqa: BLE001 - best effort
+                logger.debug("[GTK4Thumb] %s: %s", os.path.basename(video.path), e)
+                return False
+            texture = None
+            if pixbuf is not None:
+                texture = Gdk.Texture.new_for_pixbuf(pixbuf)
+                video.texture = texture
+            callback(texture)
+            return False
+
+        GLib.idle_add(_apply)
+
+    _pool.submit(lambda: _load_pixbuf(video.path, width)).add_done_callback(_done)
+
+
 def build_store(video_paths):
     store = Gio.ListStore.new(VideoItem)
     for path in video_paths:

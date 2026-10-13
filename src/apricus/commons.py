@@ -76,6 +76,8 @@ CONFIG_KEY_FIRST_TIME = "is_first_time"
 CONFIG_KEY_VIDEO_DIR = "video_dir"
 CONFIG_KEY_PLAYLIST = "playlist"
 CONFIG_KEY_SHUFFLE = "playlist_shuffle"
+CONFIG_KEY_STREAM_HISTORY = "stream_history"
+CONFIG_KEY_STREAM_FAVORITES = "stream_favorites"
 CONFIG_TEMPLATE = {
     CONFIG_KEY_VERSION: CONFIG_VERSION,
     CONFIG_KEY_MODE: MODE_NULL,
@@ -96,6 +98,11 @@ CONFIG_TEMPLATE = {
     # back to "Default". Shuffled order is computed at apply time.
     CONFIG_KEY_PLAYLIST: None,
     CONFIG_KEY_SHUFFLE: False,
+    # Stream pick-list (no version bump: backfilled like video_dir).
+    # History entries: {url, title, site, kind, last_used}.
+    CONFIG_KEY_STREAM_HISTORY: [],
+    # Favorite stream URLs (subset worth pinning, newest first).
+    CONFIG_KEY_STREAM_FAVORITES: [],
 }
 
 

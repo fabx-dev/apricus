@@ -577,28 +577,33 @@ class VideoPlayer(BasePlayer):
                 window.centercrop(*dims)
 
         elif self.mode == MODE_STREAM:
-            source = data_source["Default"]
-            try:
-                formats = get_formats(source)
-            except Exception as e:
-                logger.warning(f"[Stream] Cannot resolve {source}: {e}")
-                return
-            max_height = (
-                max(self.windows, key=lambda m: m.get_geometry().height).get_geometry().height
-            )
-            video_url, video_width, video_height = get_optimal_video(formats, max_height)
-            audio_url = get_best_audio(formats)
-
+            by_source = {}
             for monitor, window in self.windows.items():
-                media = window.media_new(video_url)
-                media.add_option("input-repeat=65535")
-                window.set_media(media)
-                if monitor.is_primary():
-                    window.add_audio_track(audio_url)
-                else:
-                    # `get_optimal_video` now might return video with audio.
-                    media.add_option("no-audio")
-                window.centercrop(video_width, video_height)
+                mkey = key_of.get(id(monitor), monitor.get_model())
+                source, _srckey = self._source_for(data_source, mkey, monitor.get_model())
+                by_source.setdefault(source, []).append((monitor, window))
+            for source, targets in by_source.items():
+                if not source:
+                    continue
+                try:
+                    formats = get_formats(source)
+                except Exception as e:
+                    logger.warning(f"[Stream] Cannot resolve {source}: {e}")
+                    continue
+                max_height = max(m.get_geometry().height for m, _ in targets)
+                video_url, video_width, video_height = get_optimal_video(formats, max_height)
+                audio_url = get_best_audio(formats)
+
+                for monitor, window in targets:
+                    media = window.media_new(video_url)
+                    media.add_option("input-repeat=65535")
+                    window.set_media(media)
+                    if monitor.is_primary():
+                        window.add_audio_track(audio_url)
+                    else:
+                        # `get_optimal_video` now might return video with audio.
+                        media.add_option("no-audio")
+                    window.centercrop(video_width, video_height)
         elif self.mode == MODE_PLAYLIST:
             playlist = self.config.get(CONFIG_KEY_PLAYLIST) or {}
             shuffle = bool(self.config.get(CONFIG_KEY_SHUFFLE))
