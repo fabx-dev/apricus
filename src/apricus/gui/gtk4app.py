@@ -39,6 +39,8 @@ from apricus.commons import (
     CONFIG_KEY_STREAM_HISTORY,
     CONFIG_KEY_VIDEO_DIR,
     CONFIG_KEY_VOLUME,
+    CONFIG_KEY_WEB_FAVORITES,
+    CONFIG_KEY_WEB_HISTORY,
     DBUS_NAME_SERVER,
     LOGGER_NAME,
     MODE_NULL,
@@ -207,6 +209,11 @@ class ControlPanel(Adw.Application):
             b".np-eq-bar:nth-child(6) { animation-delay: 0.75s; }"
             b".np-eq-bar:nth-child(7) { animation-delay: 0.9s; }"
             b"@keyframes np-eq { from { opacity: 0.35; } to { opacity: 1; } }"
+            b".web-hero { background-image: linear-gradient(to bottom, "
+            b"alpha(@accent_bg_color, 0.55), alpha(black, 0.75)); "
+            b"border-radius: 12px; padding: 32px; }"
+            b".web-hero .title-4 { color: white; }"
+            b".web-hero .dim-label { color: alpha(white, 0.85); }"
         )
         Gtk.StyleContext.add_provider_for_display(
             Gdk.Display.get_default(), css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
@@ -235,6 +242,8 @@ class ControlPanel(Adw.Application):
             self.stack.set_visible_child_name(row.get_name())
             if row.get_name() == "streaming":
                 self._reload_stream_lists()
+            elif row.get_name() == "webpage":
+                self._reload_web_lists()
 
     def _select_section(self, name):
         names = [section for section, _, _ in self.SECTIONS]
@@ -380,11 +389,11 @@ class ControlPanel(Adw.Application):
             row.set_title("No folder chosen")
             row.set_subtitle("Choose the folder scanned for local videos")
         else:
-            row.set_title(os.path.basename(video_dir) or video_dir)
+            row.set_title(self._plain(os.path.basename(video_dir) or video_dir))
             subtitle = video_dir
             if n_videos is not None:
                 subtitle += f" — {n_videos} videos"
-            row.set_subtitle(subtitle)
+            row.set_subtitle(self._plain(subtitle))
 
     def _show_server_missing(self):
         self._show_error("Background service unreachable.\nStart Apricus to apply wallpapers.")
@@ -919,6 +928,14 @@ class ControlPanel(Adw.Application):
         clamp.set_child(box)
         return clamp
 
+    @staticmethod
+    def _scroll_page(widget):
+        scrolled = Gtk.ScrolledWindow()
+        scrolled.set_vexpand(True)
+        scrolled.set_hexpand(True)
+        scrolled.set_child(widget)
+        return scrolled
+
     def _now_playing_page(self):
         from gi.repository import Pango
 
@@ -1045,7 +1062,7 @@ class ControlPanel(Adw.Application):
         self.np_empty.add_css_class("compact")
         box.append(self.np_empty)
         self.np_empty.set_child(open_lib_btn)
-        return self._clamp_page(box, 800)
+        return self._scroll_page(self._clamp_page(box, 800))
 
     @staticmethod
     def _np_picture():
@@ -1255,6 +1272,34 @@ class ControlPanel(Adw.Application):
             threading.Thread(
                 target=self._info_np_stream, args=(current, generation), daemon=True
             ).start()
+        elif mode == MODE_WEBPAGE and current:
+            group.set_visible(True)
+            rows = self.np_detail_rows
+            is_file = "://" not in current
+            rows["line1"].set_title("Title")
+            rows["line2"].set_title("Site")
+            rows["line3"].set_title("Link")
+            rows["line4"].set_title("Type")
+            if is_file:
+                rows["line1"].set_subtitle(os.path.basename(current))
+                try:
+                    size = os.path.getsize(current)
+                except OSError:
+                    size = None
+                rows["line2"].set_subtitle("Local file")
+                rows["line3"].set_subtitle(current)
+                rows["line4"].set_subtitle(
+                    f"Web page — {self._format_file_size(size)}" if size is not None else "Web page"
+                )
+            else:
+                rows["line1"].set_subtitle("…")
+                rows["line2"].set_subtitle(self._display_source(current))
+                rows["line3"].set_subtitle(current)
+                rows["line4"].set_subtitle("Web page")
+                generation = self.np_generation
+                threading.Thread(
+                    target=self._fetch_np_web_title, args=(current, generation), daemon=True
+                ).start()
         else:
             group.set_visible(False)
 
@@ -1337,8 +1382,8 @@ class ControlPanel(Adw.Application):
             row = self.np_detail_rows.get(key)
             if row is None:
                 continue
-            row.set_title(title)
-            row.set_subtitle(subtitle)
+            row.set_title(self._plain(title))
+            row.set_subtitle(self._plain(subtitle))
             icon = getattr(self, "np_detail_icons", {}).get(key)
             if icon is not None:
                 icon.set_from_icon_name(icon_name)
@@ -1349,6 +1394,28 @@ class ControlPanel(Adw.Application):
         folder_btn = getattr(self, "np_folder_btn", None)
         if folder_btn is not None:
             folder_btn.set_visible(folder_path is not None)
+        return False
+
+    def _fetch_np_web_title(self, url, generation):
+        title = ""
+        try:
+            response = requests.get(url, timeout=10, stream=True)
+            body = b"".join(response.iter_content(65536))[:65536]
+            response.close()
+            title = self._extract_html_title(body)
+        except requests.exceptions.RequestException as e:
+            logger.debug(f"[GUI4] Web title fetch failed for {url}: {e}")
+        GLib.idle_add(self._apply_np_web_title, generation, url, title)
+
+    def _apply_np_web_title(self, generation, url, title):
+        if generation != getattr(self, "np_generation", generation):
+            return False
+        current = (self.config.get(CONFIG_KEY_DATA_SOURCE) or {}).get("Default", "")
+        if current != url or not title:
+            return False
+        row = getattr(self, "np_detail_rows", {}).get("line1")
+        if row is not None:
+            row.set_subtitle(self._plain(title))
         return False
 
     def _refresh_np_queue(self, mode):
@@ -1370,7 +1437,7 @@ class ControlPanel(Adw.Application):
 
         for pos, path in enumerate(queue[:3]):
             row = Adw.ActionRow()
-            row.set_title(os.path.basename(path))
+            row.set_title(self._plain(os.path.basename(path)))
             row.set_subtitle(f"n. {pos + 1} di {len(queue)}")
             thumb = Gtk.Picture()
             thumb.set_size_request(96, 54)
@@ -1407,6 +1474,11 @@ class ControlPanel(Adw.Application):
         return label
 
     @staticmethod
+    def _plain(text):
+        """Escape for Adw row titles/subtitles (they parse Pango markup)."""
+        return GLib.markup_escape_text(str(text or ""))
+
+    @staticmethod
     def _display_source(source):
         """Short readable form: basename for files, domain for URLs."""
         if "://" in source:
@@ -1419,15 +1491,58 @@ class ControlPanel(Adw.Application):
                 return source
         return os.path.basename(source) or source
 
+    # Both content pages must measure identically: their children differ
+    # (web has file row + chips), so without an explicit floor the narrower
+    # page would collapse and the heroes would render at different widths.
+    PAGE_MIN_WIDTH = 600
+
+    def _build_hero(self, icon_name, title, subtitle):
+        """Shared Streaming/Web Page hero: identical structure and geometry.
+
+        Frame.card > Box.web-hero (VERTICAL, spacing 8, FILL) >
+        Image 32px + Label.title-4 (xalign 0, ellipsize END) +
+        Label.dim (xalign 0, ellipsize END). Only the contents differ
+        per page; never the structure, so the two heroes cannot drift.
+        """
+        from gi.repository import Pango
+
+        hero = Gtk.Frame()
+        hero.add_css_class("card")
+        hero_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        hero_box.add_css_class("web-hero")
+        hero_box.set_halign(Gtk.Align.FILL)
+        icon = Gtk.Image.new_from_icon_name(icon_name)
+        icon.set_pixel_size(45)
+        hero_box.append(icon)
+        title_label = Gtk.Label(label=title)
+        title_label.add_css_class("title-4")
+        title_label.set_xalign(0)
+        title_label.set_ellipsize(Pango.EllipsizeMode.END)
+        hero_box.append(title_label)
+        sub_label = Gtk.Label(label=subtitle)
+        sub_label.add_css_class("dim-label")
+        sub_label.set_xalign(0)
+        sub_label.set_ellipsize(Pango.EllipsizeMode.END)
+        hero_box.append(sub_label)
+        hero.set_child(hero_box)
+        return hero, {"icon": icon, "title": title_label, "sub": sub_label}
+
     def _streaming_page(self):
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        box.set_size_request(self.PAGE_MIN_WIDTH, -1)
         box.set_margin_top(24)
         box.set_margin_bottom(24)
         box.set_margin_start(24)
         box.set_margin_end(24)
-        title = Gtk.Label(label="Streaming")
-        title.set_xalign(0)
-        box.append(title)
+        hero, refs = self._build_hero(
+            "network-wireless-symbolic",
+            "Streaming",
+            "Paste a link to stream it as wallpaper",
+        )
+        self.stream_hero_icon = refs["icon"]
+        self.stream_hero_title = refs["title"]
+        self.stream_hero_sub = refs["sub"]
+        box.append(hero)
         self.stream_entry = Gtk.Entry()
         self.stream_entry.set_placeholder_text("https://… — YouTube, Twitch, live, direct video")
         self.stream_entry.set_icon_from_icon_name(
@@ -1444,23 +1559,26 @@ class ControlPanel(Adw.Application):
         self.stream_entry.connect("changed", self._on_stream_entry_changed)
         box.append(self.stream_entry)
         self.stream_type_row = Adw.ActionRow()
-        self.stream_type_row.set_title("Detected type")
+        self.stream_type_row.set_title("Detected")
         self.stream_type_row.set_subtitle("Paste a link to detect its type")
         self.stream_type_icon = Gtk.Image.new_from_icon_name("web-browser-symbolic")
         self.stream_type_row.add_prefix(self.stream_type_icon)
+        self.stream_type_spinner = Gtk.Spinner()
+        self.stream_type_spinner.set_valign(Gtk.Align.CENTER)
+        self.stream_type_row.add_suffix(self.stream_type_spinner)
         box.append(self.stream_type_row)
         row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        row.set_halign(Gtk.Align.CENTER)
-        try_btn = Gtk.Button(label="Try 10s")
-        try_btn.set_tooltip_text("Preview for 10 seconds, then pause")
-        try_btn.connect("clicked", self.on_stream_try)
-        row.append(try_btn)
+        row.set_halign(Gtk.Align.FILL)
         apply_btn = Gtk.Button(label="Apply")
         apply_btn.add_css_class("suggested-action")
         apply_btn.connect("clicked", self.on_stream_apply)
         row.append(apply_btn)
-        box.append(row)
         self.stream_apply_btn = apply_btn
+        try_btn = Gtk.Button(label="Try 10s")
+        try_btn.set_tooltip_text("Preview for 10 seconds, then pause")
+        try_btn.connect("clicked", self.on_stream_try)
+        row.append(try_btn)
+        box.append(row)
         self.saved_group = Adw.PreferencesGroup()
         self.saved_group.set_title("Saved sources")
         self.saved_list = Gtk.ListBox()
@@ -1500,7 +1618,7 @@ class ControlPanel(Adw.Application):
         box.add_controller(drop_text)
         self._update_stream_type()
         self._reload_stream_lists()
-        return self._clamp_page(box)
+        return self._scroll_page(self._clamp_page(box))
 
     def _on_stream_icon_press(self, entry, position):
         if position == Gtk.EntryIconPosition.SECONDARY:
@@ -1521,26 +1639,206 @@ class ControlPanel(Adw.Application):
 
     def _on_stream_entry_changed(self, _entry):
         self._update_stream_type()
+        url = self.stream_entry.get_text().strip()
+        host = self._stream_site(url) if url else ""
+        if host == getattr(self, "_favicon_host", None):
+            return  # same host: keep the current icon, never clobber it
+        self._favicon_host = host
+        self._favicon_generation = getattr(self, "_favicon_generation", 0) + 1
+        if not host:
+            self._set_favicon_state("idle")
+            return
+        cached = self._cached_favicon(host)
+        if cached is not None:
+            self._set_favicon_state("ok", cached)
+            return
+        self._set_favicon_state("verifying")
+        threading.Thread(
+            target=self._fetch_favicon,
+            args=(host, url, self._favicon_generation),
+            daemon=True,
+        ).start()
+
+    def _set_favicon_state(self, state, path=None, reason=""):
+        """Favicon state machine: idle / verifying / ok / fallback.
+
+        Transitions are INFO-logged so a missing icon is always diagnosable;
+        a valid favicon is never replaced except by a host change (above).
+        """
+        self._favicon_state = state
+        icon = getattr(self, "stream_type_icon", None)
+        spinner = getattr(self, "stream_type_spinner", None)
+        if icon is None:
+            return
+        if state == "ok" and path:
+            icon.set_from_file(path)
+            logger.info(f"[GUI4] Favicon ok for {getattr(self, '_favicon_host', '')}")
+        else:
+            icon.set_from_icon_name(self._stream_kind_icon())
+            if spinner is not None:
+                spinner.set_spinning(state == "verifying")
+            if state == "fallback":
+                logger.info(f"[GUI4] Favicon fallback: {reason or 'unavailable'}")
+
+    def _stream_kind_icon(self):
+        entry = getattr(self, "stream_entry", None)
+        url = entry.get_text().strip() if entry is not None else ""
+        kind = self._classify_stream_url(url) if url else "invalid"
+        return self.STREAM_KIND_ICONS.get(kind, "web-browser-symbolic")
+
+    @staticmethod
+    def _favicon_path(host):
+        safe = re.sub(r"[^a-z0-9.-]", "_", (host or "").lower())[:100]
+        return os.path.join(GLib.get_user_cache_dir(), "apricus", "favicons", f"{safe}.png")
+
+    def _cached_favicon(self, host):
+        if not host:
+            return None
+        path = self._favicon_path(host)
+        try:
+            if os.path.isfile(path) and time.time() - os.path.getmtime(path) < 30 * 86400:
+                return path
+        except OSError:
+            pass
+        return None
+
+    @staticmethod
+    def _favicon_magic_ok(data):
+        """True for PNG, ICO, GIF or JPEG magic bytes."""
+        if not data:
+            return False
+        return data[:8].startswith(
+            (
+                b"\x89PNG\r\n\x1a\n",
+                b"\x00\x00\x01\x00",
+                b"GIF8",
+                b"\xff\xd8\xff",
+            )
+        )
+
+    def _download_favicon(self, host):
+        """Fetch + validate + normalize a favicon. Sync: call off main thread.
+
+        Returns (path_or_None, reason) where reason is "ok", "http_NNN",
+        "bad_content_type", "empty", "bad_magic", "decode_failed",
+        "timeout", "connection" or "error". Only transient reasons
+        (timeout, connection, http_5xx) deserve a retry.
+        """
+        url = f"https://{host}/favicon.ico"
+        try:
+            response = requests.get(url, timeout=8, stream=True)
+            status = response.status_code
+            content_type = response.headers.get("Content-Type", "")
+            data = b"".join(response.iter_content(65536))[:102400]
+            response.close()
+        except requests.exceptions.Timeout:
+            return None, "timeout"
+        except requests.exceptions.ConnectionError:
+            return None, "connection"
+        except (requests.exceptions.RequestException, OSError) as e:
+            logger.debug(f"[GUI4] Favicon download failed for {host}: {e}")
+            return None, "error"
+        if status != 200:
+            reason = f"http_{status}"
+            if 500 <= status < 600:
+                reason = "transient_http_5xx"
+            return None, reason
+        if "image" not in content_type:
+            return None, "bad_content_type"
+        if not data:
+            return None, "empty"
+        if not self._favicon_magic_ok(data):
+            return None, "bad_magic"
+        try:
+            from gi.repository import GdkPixbuf
+
+            loader = GdkPixbuf.PixbufLoader.new()
+            loader.write_bytes(GLib.Bytes(data))
+            loader.close()
+            pixbuf = loader.get_pixbuf()
+            if pixbuf is None:
+                return None, "decode_failed"
+            width = pixbuf.get_width()
+            height = pixbuf.get_height()
+            if width > 32:
+                scaled_height = max(1, height * 32 // width)
+                pixbuf = pixbuf.scale_simple(32, scaled_height, GdkPixbuf.InterpType.BILINEAR)
+            out = self._favicon_path(host)
+            os.makedirs(os.path.dirname(out), exist_ok=True)
+            pixbuf.savev(out, "png", [], [])
+        except Exception as e:  # noqa: BLE001 - decode/save failure means fallback
+            logger.debug(f"[GUI4] Favicon decode failed for {host}: {e}")
+            return None, "decode_failed"
+        return out, "ok"
+
+    def _fetch_favicon(self, host, url, generation):
+        path, reason = self._download_favicon(host)
+        if path is None and reason in ("timeout", "connection", "transient_http_5xx"):
+            logger.info(f"[GUI4] Favicon retry for {host} after {reason}")
+            path, reason = self._download_favicon(host)
+        if path is None:
+            logger.info(f"[GUI4] Favicon fallback for {host}: {reason}")
+        else:
+            logger.info(f"[GUI4] Favicon ok for {host}")
+        GLib.idle_add(self._apply_favicon, url, generation, path, reason)
+
+    def _apply_favicon(self, url, generation, path, reason=""):
+        if generation != getattr(self, "_favicon_generation", generation):
+            logger.info(f"[GUI4] Favicon stale generation for {url}, keeping current icon")
+            return False
+        entry = getattr(self, "stream_entry", None)
+        if entry is None or entry.get_text().strip() != url:
+            logger.info("[GUI4] Favicon entry changed, keeping current icon")
+            return False
+        if not path:
+            self._set_favicon_state("fallback", reason=reason)
+            return False
+        self._set_favicon_state("ok", path=path)
+        return False
 
     def _update_stream_type(self):
-        icon = getattr(self, "stream_type_icon", None)
+        """Subtitle + hero only. Never touches the type icon: the favicon
+        state machine owns it, so a valid favicon survives retyping."""
         row = getattr(self, "stream_type_row", None)
-        if icon is None or row is None:
+        if row is None:
             return
         url = self.stream_entry.get_text().strip()
         if not url:
-            icon.set_from_icon_name("web-browser-symbolic")
             row.set_subtitle("Paste a link to detect its type")
+            self._update_stream_hero("", "")
             return
         kind = self._classify_stream_url(url)
-        icon.set_from_icon_name(self.STREAM_KIND_ICONS.get(kind, "web-browser-symbolic"))
-        row.set_subtitle(
+        service = self._service_name(url)
+        if kind == "direct":
+            subtitle = "Direct video — plays without extraction"
+        elif kind == "page":
+            subtitle = (
+                f"{service} — {self._stream_site(url)}"
+                if service
+                else (f"Streaming page via yt-dlp — {self._stream_site(url)}")
+            )
+        elif kind == "collection":
+            subtitle = "Playlist or channel — only single videos play"
+        else:
+            subtitle = "Not a valid http(s) URL"
+        row.set_subtitle(self._plain(subtitle))
+        self._update_stream_hero(url, kind)
+
+    def _update_stream_hero(self, url, kind):
+        if getattr(self, "stream_hero_title", None) is None:
+            return
+        if not url or kind in ("invalid",):
+            self.stream_hero_title.set_text("Streaming")
+            self.stream_hero_sub.set_text("Paste a link to stream it as wallpaper")
+            return
+        domain = self._stream_site(url)
+        self.stream_hero_title.set_text(domain or "Streaming")
+        self.stream_hero_sub.set_text(
             {
-                "direct": "Direct video — plays without extraction",
-                "page": f"Streaming page via yt-dlp — {self._stream_site(url)}",
-                "collection": "Playlist or channel — only single videos play",
-                "invalid": "Not a valid http(s) URL",
-            }.get(kind, "")
+                "direct": "Direct video",
+                "page": "Streaming page",
+                "collection": "Playlist link",
+            }.get(kind, "Streaming")
         )
 
     def _stream_row_title(self, entry):
@@ -1566,12 +1864,13 @@ class ControlPanel(Adw.Application):
         url = entry["url"]
         row = Adw.ActionRow()
         row.set_name(url)
-        row.set_title(self._stream_row_title(entry))
-        row.set_subtitle(url)
-        kind_icon = Gtk.Image.new_from_icon_name(
-            self.STREAM_KIND_ICONS.get(entry.get("kind") or "page", "web-browser-symbolic")
-        )
-        row.add_prefix(kind_icon)
+        row.set_title(self._plain(self._stream_row_title(entry)))
+        row.set_subtitle(self._plain(url))
+        mono = self._web_monogram(self._stream_site(url))
+        avatar = Adw.Avatar(text=mono, size=32)
+        avatar.set_show_initials(bool(mono))
+        avatar.set_tooltip_text(self._stream_site(url))
+        row.add_prefix(avatar)
         star = Gtk.ToggleButton()
         star.add_css_class("flat")
         star.set_icon_name("starred-symbolic" if favorite else "non-starred-symbolic")
@@ -1747,6 +2046,31 @@ class ControlPanel(Adw.Application):
         "collection": "view-list-symbolic",
     }
 
+    SERVICE_NAMES = (
+        (("youtube.com", "youtu.be", "youtube-nocookie.com"), "YouTube"),
+        (("twitch.tv",), "Twitch"),
+        (("vimeo.com", "player.vimeo.com"), "Vimeo"),
+        (("dailymotion.com", "dai.ly"), "Dailymotion"),
+        (("kick.com",), "Kick"),
+        (("facebook.com", "fb.watch"), "Facebook"),
+        (("tiktok.com",), "TikTok"),
+        (("x.com", "twitter.com"), "X"),
+    )
+
+    @staticmethod
+    def _service_name(url):
+        try:
+            from urllib.parse import urlparse
+
+            host = (urlparse(url).hostname or "").lower()
+        except Exception:  # noqa: BLE001 - unknown service
+            return ""
+        host = re.sub(r"^(www|m|music|gaming)\.", "", host)
+        for suffixes, name in ControlPanel.SERVICE_NAMES:
+            if any(host == suffix or host.endswith("." + suffix) for suffix in suffixes):
+                return name
+        return ""
+
     @staticmethod
     def _classify_stream_url(url):
         """direct (playable file) / page (extract via yt-dlp) /
@@ -1812,6 +2136,41 @@ class ControlPanel(Adw.Application):
         self._save_stream_data(history, favorites)
         self._reload_stream_lists()
 
+    def _load_web_data(self):
+        config = getattr(self, "config", None) or {}
+        history = ConfigUtil._sanitize_web_entries(config.get(CONFIG_KEY_WEB_HISTORY))
+        favorites = [u for u in (config.get(CONFIG_KEY_WEB_FAVORITES) or []) if isinstance(u, str)]
+        return history, favorites
+
+    def _save_web_data(self, history, favorites):
+        self.config = ConfigUtil().load()
+        self.config[CONFIG_KEY_WEB_HISTORY] = ConfigUtil._sanitize_web_entries(history)
+        self.config[CONFIG_KEY_WEB_FAVORITES] = list(dict.fromkeys(favorites))[:50]
+        ConfigUtil().save(self.config)
+
+    def _record_web_use(self, url, title=""):
+        history, favorites = self._load_web_data()
+        history = [e for e in history if e["url"] != url]
+        history.insert(
+            0,
+            {
+                "url": url,
+                "title": title,
+                "site": self._web_domain(url),
+                "last_used": time.time(),
+            },
+        )
+        self._save_web_data(history, favorites)
+
+    def _toggle_web_favorite(self, url):
+        history, favorites = self._load_web_data()
+        if url in favorites:
+            favorites.remove(url)
+        else:
+            favorites.insert(0, url)
+        self._save_web_data(history, favorites)
+        self._reload_web_lists()
+
     def _check_stream_url(self, url):
         """Validate a streaming URL with yt-dlp; None when valid, else error."""
         try:
@@ -1847,6 +2206,12 @@ class ControlPanel(Adw.Application):
         except requests.exceptions.RequestException:
             return "fallback"
 
+    def _set_apply_busy(self, button, busy):
+        if button is None:
+            return
+        button.set_sensitive(not busy)
+        button.set_label("Checking…" if busy else "Apply")
+
     def on_stream_apply(self, *_args):
         url = self.stream_entry.get_text().strip()
         if not url:
@@ -1858,6 +2223,7 @@ class ControlPanel(Adw.Application):
         if kind == "collection":
             self._show_collection_warning(url)
             return
+        self._set_apply_busy(getattr(self, "stream_apply_btn", None), True)
         threading.Thread(target=self._validate_and_stream, args=(url, kind), daemon=True).start()
 
     def _show_collection_warning(self, url):
@@ -1892,6 +2258,7 @@ class ControlPanel(Adw.Application):
         GLib.idle_add(self._finish_stream_apply, url, error, kind)
 
     def _finish_stream_apply(self, url, error, kind="page"):
+        self._set_apply_busy(getattr(self, "stream_apply_btn", None), False)
         if error is not None:
             logger.error(f"[GUI4] Failed to stream {url}. Error:\n{error}")
             self._show_error(f"Failed to stream {url}.\nError:\n{error}")
@@ -1934,31 +2301,562 @@ class ControlPanel(Adw.Application):
         target = "all monitors" if not monitor else monitor
         self._toast(f"Streaming on {target}")
 
+    WEB_EXAMPLES = (
+        ("Windy", "https://www.windy.com/", "Live weather map"),
+        ("Earth", "https://earth.nullschool.net/", "Live earth data"),
+        ("Attacks", "https://www.digitalattackmap.com/", "Live cyber attacks"),
+        ("Bitcoin", "https://bitcoin.clarkmoody.com/", "Live market dashboard"),
+        ("Lightning", "https://www.lightningmaps.org/", "Live lightning map"),
+        ("Silk", "https://weavesilk.com/", "Interactive silk art"),
+    )
+
+    @staticmethod
+    def _web_domain(url):
+        try:
+            from urllib.parse import urlparse
+
+            return urlparse(url).hostname or ""
+        except Exception:  # noqa: BLE001 - no domain deducible
+            return ""
+
+    @staticmethod
+    def _web_monogram(domain):
+        import re
+
+        parts = [p for p in re.split(r"[^a-z0-9]", (domain or "").lower()) if p]
+        while parts and parts[0] in ("www", "m", "mobile"):
+            parts.pop(0)
+        if not parts:
+            return ""
+        if len(parts) == 1:
+            return parts[0][:2].upper()
+        return (parts[0][:1] + parts[1][:1]).upper()
+
+    @staticmethod
+    def _extract_html_title(data):
+        import html
+        import re
+
+        try:
+            text = bytes(data)[:65536].decode("utf-8", "ignore")
+        except Exception:  # noqa: BLE001 - undecodable body
+            return ""
+        match = re.search(r"<title[^>]*>(.*?)</title>", text, re.IGNORECASE | re.DOTALL)
+        if not match:
+            return ""
+        return re.sub(r"\s+", " ", html.unescape(match.group(1))).strip()[:200]
+
+    @staticmethod
+    def _format_file_size(size):
+        try:
+            size = int(size)
+        except (TypeError, ValueError):
+            return "—"
+        if size < 1024:
+            return f"{size} B"
+        if size < 1024 * 1024:
+            return f"{size / 1024:.0f} KB"
+        return f"{size / (1024 * 1024):.1f} MB"
+
     def _webpage_page(self):
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        box.set_size_request(self.PAGE_MIN_WIDTH, -1)
         box.set_margin_top(24)
         box.set_margin_bottom(24)
         box.set_margin_start(24)
         box.set_margin_end(24)
-        title = Gtk.Label(label="Web Page")
-        title.set_xalign(0)
-        box.append(title)
+        self._web_generation = 0
+        hero, refs = self._build_hero(
+            "web-browser-symbolic",
+            "Web Page",
+            "Display a website or HTML file as wallpaper",
+        )
+        self.web_hero_icon = refs["icon"]
+        self.web_hero_title = refs["title"]
+        self.web_hero_sub = refs["sub"]
+        box.append(hero)
         self.webpage_entry = Gtk.Entry()
-        self.webpage_entry.set_placeholder_text("https://www.google.com/")
+        self.webpage_entry.set_placeholder_text("https://example.com")
+        self.webpage_entry.set_icon_from_icon_name(
+            Gtk.EntryIconPosition.PRIMARY, "web-browser-symbolic"
+        )
+        self.webpage_entry.set_icon_from_icon_name(
+            Gtk.EntryIconPosition.SECONDARY, "edit-paste-symbolic"
+        )
+        self.webpage_entry.set_icon_tooltip_text(
+            Gtk.EntryIconPosition.SECONDARY, "Paste from clipboard"
+        )
         self.webpage_entry.connect("activate", self.on_webpage_apply)
+        self.webpage_entry.connect("icon-press", self._on_webpage_icon_press)
+        self.webpage_entry.connect("changed", self._on_webpage_entry_changed)
         box.append(self.webpage_entry)
+        self.web_detect_row = Adw.ActionRow()
+        self.web_detect_row.set_title("Detected")
+        self.web_detect_row.set_subtitle("Paste a link to detect its type")
+        self.web_detect_icon = Gtk.Image.new_from_icon_name("web-browser-symbolic")
+        self.web_detect_row.add_prefix(self.web_detect_icon)
+        self.web_detect_spinner = Gtk.Spinner()
+        self.web_detect_spinner.set_valign(Gtk.Align.CENTER)
+        self.web_detect_row.add_suffix(self.web_detect_spinner)
+        box.append(self.web_detect_row)
         row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        row.set_halign(Gtk.Align.CENTER)
+        row.set_halign(Gtk.Align.FILL)
         apply_btn = Gtk.Button(label="Apply")
         apply_btn.add_css_class("suggested-action")
         apply_btn.connect("clicked", self.on_webpage_apply)
-        local_btn = Gtk.Button(label="Local HTML file…")
-        local_btn.set_tooltip_text("Choose a HTML file on this PC")
-        local_btn.connect("clicked", self.on_webpage_choose_file)
+        open_btn = Gtk.Button(label="Open in browser")
+        open_btn.set_tooltip_text("Open the entered address in the browser")
+        open_btn.connect("clicked", self.on_webpage_open_browser)
         row.append(apply_btn)
-        row.append(local_btn)
+        row.append(open_btn)
         box.append(row)
-        return self._clamp_page(box)
+        self.webpage_apply_btn = apply_btn
+        file_group = Adw.PreferencesGroup()
+        file_group.set_title("Local file")
+        self.web_file_row = Adw.ActionRow()
+        self.web_file_row.set_title("No file chosen")
+        self.web_file_row.set_subtitle("Choose an HTML file on this PC")
+        file_icon = Gtk.Image.new_from_icon_name("x-office-document-symbolic")
+        self.web_file_row.add_prefix(file_icon)
+        choose_btn = Gtk.Button(label="Choose…")
+        choose_btn.set_tooltip_text("Choose local HTML file")
+        choose_btn.set_valign(Gtk.Align.CENTER)
+        choose_btn.connect("clicked", self.on_webpage_choose_file)
+        self.web_file_row.add_suffix(choose_btn)
+        folder_btn = Gtk.Button()
+        folder_btn.set_icon_name("folder-open-symbolic")
+        folder_btn.set_tooltip_text("Show the file in the file manager")
+        folder_btn.set_valign(Gtk.Align.CENTER)
+        folder_btn.connect("clicked", self.on_webpage_show_in_folder)
+        self.web_file_row.add_suffix(folder_btn)
+        file_group.add(self.web_file_row)
+        box.append(file_group)
+        drop_html = Gtk.DropTarget.new(Gio.File, Gdk.DragAction.COPY)
+        drop_html.connect("drop", self._on_webpage_drop)
+        file_group.add_controller(drop_html)
+        insp_group = Adw.PreferencesGroup()
+        insp_group.set_title("Inspiration")
+        insp_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        for name, url, desc in self.WEB_EXAMPLES:
+            chip = Gtk.Button()
+            chip_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+            chip_icon = Gtk.Image.new_from_icon_name("web-browser-symbolic")
+            chip_box.append(chip_icon)
+            chip_label = Gtk.Label(label=name)
+            chip_box.append(chip_label)
+            chip.set_child(chip_box)
+            chip.set_tooltip_text(f"{desc} — {url}")
+            chip.connect("clicked", self._on_web_example, url)
+            insp_row.append(chip)
+        insp_group.add(insp_row)
+        box.append(insp_group)
+        self.web_details = Adw.PreferencesGroup()
+        self.web_details.set_title("Details")
+        self.web_detail_rows = {}
+        for key, title, icon_name in (
+            ("title", "Title", "x-office-document-symbolic"),
+            ("address", "Address", "web-browser-symbolic"),
+            ("source", "Source", "folder-symbolic"),
+            ("status", "Status", "object-select-symbolic"),
+        ):
+            action_row = Adw.ActionRow()
+            action_row.set_title(title)
+            icon = Gtk.Image.new_from_icon_name(icon_name)
+            action_row.add_prefix(icon)
+            self.web_details.add(action_row)
+            self.web_detail_rows[key] = action_row
+        copy_btn = Gtk.Button()
+        copy_btn.set_icon_name("edit-copy-symbolic")
+        copy_btn.set_tooltip_text("Copy link")
+        copy_btn.set_valign(Gtk.Align.CENTER)
+        copy_btn.connect("clicked", self.on_webpage_copy_link)
+        self.web_detail_rows["address"].add_suffix(copy_btn)
+        box.append(self.web_details)
+        self.web_saved_group = Adw.PreferencesGroup()
+        self.web_saved_group.set_title("Saved pages")
+        self.web_saved_list = Gtk.ListBox()
+        self.web_saved_list.add_css_class("boxed-list")
+        self.web_saved_list.connect("row-activated", self._on_web_list_activated)
+        self.web_saved_group.add(self.web_saved_list)
+        box.append(self.web_saved_group)
+        web_recent_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        web_recent_label = Gtk.Label(label="Recent")
+        web_recent_label.set_xalign(0)
+        web_recent_label.set_hexpand(True)
+        web_recent_box.append(web_recent_label)
+        web_clear_btn = Gtk.Button(label="Clear")
+        web_clear_btn.connect("clicked", self.on_clear_web_history)
+        web_recent_box.append(web_clear_btn)
+        box.append(web_recent_box)
+        self.web_recent_list = Gtk.ListBox()
+        self.web_recent_list.add_css_class("boxed-list")
+        self.web_recent_list.connect("row-activated", self._on_web_list_activated)
+        box.append(self.web_recent_list)
+        self.web_empty = Adw.StatusPage()
+        self.web_empty.set_icon_name("web-browser-symbolic")
+        self.web_empty.set_title("No saved pages yet")
+        self.web_empty.set_description("Apply a link or file above. You will find it here.")
+        box.append(self.web_empty)
+        self._refresh_web_file_row()
+        self._refresh_web_details()
+        self._sync_web_hero_with_config()
+        self._reload_web_lists()
+        return self._scroll_page(self._clamp_page(box))
+
+    def _web_list_title(self, entry):
+        if entry.get("title"):
+            title = entry["title"]
+            return title if len(title) <= 60 else title[:57] + "…"
+        url = entry.get("url", "")
+        if "://" in url:
+            return self._web_domain(url) or url
+        return os.path.basename(url) or url
+
+    def _web_list_row(self, entry, favorite, allow_delete):
+        url = entry["url"]
+        row = Adw.ActionRow()
+        row.set_name(url)
+        row.set_title(self._plain(self._web_list_title(entry)))
+        row.set_subtitle(self._plain(url))
+        is_file = "://" not in url
+        if is_file:
+            prefix = Gtk.Image.new_from_icon_name("x-office-document-symbolic")
+        else:
+            prefix = Adw.Avatar(text=self._web_monogram(self._web_domain(url)), size=32)
+            prefix.set_show_initials(True)
+        row.add_prefix(prefix)
+        star = Gtk.ToggleButton()
+        star.add_css_class("flat")
+        star.set_icon_name("starred-symbolic" if favorite else "non-starred-symbolic")
+        star.set_tooltip_text("Remove from saved" if favorite else "Save")
+        star.set_active(favorite)
+        star.set_valign(Gtk.Align.CENTER)
+        star.connect("toggled", self._on_web_star_toggled, url)
+        row.add_suffix(star)
+        if is_file:
+            go = Gtk.Button()
+            go.set_icon_name("media-playback-start-symbolic")
+            go.set_tooltip_text("Apply this file now")
+            go.set_valign(Gtk.Align.CENTER)
+            go.connect("clicked", self._on_web_list_play, url)
+            row.add_suffix(go)
+        else:
+            globe = Gtk.Button()
+            globe.set_icon_name("web-browser-symbolic")
+            globe.set_tooltip_text("Open in browser")
+            globe.set_valign(Gtk.Align.CENTER)
+            globe.connect("clicked", self._on_web_open, url)
+            row.add_suffix(globe)
+        if allow_delete:
+            trash = Gtk.Button()
+            trash.set_icon_name("user-trash-symbolic")
+            trash.set_tooltip_text("Remove from recent (kept in saved)")
+            trash.set_valign(Gtk.Align.CENTER)
+            trash.connect("clicked", self._on_web_delete, url)
+            row.add_suffix(trash)
+        return row
+
+    def _reload_web_lists(self):
+        if getattr(self, "web_saved_list", None) is None:
+            return
+        history, favorites = self._load_web_data()
+        fav_set = set(favorites)
+        self._clear_listbox(self.web_saved_list)
+        for url in favorites[:20]:
+            entry = next((e for e in history if e["url"] == url), None)
+            if entry is None:
+                entry = {
+                    "url": url,
+                    "title": "",
+                    "site": self._web_domain(url),
+                    "last_used": 0,
+                }
+            self.web_saved_list.append(self._web_list_row(entry, True, False))
+        self._clear_listbox(self.web_recent_list)
+        for entry in history[:8]:
+            self.web_recent_list.append(self._web_list_row(entry, entry["url"] in fav_set, True))
+        empty = not favorites and not history
+        self.web_saved_group.set_visible(not empty)
+        self.web_recent_list.set_visible(not empty)
+        self.web_empty.set_visible(empty)
+
+    def _on_web_list_activated(self, _listbox, row):
+        url = row.get_name()
+        if not url:
+            return
+        if "://" in url:
+            self.webpage_entry.set_text(url)
+            self._on_webpage_entry_changed(self.webpage_entry)
+            self.on_webpage_apply()
+        elif os.path.isfile(url):
+            self._set_webpage_file(url)
+
+    def _on_web_star_toggled(self, button, url):
+        active = bool(button.get_active())
+        button.set_icon_name("starred-symbolic" if active else "non-starred-symbolic")
+        _history, favorites = self._load_web_data()
+        if active and url not in favorites:
+            favorites.insert(0, url)
+        elif not active and url in favorites:
+            favorites.remove(url)
+        history, _favorites = self._load_web_data()
+        self._save_web_data(history, favorites)
+        self._reload_web_lists()
+
+    def _on_web_list_play(self, _button, url):
+        if os.path.isfile(url):
+            self._set_webpage_file(url)
+
+    def _on_web_open(self, _button, url):
+        if not url.startswith(("http://", "https://")):
+            return
+        try:
+            Gio.AppInfo.launch_default_for_uri(url)
+        except GLib.Error as e:
+            logger.warning(f"[GUI4] Could not open browser: {e.message}")
+
+    def _on_web_delete(self, _button, url):
+        history, favorites = self._load_web_data()
+        self._save_web_data([e for e in history if e["url"] != url], favorites)
+        self._reload_web_lists()
+
+    def on_clear_web_history(self, *_args):
+        history, favorites = self._load_web_data()
+        fav_set = set(favorites)
+        self._save_web_data([e for e in history if e["url"] in fav_set], favorites)
+        self._reload_web_lists()
+        self._toast("Web history cleared")
+
+    def _on_webpage_icon_press(self, entry, position):
+        if position == Gtk.EntryIconPosition.SECONDARY:
+            clipboard = Gdk.Display.get_default().get_clipboard()
+            clipboard.read_text_async(None, self._on_webpage_clipboard_text)
+
+    def _on_webpage_clipboard_text(self, clipboard, result):
+        try:
+            text = clipboard.read_text_finish(result)
+        except GLib.Error:
+            return
+        if text and text.strip():
+            self.webpage_entry.set_text(text.strip())
+            self._on_webpage_entry_changed(self.webpage_entry)
+
+    def _on_webpage_entry_changed(self, entry):
+        url = entry.get_text().strip()
+        if not url:
+            self._set_web_detect("web-browser-symbolic", "Paste a link to detect its type", False)
+            self._update_web_hero("", "")
+            return
+        if not url.startswith(("http://", "https://")):
+            self._set_web_detect(
+                "dialog-error-symbolic", "Enter a URL starting with http(s)://", False
+            )
+            self._update_web_hero("", "")
+            return
+        domain = self._web_domain(url)
+        self._set_web_detect("web-browser-symbolic", f"{domain} — checking…", True)
+        self._update_web_hero(url, "")
+        self._web_generation += 1
+        generation = self._web_generation
+        threading.Thread(
+            target=self._check_web_details, args=(url, generation), daemon=True
+        ).start()
+
+    def _set_web_detect(self, icon_name, subtitle, spinning):
+        self.web_detect_icon.set_from_icon_name(icon_name)
+        self.web_detect_row.set_subtitle(self._plain(subtitle))
+        self.web_detect_spinner.set_spinning(spinning)
+
+    def _check_web_details(self, url, generation):
+        title, ok, detail = "", False, ""
+        try:
+            response = requests.get(url, timeout=10, stream=True)
+            status = response.status_code
+            content_type = response.headers.get("Content-Type", "")
+            body = b"".join(response.iter_content(65536))[:65536]
+            response.close()
+            if status >= 400:
+                detail = f"Error code: {status}"
+            else:
+                ok = True
+                title = self._extract_html_title(body) if "html" in content_type else ""
+                detail = f"{self._web_domain(url)} — reachable"
+        except requests.exceptions.RequestException as e:
+            detail = str(e)[:160]
+        GLib.idle_add(self._apply_web_details, generation, url, title, ok, detail)
+
+    def _apply_web_details(self, generation, url, title, ok, detail):
+        if generation != getattr(self, "_web_generation", generation):
+            return False
+        if ok:
+            self._set_web_detect("object-select-symbolic", detail, False)
+        else:
+            self._set_web_detect("dialog-error-symbolic", detail, False)
+        self._update_web_hero(url, title)
+        return False
+
+    def _update_web_hero(self, url, title):
+        if getattr(self, "web_hero_title", None) is None:
+            return
+        domain = self._web_domain(url)
+        is_file = bool(url) and "://" not in url
+        if title:
+            self.web_hero_title.set_text(title)
+        elif domain:
+            self.web_hero_title.set_text(domain)
+        elif is_file:
+            self.web_hero_title.set_text(os.path.basename(url))
+        else:
+            self.web_hero_title.set_text("Web Page")
+        if url:
+            self.web_hero_sub.set_text(url)
+        else:
+            self.web_hero_sub.set_text("Type an address above to load a preview")
+        self.web_hero_sub.set_tooltip_text(url)
+
+    def _on_web_example(self, _button, url):
+        self.webpage_entry.set_text(url)
+        self._on_webpage_entry_changed(self.webpage_entry)
+        self._toast("Example loaded")
+
+    def _on_webpage_drop(self, _target, value, _x, _y):
+        path = None
+        if isinstance(value, Gio.File):
+            if value.get_uri_scheme() in ("http", "https"):
+                self.webpage_entry.set_text(value.get_uri())
+                self._on_webpage_entry_changed(self.webpage_entry)
+                return True
+            path = value.get_path()
+        if path and path.lower().endswith((".html", ".htm")):
+            self._set_webpage_file(path)
+            return True
+        return False
+
+    def _sync_web_hero_with_config(self):
+        config = getattr(self, "config", None) or {}
+        if config.get(CONFIG_KEY_MODE) != MODE_WEBPAGE:
+            return
+        current = (config.get(CONFIG_KEY_DATA_SOURCE) or {}).get("Default", "")
+        if not current:
+            return
+        if "://" not in current and os.path.isfile(current):
+            self._refresh_web_file_row()
+            self._update_web_hero(current, "")
+        else:
+            self.webpage_entry.set_text(current)
+            self._update_web_hero(current, "")
+
+    def _set_webpage_file(self, path):
+        try:
+            size = os.path.getsize(path)
+        except OSError:
+            size = None
+        self.web_file_row.set_title(self._plain(os.path.basename(path)))
+        self.web_file_row.set_subtitle(
+            self._plain(f"{path} — {self._format_file_size(size)}" if size is not None else path)
+        )
+        self._update_web_hero(path, "")
+        self._set_webpage_source(path)
+
+    def on_webpage_open_browser(self, *_args):
+        url = self.webpage_entry.get_text().strip()
+        if not url.startswith(("http://", "https://")):
+            return
+        try:
+            Gio.AppInfo.launch_default_for_uri(url)
+        except GLib.Error as e:
+            logger.warning(f"[GUI4] Could not open browser: {e.message}")
+
+    def on_webpage_show_in_folder(self, *_args):
+        subtitle = self.web_file_row.get_subtitle()
+        folder = os.path.dirname(subtitle.split(" — ")[0])
+        if not folder or not os.path.isdir(folder):
+            return
+        try:
+            Gio.AppInfo.launch_default_for_uri(GLib.filename_to_uri(folder))
+        except GLib.Error as e:
+            logger.warning(f"[GUI4] Could not open containing folder: {e.message}")
+
+    def on_webpage_copy_link(self, *_args):
+        url = self.web_detail_rows["address"].get_subtitle()
+        if not url:
+            return
+        clipboard = Gdk.Display.get_default().get_clipboard()
+        clipboard.set(url)
+        self._toast("Link copied")
+
+    def _refresh_web_file_row(self):
+        row = getattr(self, "web_file_row", None)
+        if row is None:
+            return
+        config = getattr(self, "config", None) or {}
+        current = (config.get(CONFIG_KEY_DATA_SOURCE) or {}).get("Default", "")
+        if current and "://" not in current and os.path.isfile(current):
+            try:
+                size = os.path.getsize(current)
+            except OSError:
+                size = None
+            row.set_title(self._plain(os.path.basename(current)))
+            row.set_subtitle(
+                self._plain(
+                    f"{current} — {self._format_file_size(size)}" if size is not None else current
+                )
+            )
+
+    def _refresh_web_details(self):
+        group = getattr(self, "web_details", None)
+        if group is None:
+            return
+        mode = self.config.get(CONFIG_KEY_MODE) if hasattr(self, "config") else None
+        current = ""
+        if hasattr(self, "config") and self.config:
+            current = (self.config.get(CONFIG_KEY_DATA_SOURCE) or {}).get("Default", "")
+        show = mode == MODE_WEBPAGE and bool(current)
+        group.set_visible(show)
+        if not show:
+            return
+        is_file = os.path.isfile(current) if current and "://" not in current else False
+        rows = self.web_detail_rows
+        if is_file:
+            try:
+                size = os.path.getsize(current)
+            except OSError:
+                size = None
+            rows["title"].set_subtitle(os.path.basename(current))
+            rows["address"].set_subtitle(current)
+            rows["source"].set_subtitle(f"Local file — {self._format_file_size(size)}")
+        else:
+            rows["title"].set_subtitle("…")
+            rows["address"].set_subtitle(current)
+            rows["source"].set_subtitle(f"Remote — {self._web_domain(current)}")
+            self._web_generation += 1
+            generation = self._web_generation
+            threading.Thread(
+                target=self._fetch_web_title, args=(current, generation), daemon=True
+            ).start()
+        active = (self.config.get(CONFIG_KEY_DATA_SOURCE) or {}).get("Default", "") == current
+        rows["status"].set_subtitle("Current wallpaper" if active else "Not applied")
+
+    def _fetch_web_title(self, url, generation):
+        title = ""
+        try:
+            response = requests.get(url, timeout=10, stream=True)
+            body = b"".join(response.iter_content(65536))[:65536]
+            response.close()
+            title = self._extract_html_title(body)
+        except requests.exceptions.RequestException as e:
+            logger.debug(f"[GUI4] Title fetch failed for {url}: {e}")
+        GLib.idle_add(self._apply_web_fetched_title, generation, url, title)
+
+    def _apply_web_fetched_title(self, generation, url, title):
+        if generation != getattr(self, "_web_generation", generation):
+            return False
+        current = (self.config.get(CONFIG_KEY_DATA_SOURCE) or {}).get("Default", "")
+        if current != url:
+            return False
+        if title:
+            self.web_detail_rows["title"].set_subtitle(title)
+        return False
 
     def _check_web_url(self, url):
         """Validate a web page URL; None when valid, else error."""
@@ -1975,6 +2873,7 @@ class ControlPanel(Adw.Application):
         url = self.webpage_entry.get_text().strip()
         if not url:
             return
+        self._set_apply_busy(getattr(self, "webpage_apply_btn", None), True)
         threading.Thread(target=self._validate_and_webpage, args=(url,), daemon=True).start()
 
     def _validate_and_webpage(self, url):
@@ -1982,12 +2881,54 @@ class ControlPanel(Adw.Application):
         GLib.idle_add(self._finish_webpage_apply, url, error)
 
     def _finish_webpage_apply(self, url, error):
+        self._set_apply_busy(getattr(self, "webpage_apply_btn", None), False)
         if error is not None:
             logger.error(f"[GUI4] Failed to access {url}. Error:\n{error}")
             self._show_error(f"Failed to access {url}.\nError:\n{error}")
             return False
-        self._set_webpage_source(url)
+        self._record_web_use(url)
+        self._reload_web_lists()
+        self._show_webpage_monitor_chooser(url)
         return False
+
+    def _show_webpage_monitor_chooser(self, source):
+        if not self._monitor_choices():
+            self._apply_webpage_to_monitor(source, "")
+            return
+        popover = Gtk.Popover()
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+        for label, key in self._monitor_menu_items(source):
+            btn = Gtk.Button(label=label)
+            btn.add_css_class("flat")
+            btn.connect(
+                "clicked",
+                lambda *_a, k=key: (
+                    popover.popdown(),
+                    self._apply_webpage_to_monitor(source, k),
+                ),
+            )
+            box.append(btn)
+        popover.set_child(box)
+        anchor = getattr(self, "webpage_apply_btn", None) or self.window
+        popover.set_parent(anchor)
+        popover.popup()
+
+    def _apply_webpage_to_monitor(self, source, monitor):
+        logger.info(f"[GUI4] Webpage: {source} For Monitor {monitor or 'all'}")
+        self.config = ConfigUtil().load()
+        self.config[CONFIG_KEY_MODE] = MODE_WEBPAGE
+        data_source = self.config.get(CONFIG_KEY_DATA_SOURCE) or {}
+        self.config[CONFIG_KEY_DATA_SOURCE] = data_source
+        data_source["Default"] = source
+        ConfigUtil().save(self.config)
+        server = self._server()
+        if server is not None:
+            server.webpage(source, monitor)
+        self._refresh_all()
+        if "://" in source and getattr(self, "web_hero_title", None) is not None:
+            self._update_web_hero(source, "")
+        target = "all monitors" if not monitor else monitor
+        self._toast(f"Web page on {target}")
 
     def on_webpage_choose_file(self, *_args):
         dialog = Gtk.FileDialog()
@@ -2010,21 +2951,13 @@ class ControlPanel(Adw.Application):
         path = chosen.get_path()
         if not path:
             return
-        self._set_webpage_source(path)
+        self._set_webpage_file(path)
 
     def _set_webpage_source(self, source):
         logger.info(f"[GUI4] Webpage: {source}")
-        self.config = ConfigUtil().load()
-        self.config[CONFIG_KEY_MODE] = MODE_WEBPAGE
-        data_source = self.config.get(CONFIG_KEY_DATA_SOURCE) or {}
-        self.config[CONFIG_KEY_DATA_SOURCE] = data_source
-        data_source["Default"] = source
-        ConfigUtil().save(self.config)
-        server = self._server()
-        if server is not None:
-            server.webpage(source)
-        self._refresh_all()
-        self._toast("Web page set as wallpaper")
+        self._record_web_use(source)
+        self._reload_web_lists()
+        self._show_webpage_monitor_chooser(source)
 
     def _show_error(self, message):
         dialog = Adw.AlertDialog(heading="Error", body=message)
@@ -2054,7 +2987,7 @@ class ControlPanel(Adw.Application):
         self.volume_scale.connect("value-changed", self.on_volume_changed)
         vol_row.add_suffix(self.volume_scale)
         box.append(vol_row)
-        return self._clamp_page(box)
+        return self._scroll_page(self._clamp_page(box))
 
     # -- refresh + handlers ---------------------------------------------
 
@@ -2082,6 +3015,7 @@ class ControlPanel(Adw.Application):
         self.volume_scale.set_value(int(self.config.get(CONFIG_KEY_VOLUME, 50)))
         self._refresh_badges(n_videos, len(self.playlist_paths))
         self._update_queue_actions()
+        self._refresh_web_details()
         banner = getattr(self, "server_banner", None)
         if banner is not None:
             banner.set_revealed(server is None)

@@ -48,8 +48,8 @@ class _FakeServer:
     def stream(self, url, monitor=""):
         self.stream_calls.append((url, monitor))
 
-    def webpage(self, url):
-        self.webpage_calls.append(url)
+    def webpage(self, url, monitor=""):
+        self.webpage_calls.append((url, monitor))
 
 
 class _ConfigStore:
@@ -75,6 +75,12 @@ class _ConfigStore:
                 from apricus.utils import ConfigUtil as RealConfigUtil
 
                 return RealConfigUtil._sanitize_stream_entries(entries)
+
+            @staticmethod
+            def _sanitize_web_entries(entries):
+                from apricus.utils import ConfigUtil as RealConfigUtil
+
+                return RealConfigUtil._sanitize_web_entries(entries)
 
         return _FakeConfigUtil
 
@@ -481,6 +487,8 @@ def sidebar_builds_four_rows_and_pages():
     assert obj.stream_entry is not None
     obj._webpage_page()
     assert obj.webpage_entry is not None
+    assert obj.web_hero_title is not None and obj.web_detect_row is not None
+    assert obj.web_file_row is not None and obj.web_details is not None
     obj._settings_page()
     assert obj.mute_switch is not None and obj.volume_scale is not None
 
@@ -596,17 +604,42 @@ def finish_stream_apply_error_shows_no_server_call():
 
 
 @check
-def set_webpage_source_persists_and_calls_server():
+@check
+@check
+def set_webpage_source_records_and_opens_chooser():
     import apricus.gui.gtk4app as appmod
 
     store = _ConfigStore(_base_config())
     old = _patch_config(None, store)
     try:
         obj, server = _panel(_base_config(), [])
+        chosen = []
+        obj._show_webpage_monitor_chooser = lambda source: chosen.append(source)
         obj._set_webpage_source("https://example.com/")
+        assert chosen == ["https://example.com/"], chosen
+        assert [e["url"] for e in store.config["web_history"]] == [
+            "https://example.com/"
+        ]
+        assert server.webpage_calls == [], "apply happens after monitor choice"
+    finally:
+        appmod.ConfigUtil = old
+
+
+@check
+@check
+def apply_webpage_to_monitor_persists_and_calls_server():
+    import apricus.gui.gtk4app as appmod
+
+    store = _ConfigStore(_base_config())
+    old = _patch_config(None, store)
+    try:
+        obj, server = _panel(_base_config(), [])
+        obj._apply_webpage_to_monitor("https://example.com/", "M1")
         assert store.config["mode"] == "MODE_WEBPAGE", store.config["mode"]
         assert store.config["data_source"]["Default"] == "https://example.com/"
-        assert server.webpage_calls == ["https://example.com/"], server.webpage_calls
+        assert server.webpage_calls == [("https://example.com/", "M1")], (
+            server.webpage_calls
+        )
     finally:
         appmod.ConfigUtil = old
 
@@ -1018,6 +1051,428 @@ def sidebar_streaming_selection_reloads_lists():
 
 
 @check
+def webpage_helpers():
+    assert (
+        app.ControlPanel._web_domain("https://www.windy.com/?x=1") == "www.windy.com"
+    )
+    assert app.ControlPanel._web_domain("not a url") == ""
+    assert app.ControlPanel._web_monogram("windy.com") == "WC"
+    assert app.ControlPanel._web_monogram("sub.example.co.uk") == "SE"
+    assert app.ControlPanel._web_monogram("") == ""
+    extract = app.ControlPanel._extract_html_title
+    assert extract(b"<html><head><title>  Hello  World </title></head>") == "Hello World"
+    assert extract(b"<TITLE>A &amp; B</TITLE>") == "A & B"
+    assert extract(b"<html>no title here") == ""
+    assert extract(b"") == ""
+    assert extract(None) == ""
+    fmt = app.ControlPanel._format_file_size
+    assert fmt(512) == "512 B"
+    assert fmt(12288) == "12 KB"
+    assert fmt(3145728) == "3.0 MB"
+    assert fmt(None) == "—"
+
+
+@check
+def web_hero_sync_and_file_row():
+    obj, _ = _panel(_base_config(), [])
+    shown = {}
+
+    class _L:
+        def __init__(self, name):
+            self._name = name
+
+        def set_text(self, text):
+            shown[self._name] = text
+
+        def set_subtitle(self, text):
+            shown[self._name] = text
+
+        def set_title(self, title):
+            shown[self._name + ":title"] = title
+
+        def set_visible(self, visible):
+            shown[self._name + ":visible"] = visible
+
+        def set_tooltip_text(self, text):
+            pass
+
+    obj.web_hero_title = _L("htitle")
+    obj.web_hero_sub = _L("hsub")
+    obj.web_hero_icon = _L("icon")
+    obj.web_file_row = _L("file")
+    obj.config = {"video_dir": None}
+    obj._update_web_hero("", "")
+    assert shown["htitle"] == "Web Page"
+    assert "Type an address" in shown["hsub"]
+    obj._update_web_hero("https://www.windy.com/", "")
+    assert shown["htitle"] == "www.windy.com"
+    assert "mono" not in shown, "no monogram labels anymore"
+
+
+@check
+def web_record_star_clear_roundtrip():
+    import apricus.gui.gtk4app as appmod
+
+    store = _ConfigStore(_base_config())
+    old = _patch_config(None, store)
+    try:
+        obj, _ = _panel(_base_config(), [])
+        obj._reload_web_lists = lambda: None
+        obj._record_web_use("https://w.example/p", title="P")
+        obj._record_web_use("/tmp/page.html")
+        urls = [e["url"] for e in store.config["web_history"]]
+        assert urls == ["/tmp/page.html", "https://w.example/p"], urls
+        obj._toggle_web_favorite("https://w.example/p")
+        assert store.config["web_favorites"] == ["https://w.example/p"]
+        obj.on_clear_web_history()
+        urls = [e["url"] for e in store.config["web_history"]]
+        assert urls == ["https://w.example/p"], urls
+        obj._toast = lambda *a: None
+    finally:
+        appmod.ConfigUtil = old
+
+
+@check
+def web_sanitize_accepts_html_paths():
+    import apricus.utils as real_utils
+
+    entries = real_utils.ConfigUtil._sanitize_web_entries(
+        [
+            {"url": "https://w.example/p", "last_used": 3},
+            {"url": "/tmp/a.html", "last_used": 2},
+            {"url": "/tmp/b.txt", "last_used": 1},
+            {"url": "notaurl", "last_used": 4},
+            "junk",
+        ]
+    )
+    assert [e["url"] for e in entries] == [
+        "https://w.example/p",
+        "/tmp/a.html",
+    ], entries
+
+
+@check
+def web_list_title_prefers_title_then_domain():
+    obj, _ = _panel(_base_config(), [])
+    assert obj._web_list_title({"url": "https://w.example/p", "title": "Hello"}) == "Hello"
+    assert obj._web_list_title({"url": "https://www.windy.com/", "title": ""}) == (
+        "www.windy.com"
+    )
+    assert obj._web_list_title({"url": "/tmp/my page.html", "title": ""}) == "my page.html"
+
+
+@check
+def stream_service_names():
+    service = app.ControlPanel._service_name
+    assert service("https://www.youtube.com/watch?v=x") == "YouTube"
+    assert service("https://youtu.be/x") == "YouTube"
+    assert service("https://www.twitch.tv/someone") == "Twitch"
+    assert service("https://vimeo.com/123") == "Vimeo"
+    assert service("https://www.twitch.tvx.com/") == ""
+    assert service("not a url") == ""
+    assert service("") == ""
+
+
+@check
+def stream_favicon_cache_miss_and_path():
+    import os
+
+    obj, _ = _panel(_base_config(), [])
+    assert obj._cached_favicon("nonexistent.invalid") is None
+    assert obj._cached_favicon("") is None
+    path = app.ControlPanel._favicon_path("YouTube.COM")
+    assert path.endswith(os.path.join("apricus", "favicons", "youtube.com.png")), path
+
+
+@check
+def plain_escapes_markup_and_busy_toggles_button():
+    assert app.ControlPanel._plain("a & b") == "a &amp; b"
+    assert app.ControlPanel._plain(None) == ""
+    assert app.ControlPanel._plain("Orologio — minimale") == "Orologio — minimale"
+    obj, _ = _panel(_base_config(), [])
+    states = {}
+
+    class _Btn:
+        def set_sensitive(self, value):
+            states["sensitive"] = value
+
+        def set_label(self, label):
+            states["label"] = label
+
+    obj._set_apply_busy(_Btn(), True)
+    assert states == {"sensitive": False, "label": "Checking…"}, states
+    obj._set_apply_busy(_Btn(), False)
+    assert states == {"sensitive": True, "label": "Apply"}, states
+    obj._set_apply_busy(None, True)  # must not raise
+
+
+@check
+def favicon_states_with_mocks():
+    """State machine: ok applies file, stale/entry-change/None keep fallback."""
+    import logging
+
+    import apricus.gui.gtk4app as appmod
+
+    calls = []
+
+    class _Icon:
+        def set_from_file(self, path):
+            calls.append(("file", path))
+
+        def set_from_icon_name(self, name):
+            calls.append(("icon", name))
+
+    class _Spin:
+        def set_spinning(self, active):
+            calls.append(("spin", active))
+
+    class _Entry:
+        def __init__(self, text):
+            self.text = text
+
+        def get_text(self):
+            return self.text
+
+    obj, _ = _panel(_base_config(), [])
+    obj.stream_type_icon = _Icon()
+    obj.stream_type_spinner = _Spin()
+    obj.stream_entry = _Entry("https://w.example/v")
+    obj._favicon_host = None
+    obj._favicon_generation = 0
+    records = []
+
+    class _Handler(logging.Handler):
+        def emit(self, record):
+            records.append((record.levelname, record.getMessage()))
+
+    logger = logging.getLogger("Apricus")
+    handler = _Handler()
+    old_level = logger.level
+    logger.setLevel(logging.INFO)
+    logger.addHandler(handler)
+    try:
+        # Valid apply.
+        obj._set_favicon_state("ok", path="/tmp/fav.png")
+        assert ("file", "/tmp/fav.png") in calls
+        assert any(lvl == "INFO" and "ok" in msg for lvl, msg in records), records
+        # Fallback keeps a coherent icon, logged.
+        obj._set_favicon_state("fallback", reason="http_404")
+        assert ("icon", "web-browser-symbolic") in calls, calls
+        assert any(lvl == "INFO" and "http_404" in msg for lvl, msg in records), records
+        # Stale generation never touches the widget.
+        before = len(calls)
+        assert obj._apply_favicon("https://w.example/v", 999, "/tmp/fav.png") is False
+        # Valid generation but no path: explicit fallback icon (logged).
+        obj._favicon_generation = 7
+        assert obj._apply_favicon("https://w.example/v", 7, None) is False
+        assert ("icon", "web-browser-symbolic") in calls[before:], calls[before:]
+        before = len(calls)
+        # Entry changed in the meantime: keep current icon.
+        obj.stream_entry = _Entry("https://other.example/")
+        assert obj._apply_favicon("https://w.example/v", 7, "/tmp/fav.png") is False
+        assert len(calls) == before
+    finally:
+        logger.removeHandler(handler)
+        logger.setLevel(old_level)
+
+
+@check
+def favicon_regression_persists_after_retype():
+    """Open -> favicon applied -> retype/refresh -> cache reuse keeps it.
+
+    Fails on the old behavior where every type/refresh reset the icon.
+    """
+    import apricus.gui.gtk4app as appmod
+
+    calls = []
+
+    class _Icon:
+        def set_from_file(self, path):
+            calls.append(("file", path))
+
+        def set_from_icon_name(self, name):
+            calls.append(("icon", name))
+
+    class _Spin:
+        def set_spinning(self, active):
+            pass
+
+    class _Row:
+        def set_subtitle(self, text):
+            pass
+
+    class _Entry:
+        def __init__(self):
+            self.text = ""
+
+        def get_text(self):
+            return self.text
+
+        def set_text(self, text):
+            self.text = text
+
+    class _Label:
+        def set_text(self, text):
+            pass
+
+    obj, _ = _panel(_base_config(), [])
+    obj.stream_type_icon = _Icon()
+    obj.stream_type_spinner = _Spin()
+    obj.stream_type_row = _Row()
+    obj.stream_entry = _Entry()
+    obj.stream_hero_title = _Label()
+    obj.stream_hero_sub = _Label()
+    obj._favicon_host = None
+    obj._favicon_generation = 0
+    real_cached = appmod.ControlPanel._cached_favicon
+    appmod.ControlPanel._cached_favicon = lambda self, host: "/tmp/cached.png"
+    try:
+        obj.stream_entry.set_text("https://w.example/v")
+        obj._on_stream_entry_changed(obj.stream_entry)
+        assert ("file", "/tmp/cached.png") in calls, calls
+        n_calls = len(calls)
+        # Retype the same URL + explicit refresh: icon must survive.
+        obj._on_stream_entry_changed(obj.stream_entry)
+        obj._update_stream_type()
+        assert calls[n_calls:] == [], calls[n_calls:]
+    finally:
+        appmod.ControlPanel._cached_favicon = real_cached
+
+
+@check
+def download_favicon_validates_and_normalizes():
+    """Mocked HTTP + real decode: ok only for valid magic; transient retry."""
+    import apricus.gui.gtk4app as appmod
+    from gi.repository import GdkPixbuf
+
+    pixbuf = GdkPixbuf.Pixbuf.new(GdkPixbuf.Colorspace.RGB, True, 8, 64, 16)
+    _ok, png = pixbuf.save_to_bufferv("png", [], [])
+
+    class _Resp:
+        def __init__(self, status=200, ctype="image/png", body=b""):
+            self.status_code = status
+            self.headers = {"Content-Type": ctype}
+            self._body = body
+
+        def iter_content(self, size):
+            yield self._body
+
+        def close(self):
+            pass
+
+    class _Requests:
+        def __init__(self, script):
+            self.script = list(script)
+
+        def get(self, *a, **k):
+            item = self.script.pop(0)
+            if isinstance(item[1], BaseException):
+                raise item[1]
+            return item[1]
+
+        @property
+        def exceptions(self):
+            import requests as real_requests
+
+            return real_requests.exceptions
+
+    import tempfile
+
+    import requests as real_requests_mod
+
+    tmp = tempfile.mkdtemp(prefix="apricus-favtest-")
+    real_path = app.ControlPanel._favicon_path
+    app.ControlPanel._favicon_path = staticmethod(lambda host: f"{tmp}/{host}.png")
+    real_requests = appmod.requests
+    try:
+        # 1. Valid PNG -> ok + normalized file on disk.
+        appmod.requests = _Requests([("png", _Resp(200, "image/png", png))])
+        obj, _ = _panel(_base_config(), [])
+        path, reason = obj._download_favicon("w.example")
+        assert reason == "ok" and path and path.endswith(".png"), (path, reason)
+        import os
+
+        assert os.path.getsize(path) > 0
+        from gi.repository import GdkPixbuf as _Pb
+
+        assert _Pb.Pixbuf.new_from_file(path).get_width() == 32
+        # 2. HTML body with image content-type -> bad_magic, no file.
+        appmod.requests = _Requests([("html", _Resp(200, "image/png", b"<html>"))])
+        path, reason = obj._download_favicon("x.example")
+        assert (path, reason) == (None, "bad_magic"), (path, reason)
+        # 3. 404 -> http_404 (no retry inside download).
+        appmod.requests = _Requests([("404", _Resp(404, "text/plain", b"no"))])
+        path, reason = obj._download_favicon("y.example")
+        assert (path, reason) == (None, "http_404"), (path, reason)
+        # 4. Timeout is transient (retry happens in _fetch, not here).
+        appmod.requests = _Requests([("t/o", real_requests_mod.Timeout("slow"))])
+        path, reason = obj._download_favicon("z.example")
+        assert (path, reason) == (None, "timeout"), (path, reason)
+    finally:
+        appmod.requests = real_requests
+        app.ControlPanel._favicon_path = real_path
+
+
+@check
+def hero_parity_streaming_webpage():
+    """Structural parity: both heroes share builder, geometry and classes."""
+    import os
+
+    assert os.environ.get("DISPLAY"), "needs a display (run under Xvfb)"
+    from gi.repository import Adw, Gtk, Pango
+
+    Adw.init()
+    obj = app.ControlPanel.__new__(app.ControlPanel)
+    # Hold page references: dropping them lets GC unparent the widgets.
+    obj._held_pages = [obj._streaming_page(), obj._webpage_page()]
+
+    def signature(frame, name):
+        box = frame.get_child()
+        assert type(box).__name__ == "Box", (name, type(box).__name__)
+        assert box.get_orientation() == Gtk.Orientation.VERTICAL, name
+        assert box.get_spacing() == 8, name
+        assert box.get_halign() == Gtk.Align.FILL, name
+        assert box.has_css_class("web-hero"), name
+        kids = []
+        child = box.get_first_child()
+        while child is not None:
+            kids.append(child)
+            child = child.get_next_sibling()
+        assert [type(k).__name__ for k in kids] == ["Image", "Label", "Label"], (
+            name,
+            [type(k).__name__ for k in kids],
+        )
+        icon, title, sub = kids
+        assert icon.get_pixel_size() == 45, name
+        for label, cls in ((title, "title-4"), (sub, "dim-label")):
+            assert label.has_css_class(cls), (name, cls)
+            assert label.get_xalign() == 0, name
+            assert label.get_ellipsize() == Pango.EllipsizeMode.END, name
+        for label in (title, sub):
+            assert not label.has_css_class("web-hero-title"), (name, "monogram gone")
+        return kids
+
+    s_kids = signature(obj.stream_hero_icon.get_parent().get_parent(), "streaming")
+    w_kids = signature(obj.web_hero_icon.get_parent().get_parent(), "webpage")
+    s_frame = obj.stream_hero_icon.get_parent().get_parent()
+    w_frame = obj.web_hero_icon.get_parent().get_parent()
+    assert s_frame.has_css_class("card") and w_frame.has_css_class("card")
+    s_min, _, _, _ = s_frame.measure(Gtk.Orientation.HORIZONTAL, -1)
+    w_min, _, _, _ = w_frame.measure(Gtk.Orientation.HORIZONTAL, -1)
+    assert abs(s_min - w_min) <= 40, (s_min, w_min)
+    for page in obj._held_pages:
+        node = page.get_child()
+        while node is not None and type(node).__name__ != "Box":
+            node = node.get_first_child()
+        assert node is not None
+        req = node.get_size_request()
+        assert (req.width, req.height) == (
+            app.ControlPanel.PAGE_MIN_WIDTH,
+            -1,
+        ), (req.width, req.height)
+
+
+@check
 def toast_without_overlay_is_noop():
     obj, _ = _panel(_base_config(), [])
     obj._toast("hello")  # must not raise without a ToastOverlay
@@ -1266,8 +1721,12 @@ def test_finish_stream_apply_error_shows_no_server_call():
     _run("finish_stream_apply_error_shows_no_server_call")
 
 
-def test_set_webpage_source_persists_and_calls_server():
-    _run("set_webpage_source_persists_and_calls_server")
+def test_set_webpage_source_records_and_opens_chooser():
+    _run("set_webpage_source_records_and_opens_chooser")
+
+
+def test_apply_webpage_to_monitor_persists_and_calls_server():
+    _run("apply_webpage_to_monitor_persists_and_calls_server")
 
 
 def test_video_dir_chosen_persists_and_refreshes():
@@ -1284,6 +1743,54 @@ def test_source_row_shows_folder_or_empty():
 
 def test_toast_without_overlay_is_noop():
     _run("toast_without_overlay_is_noop")
+
+
+def test_hero_parity_streaming_webpage():
+    _run_display("hero_parity_streaming_webpage")
+
+
+def test_favicon_states_with_mocks():
+    _run("favicon_states_with_mocks")
+
+
+def test_favicon_regression_persists_after_retype():
+    _run("favicon_regression_persists_after_retype")
+
+
+def test_download_favicon_validates_and_normalizes():
+    _run("download_favicon_validates_and_normalizes")
+
+
+def test_plain_escapes_markup_and_busy_toggles_button():
+    _run("plain_escapes_markup_and_busy_toggles_button")
+
+
+def test_stream_service_names():
+    _run("stream_service_names")
+
+
+def test_stream_favicon_cache_miss_and_path():
+    _run("stream_favicon_cache_miss_and_path")
+
+
+def test_web_record_star_clear_roundtrip():
+    _run("web_record_star_clear_roundtrip")
+
+
+def test_web_sanitize_accepts_html_paths():
+    _run("web_sanitize_accepts_html_paths")
+
+
+def test_web_list_title_prefers_title_then_domain():
+    _run("web_list_title_prefers_title_then_domain")
+
+
+def test_web_hero_sync_and_file_row():
+    _run("web_hero_sync_and_file_row")
+
+
+def test_webpage_helpers():
+    _run("webpage_helpers")
 
 
 def test_stream_classify_and_errors():

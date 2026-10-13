@@ -45,6 +45,8 @@ from apricus.commons import (
     CONFIG_KEY_STREAM_HISTORY,
     CONFIG_KEY_VIDEO_DIR,
     CONFIG_KEY_VOLUME,
+    CONFIG_KEY_WEB_FAVORITES,
+    CONFIG_KEY_WEB_HISTORY,
     CONFIG_PATH,
     CONFIG_TEMPLATE,
     CONFIG_VERSION,
@@ -587,6 +589,35 @@ class ConfigUtil:
         clean.sort(key=lambda e: e["last_used"], reverse=True)
         return clean[:30]
 
+    @staticmethod
+    def _sanitize_web_entries(entries):
+        """Keep at most 30 well-formed web entries (http URLs or .html paths)."""
+        clean = []
+        seen = set()
+        for entry in entries or []:
+            if not isinstance(entry, dict):
+                continue
+            url = entry.get("url")
+            if not isinstance(url, str):
+                continue
+            is_remote = url.startswith(("http://", "https://"))
+            is_file = os.path.isabs(url) and url.lower().endswith((".html", ".htm"))
+            if not (is_remote or is_file):
+                continue
+            if len(url) > 2048 or url in seen:
+                continue
+            seen.add(url)
+            clean.append(
+                {
+                    "url": url,
+                    "title": entry.get("title") or "",
+                    "site": entry.get("site") or "",
+                    "last_used": entry.get("last_used") or 0,
+                }
+            )
+        clean.sort(key=lambda e: e["last_used"], reverse=True)
+        return clean[:30]
+
     def _migrateLegacyMonitorKeys(self, config: dict):
         """Move per-monitor sources keyed by bare model to stable keys.
 
@@ -699,6 +730,18 @@ class ConfigUtil:
                         u
                         for u in (config.get(CONFIG_KEY_STREAM_FAVORITES) or [])
                         if isinstance(u, str) and u.startswith(("http://", "https://"))
+                    ][:50]
+                    config[CONFIG_KEY_WEB_HISTORY] = self._sanitize_web_entries(
+                        config.get(CONFIG_KEY_WEB_HISTORY)
+                    )
+                    config[CONFIG_KEY_WEB_FAVORITES] = [
+                        u
+                        for u in (config.get(CONFIG_KEY_WEB_FAVORITES) or [])
+                        if isinstance(u, str)
+                        and (
+                            u.startswith(("http://", "https://"))
+                            or (os.path.isabs(u) and u.lower().endswith((".html", ".htm")))
+                        )
                     ][:50]
                     # blur was removed: drop the legacy key, keep the rest.
                     config.pop(CONFIG_KEY_BLUR_RADIUS, None)

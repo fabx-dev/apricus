@@ -129,3 +129,42 @@ def test_stream_all_refreshes_every_monitor_key():
         "M3-live": "https://example.com/v",
         "Default": "https://example.com/v",
     }
+
+
+def test_webpage_all_refreshes_every_monitor_key():
+    from unittest.mock import patch
+
+    s = _setup_stub(["M1", "M2"])
+    with (
+        patch.object(srv, "Monitors") as MM,
+        patch.object(srv, "get_instance", return_value=None),
+    ):
+        MM.return_value.get_monitors.return_value = {
+            "M1": object(),
+            "M2": object(),
+        }
+        s._setup_player("MODE_WEBPAGE", "https://example.com/", "")
+    assert s.config["data_source"] == {
+        "M1": "https://example.com/",
+        "M2": "https://example.com/",
+        "M9-stale": "https://example.com/",
+        "Default": "https://example.com/",
+    }
+
+
+def test_webpage_single_monitor_keeps_other_keys():
+    from unittest.mock import patch
+
+    s = _setup_stub(["M1", "M2"])
+    with (
+        patch.object(srv, "Monitors") as MM,
+        patch.object(srv, "get_instance", return_value=None),
+    ):
+        MM.return_value.get_monitors.return_value = {"M1": object(), "M2": object()}
+        s._setup_player("MODE_WEBPAGE", "https://example.com/", "M2")
+    assert s.config["data_source"] == {
+        "M1": "/old.mp4",
+        "M2": "https://example.com/",
+        "M9-stale": "/old.mp4",
+        "Default": "https://example.com/",
+    }

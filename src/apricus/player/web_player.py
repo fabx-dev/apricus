@@ -140,16 +140,35 @@ class WebPlayer(BasePlayer):
         if self.mode != MODE_WEBPAGE:
             raise ValueError("Invalid mode")
 
-        # Convert to uri if necessary
-        if (
-            not data_source.startswith("http://")
-            and not data_source.startswith("https://")
-            and not data_source.startswith("file://")
-        ):
-            data_source = pathlib.Path(data_source).resolve().as_uri()
+        sources = self.config[CONFIG_KEY_DATA_SOURCE]
+        key_of = {}
+        if self.windows:
+            from apricus.monitor import assign_keys
+
+            keyed = assign_keys(
+                [
+                    {
+                        "name": m.get_model(),
+                        "x": m.get_geometry().x,
+                        "y": m.get_geometry().y,
+                    }
+                    for m in self.windows
+                ]
+            )
+            for gdk_monitor, info in zip(self.windows, keyed, strict=True):
+                key_of[id(gdk_monitor)] = info["key"]
 
         for monitor, window in self.windows.items():
-            window.load_uri(data_source)
+            mkey = key_of.get(id(monitor), monitor.get_model())
+            source = sources.get(mkey) or sources.get(monitor.get_model()) or data_source
+            # Convert to uri if necessary
+            if (
+                not source.startswith("http://")
+                and not source.startswith("https://")
+                and not source.startswith("file://")
+            ):
+                source = pathlib.Path(source).resolve().as_uri()
+            window.load_uri(source)
             if not monitor.is_primary():
                 window.set_is_mute(True)
         self.volume = self.config[CONFIG_KEY_VOLUME]

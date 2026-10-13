@@ -78,6 +78,8 @@ CONFIG_KEY_PLAYLIST = "playlist"
 CONFIG_KEY_SHUFFLE = "playlist_shuffle"
 CONFIG_KEY_STREAM_HISTORY = "stream_history"
 CONFIG_KEY_STREAM_FAVORITES = "stream_favorites"
+CONFIG_KEY_WEB_HISTORY = "web_history"
+CONFIG_KEY_WEB_FAVORITES = "web_favorites"
 CONFIG_TEMPLATE = {
     CONFIG_KEY_VERSION: CONFIG_VERSION,
     CONFIG_KEY_MODE: MODE_NULL,
@@ -103,6 +105,9 @@ CONFIG_TEMPLATE = {
     CONFIG_KEY_STREAM_HISTORY: [],
     # Favorite stream URLs (subset worth pinning, newest first).
     CONFIG_KEY_STREAM_FAVORITES: [],
+    # Web pick-list, same policy (entries may also be local .html paths).
+    CONFIG_KEY_WEB_HISTORY: [],
+    CONFIG_KEY_WEB_FAVORITES: [],
 }
 
 

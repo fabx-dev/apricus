@@ -57,6 +57,7 @@ class ApricusServer:
         </method>
         <method name='webpage'>
             <arg type='s' name='webpage_url' direction='in'/>
+            <arg type='s' name='monitor' direction='in'/>
         </method>
         <method name='playlist'>
             <arg type='as' name='video_paths' direction='in'/>
@@ -144,7 +145,7 @@ class ApricusServer:
             if monitor and monitor != "all":
                 self.config[CONFIG_KEY_DATA_SOURCE][monitor] = data_source
             else:
-                if mode in (MODE_VIDEO, MODE_STREAM):
+                if mode in (MODE_VIDEO, MODE_STREAM, MODE_WEBPAGE):
                     # "All monitors": refresh every stored key plus every
                     # live one, not just Default. Stale per-monitor entries
                     # would otherwise shadow Default in the player's
@@ -292,9 +293,9 @@ class ApricusServer:
         _authorize("stream", dbus_context)
         self._setup_player(MODE_STREAM, stream_url, monitor)
 
-    def webpage(self, webpage_url=None, dbus_context=None):
+    def webpage(self, webpage_url=None, monitor="", dbus_context=None):
         _authorize("webpage", dbus_context)
-        self._setup_player(MODE_WEBPAGE, webpage_url)
+        self._setup_player(MODE_WEBPAGE, webpage_url, monitor)
 
     def playlist(self, video_paths=None, monitor=None, dbus_context=None):
         """Play a queue of videos, looping. Muted by design (PipeWire safety)."""
