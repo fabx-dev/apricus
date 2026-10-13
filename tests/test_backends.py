@@ -17,6 +17,17 @@ from apricus.backends import (
 )
 
 
+def test_static_frame_cmd_forces_8bit_png():
+    """10-bit sources must not produce 16-bit PNGs: Mutter rejects them
+    as wallpaper and falls back to the default blue background."""
+    from apricus.player.video_player import VideoPlayer
+
+    cmd = VideoPlayer._static_ffmpeg_cmd("/v/a.mov", "00:00:10", "/tmp/out.png")
+    assert "-pix_fmt" in cmd and "rgb24" in cmd
+    assert cmd.index("-pix_fmt") < cmd.index("/tmp/out.png")
+    assert cmd[-1] == "/tmp/out.png"
+
+
 def test_null_wallpaper_backend_is_inert(tmp_path):
     wb = NullWallpaperBackend()
     assert wb.supports_static is False

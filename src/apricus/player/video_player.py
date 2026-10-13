@@ -792,6 +792,24 @@ class VideoPlayer(BasePlayer):
         )
         thread.start()
 
+    @staticmethod
+    def _static_ffmpeg_cmd(video, ss, tmp_path):
+        # Force 8-bit output: 10-bit sources (e.g. yuv420p10le) otherwise
+        # produce 16-bit PNGs that Mutter refuses as wallpaper (blue fallback).
+        return [
+            "ffmpeg",
+            "-y",
+            "-ss",
+            ss,
+            "-i",
+            video,
+            "-vframes",
+            "1",
+            "-pix_fmt",
+            "rgb24",
+            tmp_path,
+        ]
+
     def _generate_static_wallpaper(self, video, cached, token):
         _width, _height, duration = mediacache.probe_video(video)
         if duration is None:
@@ -802,17 +820,7 @@ class VideoPlayer(BasePlayer):
         tmp_path = f"{cached}.tmp.png"
         try:
             ret = subprocess.run(
-                [
-                    "ffmpeg",
-                    "-y",
-                    "-ss",
-                    ss,
-                    "-i",
-                    video,
-                    "-vframes",
-                    "1",
-                    tmp_path,
-                ],
+                self._static_ffmpeg_cmd(video, ss, tmp_path),
                 shell=False,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.STDOUT,
