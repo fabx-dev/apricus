@@ -464,7 +464,9 @@ def sidebar_builds_four_rows_and_pages():
 
     Adw.init()
     obj = app.ControlPanel.__new__(app.ControlPanel)
-    sidebar = obj._build_sidebar()
+    obj.version = "test"
+    container = obj._build_sidebar()
+    sidebar = container.get_first_child()
     rows = [sidebar.get_row_at_index(i) for i in range(6)]
     assert [r.get_name() for r in rows] == [
         "library",
@@ -474,6 +476,15 @@ def sidebar_builds_four_rows_and_pages():
         "webpage",
         "settings",
     ]
+    assert obj.sidebar_dot is not None and obj.sidebar_status is not None
+    assert obj.sidebar_version is not None
+    assert "test" in obj.sidebar_version.get_text()
+    # Sidebar slot must never claim extra width: nested rows contain
+    # expanding children, so without pinning the whole sidebar swallows
+    # free window space (compute_expand propagates up).
+    assert obj.sidebar_box.get_hexpand_set() is True
+    assert obj.sidebar_box.get_hexpand() is False
+    assert obj.sidebar_status.get_hexpand() is False
     obj._library_page()
     assert obj.video_store is not None and obj.video_selection is not None
     obj._playlist_page()
@@ -490,7 +501,11 @@ def sidebar_builds_four_rows_and_pages():
     assert obj.web_hero_title is not None and obj.web_detect_row is not None
     assert obj.web_file_row is not None and obj.web_details is not None
     obj._settings_page()
-    assert obj.mute_switch is not None and obj.volume_scale is not None
+    assert not hasattr(obj, "mute_switch"), "mute lives only in Now Playing"
+    assert not hasattr(obj, "volume_scale"), "volume lives only in Now Playing"
+    assert obj.static_switch is not None
+    assert obj.pause_max_switch is not None and obj.mute_max_switch is not None
+    assert obj.autostart_switch is not None
 
 
 @check
@@ -1473,6 +1488,237 @@ def hero_parity_streaming_webpage():
 
 
 @check
+def web_file_row_ignores_non_webpage_sources():
+    """Video files or other modes must not leak into the Local web page row."""
+    obj, _ = _panel(_base_config(), [])
+    shown = {}
+
+    class _Row:
+        def set_title(self, title):
+            shown["title"] = title
+
+        def set_subtitle(self, subtitle):
+            shown["subtitle"] = subtitle
+
+    obj.web_file_row = _Row()
+    obj.config = {
+        "mode": "MODE_VIDEO",
+        "data_source": {"Default": "/v/movie.mp4"},
+        "video_dir": None,
+    }
+    obj._refresh_web_file_row()
+    assert shown["title"] == "No page chosen", shown
+    assert "HTML web page" in shown["subtitle"], shown
+
+
+@check
+def sidebar_status_text_maps_states():
+    css, text = app.ControlPanel._sidebar_status_text(False, "MODE_VIDEO")
+    assert (css, text) == ("error", "Server assente"), (css, text)
+    css, text = app.ControlPanel._sidebar_status_text(True, "MODE_PLAYLIST")
+    assert (css, text) == ("success", "Pronto — Playlist (muted)"), (css, text)
+    css, text = app.ControlPanel._sidebar_status_text(True, "BOGUS")
+    assert (css, text) == ("success", "Pronto — Static wallpaper"), (css, text)
+
+
+@check
+def about_dialog_carries_identity_and_license():
+    import os
+
+    assert os.environ.get("DISPLAY"), "needs a display (run under Xvfb)"
+    from gi.repository import Adw, Gtk
+
+    Adw.init()
+    obj = app.ControlPanel.__new__(app.ControlPanel)
+    obj.version = "1.0"
+    dialog = obj._make_about_dialog()
+    assert dialog.get_application_name() == "Apricus"
+    assert dialog.get_version() == "1.0"
+    assert dialog.get_website() == "https://github.com/fabx-dev/apricus"
+    assert dialog.get_license_type() == Gtk.License.GPL_3_0
+    assert "Community fork of Hidamari" in dialog.get_comments()
+    assert not dialog.get_copyright()
+    assert any("fabx-dev" in dev for dev in dialog.get_developers())
+
+
+@check
+def sidebar_status_toggles_eq_and_dot():
+    obj, _ = _panel(_base_config(), [])
+    vis = {}
+
+    class _W:
+        def __init__(self, name):
+            self._name = name
+
+        def set_visible(self, visible):
+            vis[self._name] = visible
+
+        def set_text(self, text):
+            pass
+
+        def set_tooltip_text(self, text):
+            pass
+
+        def add_css_class(self, cls):
+            pass
+
+        def remove_css_class(self, cls):
+            pass
+
+    obj.sidebar_dot = _W("dot")
+    obj.sidebar_status = _W("label")
+    obj.sidebar_eq = _W("eq")
+    obj._animations_enabled = lambda: True
+
+    class _Srv:
+        mode = "MODE_VIDEO"
+        is_paused_by_user = False
+
+    obj._refresh_sidebar_status(_Srv(), "MODE_VIDEO")
+    assert vis == {"eq": True, "dot": False}, vis
+    obj._refresh_sidebar_status(None, "MODE_NULL")
+    assert vis == {"eq": False, "dot": True}, vis
+
+
+@check
+def autostart_enabled_reflects_disk():
+    import tempfile
+
+    import apricus.gui.gtk4app as appmod
+
+    real = appmod.AUTOSTART_DESKTOP_PATH
+    tmp = tempfile.mkdtemp(prefix="apricus-autostart-")
+    appmod.AUTOSTART_DESKTOP_PATH = tmp + "/io.github.fabx_dev.Apricus.desktop"
+    try:
+        obj, _ = _panel(_base_config(), [])
+        assert obj._autostart_enabled() is False
+        open(appmod.AUTOSTART_DESKTOP_PATH, "w").write("[Desktop Entry]\n")
+        assert obj._autostart_enabled() is True
+    finally:
+        appmod.AUTOSTART_DESKTOP_PATH = real
+
+
+@check
+def autostart_toggle_roundtrip_and_rollback():
+    import apricus.gui.gtk4app as appmod
+
+    real_path = appmod.AUTOSTART_DESKTOP_PATH
+    real_setup = appmod.setup_autostart
+    tmp = __import__("tempfile").mkdtemp(prefix="apricus-autostart-")
+    appmod.AUTOSTART_DESKTOP_PATH = tmp + "/io.github.fabx_dev.Apricus.desktop"
+
+    class _Switch:
+        def __init__(self, active):
+            self.active = active
+
+        def get_active(self):
+            return self.active
+
+        def set_active(self, value):
+            self.active = bool(value)
+
+    def fake_setup(want):
+        if want:
+            open(appmod.AUTOSTART_DESKTOP_PATH, "w").write("x")
+        else:
+            import os
+
+            if os.path.isfile(appmod.AUTOSTART_DESKTOP_PATH):
+                os.remove(appmod.AUTOSTART_DESKTOP_PATH)
+
+    appmod.setup_autostart = fake_setup
+    try:
+        obj, _ = _panel(_base_config(), [])
+        seen_toasts, seen_errors = [], []
+        obj._toast = lambda msg: seen_toasts.append(msg)
+        obj._show_error = lambda msg: seen_errors.append(msg)
+        switch = _Switch(True)
+        obj._on_autostart_toggled(switch, None)
+        assert obj._autostart_enabled() is True
+        assert seen_toasts == ["Startup enabled"] and not seen_errors
+        switch = _Switch(False)
+        obj._on_autostart_toggled(switch, None)
+        assert obj._autostart_enabled() is False
+        assert seen_toasts[-1] == "Startup disabled"
+        # Failure rolls the switch back and reports.
+        def boom(want):
+            raise OSError("read-only")
+
+        appmod.setup_autostart = boom
+        switch = _Switch(True)
+        obj._on_autostart_toggled(switch, None)
+        assert switch.get_active() is False
+        assert seen_errors and not obj._autostart_enabled()
+    finally:
+        appmod.AUTOSTART_DESKTOP_PATH = real_path
+        appmod.setup_autostart = real_setup
+
+
+@check
+def settings_flag_persists_and_calls_server():
+    import apricus.gui.gtk4app as appmod
+
+    class _Switch:
+        def __init__(self, active):
+            self.active = active
+
+        def get_active(self):
+            return self.active
+
+    class _Server:
+        pass
+
+    store = _ConfigStore(_base_config())
+    old = _patch_config(None, store)
+    try:
+        obj, _ = _panel(_base_config(), [])
+        server = _Server()
+        obj._server = lambda: server
+        obj._on_settings_flag(_Switch(True), None, "is_static_wallpaper")
+        assert server.is_static_wallpaper is True
+        assert store.config["is_static_wallpaper"] is True
+        # Server absent: still persists locally.
+        obj._server = lambda: None
+        obj._on_settings_flag(_Switch(False), None, "is_pause_when_maximized")
+        assert store.config["is_pause_when_maximized"] is False
+    finally:
+        appmod.ConfigUtil = old
+
+
+@check
+def settings_has_no_mute_volume_or_lucky():
+    """Volume/Mute live only in Now Playing; Feeling Lucky was never a switch."""
+    import os
+
+    assert os.environ.get("DISPLAY"), "needs a display (run under Xvfb)"
+    from gi.repository import Adw, Gtk
+
+    Adw.init()
+    obj = app.ControlPanel.__new__(app.ControlPanel)
+    obj.version = "test"
+    obj.config = dict(_base_config())
+    obj.config["video_dir"] = None
+    page = obj._settings_page()
+    labels = []
+
+    def walk(widget):
+        if isinstance(widget, (Gtk.Label, Gtk.Button)):
+            text = widget.get_label() if isinstance(widget, Gtk.Button) else widget.get_text()
+            if text:
+                labels.append(text)
+        child = widget.get_first_child() if hasattr(widget, "get_first_child") else None
+        while child is not None:
+            walk(child)
+            child = child.get_next_sibling()
+
+    walk(page)
+    joined = "\n".join(labels)
+    assert "Mute" not in labels, labels
+    assert "Volume" not in labels, labels
+    assert "Lucky" not in joined and "lucky" not in joined, labels
+
+
+@check
 def toast_without_overlay_is_noop():
     obj, _ = _panel(_base_config(), [])
     obj._toast("hello")  # must not raise without a ToastOverlay
@@ -1490,30 +1736,6 @@ def toast_records_message():
     obj.toasts = _Overlay()
     obj._toast("done")
     assert seen == ["done"], seen
-
-
-@check
-def refresh_badges_updates_labels():
-    obj, _ = _panel(_base_config(), [])
-    texts = {}
-    vis = {}
-
-    class _Label:
-        def __init__(self, name):
-            self._name = name
-
-        def set_text(self, text):
-            texts[self._name] = text
-
-        def set_visible(self, visible):
-            vis[self._name] = visible
-
-    obj.sidebar_badges = {"library": _Label("library"), "playlist": _Label("playlist")}
-    obj._refresh_badges(7, 0)
-    assert texts == {"library": "7", "playlist": "0"}, texts
-    assert vis == {"playlist": False}, vis
-    obj._refresh_badges(7, 3)
-    assert texts["playlist"] == "3" and vis == {"playlist": True}, (texts, vis)
 
 
 @check
@@ -1550,9 +1772,7 @@ def shell_refresh_reveals_banner_and_badges():
     obj.server_banner = banner
     obj._refresh_all()
     assert banner.get_revealed(), "banner must show when the server is missing"
-    assert obj.sidebar_badges["library"].get_text() == "0"
-    assert obj.sidebar_badges["playlist"].get_text() == "2"
-    assert obj.sidebar_badges["playlist"].get_visible()
+    assert not hasattr(obj, "sidebar_badges"), "badges removed for narrow sidebar"
     assert obj._app_logo_image(28).get_pixel_size() == 28
 
 
@@ -1745,6 +1965,38 @@ def test_toast_without_overlay_is_noop():
     _run("toast_without_overlay_is_noop")
 
 
+def test_autostart_enabled_reflects_disk():
+    _run("autostart_enabled_reflects_disk")
+
+
+def test_autostart_toggle_roundtrip_and_rollback():
+    _run("autostart_toggle_roundtrip_and_rollback")
+
+
+def test_settings_flag_persists_and_calls_server():
+    _run("settings_flag_persists_and_calls_server")
+
+
+def test_settings_has_no_mute_volume_or_lucky():
+    _run_display("settings_has_no_mute_volume_or_lucky")
+
+
+def test_sidebar_status_toggles_eq_and_dot():
+    _run("sidebar_status_toggles_eq_and_dot")
+
+
+def test_sidebar_status_text_maps_states():
+    _run("sidebar_status_text_maps_states")
+
+
+def test_about_dialog_carries_identity_and_license():
+    _run_display("about_dialog_carries_identity_and_license")
+
+
+def test_web_file_row_ignores_non_webpage_sources():
+    _run("web_file_row_ignores_non_webpage_sources")
+
+
 def test_hero_parity_streaming_webpage():
     _run_display("hero_parity_streaming_webpage")
 
@@ -1843,10 +2095,6 @@ def test_queue_actions_follow_selection_and_content():
 
 def test_toast_records_message():
     _run("toast_records_message")
-
-
-def test_refresh_badges_updates_labels():
-    _run("refresh_badges_updates_labels")
 
 
 def test_shell_refresh_reveals_banner_and_badges():

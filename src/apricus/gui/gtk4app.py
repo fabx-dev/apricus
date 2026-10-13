@@ -31,16 +31,21 @@ from gi.repository import Adw, Gdk, Gio, GLib, GObject, Gtk
 from pydbus import SessionBus
 
 from apricus.commons import (
+    AUTOSTART_DESKTOP_PATH,
     CONFIG_KEY_DATA_SOURCE,
     CONFIG_KEY_MODE,
     CONFIG_KEY_MUTE,
+    CONFIG_KEY_MUTE_WHEN_MAXIMIZED,
+    CONFIG_KEY_PAUSE_WHEN_MAXIMIZED,
     CONFIG_KEY_PLAYLIST,
+    CONFIG_KEY_STATIC_WALLPAPER,
     CONFIG_KEY_STREAM_FAVORITES,
     CONFIG_KEY_STREAM_HISTORY,
     CONFIG_KEY_VIDEO_DIR,
     CONFIG_KEY_VOLUME,
     CONFIG_KEY_WEB_FAVORITES,
     CONFIG_KEY_WEB_HISTORY,
+    CONFIG_PATH,
     DBUS_NAME_SERVER,
     LOGGER_NAME,
     MODE_NULL,
@@ -51,7 +56,15 @@ from apricus.commons import (
     PROJECT,
     resolve_video_dir,
 )
-from apricus.utils import ConfigUtil, get_video_paths, init_translations, setup_logging
+from apricus.utils import (
+    ConfigUtil,
+    get_video_paths,
+    init_translations,
+    is_gnome,
+    is_wayland,
+    setup_autostart,
+    setup_logging,
+)
 
 logger = logging.getLogger(LOGGER_NAME)
 
@@ -115,9 +128,10 @@ class ControlPanel(Adw.Application):
             self.stack.add_titled(self._webpage_page(), "webpage", "Web Page")
             self.stack.add_titled(self._settings_page(), "settings", "Settings")
             self.stack.set_hexpand(True)
-            self.sidebar = self._build_sidebar()
+            self.stack.set_vexpand(True)
+            self._build_sidebar()
             content = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
-            content.append(self.sidebar)
+            content.append(self.sidebar_box)
             content.append(Gtk.Separator(orientation=Gtk.Orientation.VERTICAL))
             content.append(self.stack)
             self.toasts = Adw.ToastOverlay()
@@ -145,26 +159,64 @@ class ControlPanel(Adw.Application):
         self.window.present()
 
     def _build_sidebar(self):
+        from gi.repository import Pango
+
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        self.sidebar_box = box
+        # Fixed slot: never claim extra horizontal space even though nested
+        # rows contain expanding children (Adw internals). Without pinning,
+        # compute_expand() propagates up and the sidebar swallows half the
+        # free window width.
+        box.set_hexpand(False)
+        box.set_hexpand_set(True)
         sidebar = Gtk.ListBox()
         sidebar.add_css_class("navigation-sidebar")
+        sidebar.set_vexpand(True)
         self.sidebar_rows = {}
-        self.sidebar_badges = {}
         for name, title, icon_name in self.SECTIONS:
             row = Adw.ActionRow()
             row.set_name(name)
             row.set_title(title)
             icon = Gtk.Image.new_from_icon_name(icon_name)
             row.add_prefix(icon)
-            if name in ("library", "playlist"):
-                badge = Gtk.Label(label="")
-                badge.add_css_class("caption")
-                badge.add_css_class("sidebar-badge")
-                row.add_suffix(badge)
-                self.sidebar_badges[name] = badge
             self.sidebar_rows[name] = row
             sidebar.append(row)
         sidebar.connect("row-selected", self._on_sidebar_selected)
-        return sidebar
+        self.sidebar = sidebar
+        box.append(sidebar)
+        status_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        status_row.set_margin_top(8)
+        status_row.set_margin_bottom(2)
+        status_row.set_margin_start(12)
+        status_row.set_margin_end(12)
+        self.sidebar_dot = Gtk.Label(label="●")
+        status_row.append(self.sidebar_dot)
+        self.sidebar_eq = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=2)
+        self.sidebar_eq.set_valign(Gtk.Align.CENTER)
+        for _ in range(3):
+            bar = Gtk.Box()
+            bar.set_size_request(3, 10)
+            bar.add_css_class("sb-eq-bar")
+            self.sidebar_eq.append(bar)
+        status_row.append(self.sidebar_eq)
+        self.sidebar_status = Gtk.Label(label="")
+        self.sidebar_status.set_xalign(0)
+        self.sidebar_status.set_ellipsize(Pango.EllipsizeMode.END)
+        self.sidebar_status.set_max_width_chars(14)
+        status_row.append(self.sidebar_status)
+        box.append(status_row)
+        self.sidebar_version = Gtk.Label(label=f"Apricus {self.version}")
+        self.sidebar_version.add_css_class("dim-label")
+        self.sidebar_version.add_css_class("caption")
+        self.sidebar_version.set_xalign(0)
+        self.sidebar_version.set_ellipsize(Pango.EllipsizeMode.END)
+        self.sidebar_version.set_max_width_chars(22)
+        self.sidebar_version.set_margin_start(12)
+        self.sidebar_version.set_margin_end(12)
+        self.sidebar_version.set_margin_bottom(8)
+        box.append(self.sidebar_version)
+        self._refresh_sidebar_status(None, None)
+        return box
 
     @staticmethod
     def _app_logo_path():
@@ -191,8 +243,6 @@ class ControlPanel(Adw.Application):
     def _load_css():
         css = Gtk.CssProvider()
         css.load_from_data(
-            b".sidebar-badge { background: alpha(@accent_bg_color, 0.18); "
-            b"border-radius: 999px; padding: 1px 8px; }"
             b".np-caption { background: alpha(black, 0.55); border-radius: 12px; "
             b"padding: 12px; }"
             b".np-caption .title-1 { color: white; }"
@@ -209,6 +259,10 @@ class ControlPanel(Adw.Application):
             b".np-eq-bar:nth-child(6) { animation-delay: 0.75s; }"
             b".np-eq-bar:nth-child(7) { animation-delay: 0.9s; }"
             b"@keyframes np-eq { from { opacity: 0.35; } to { opacity: 1; } }"
+            b".sb-eq-bar { background: @success_color; border-radius: 2px; "
+            b"animation: np-eq 0.9s ease-in-out infinite alternate; }"
+            b".sb-eq-bar:nth-child(2) { animation-delay: 0.3s; }"
+            b".sb-eq-bar:nth-child(3) { animation-delay: 0.6s; }"
             b".web-hero { background-image: linear-gradient(to bottom, "
             b"alpha(@accent_bg_color, 0.55), alpha(black, 0.75)); "
             b"border-radius: 12px; padding: 32px; }"
@@ -225,17 +279,59 @@ class ControlPanel(Adw.Application):
             return
         overlay.add_toast(Adw.Toast.new(message))
 
-    def _refresh_badges(self, n_videos, n_queue):
-        badges = getattr(self, "sidebar_badges", None)
-        if not badges:
+    @staticmethod
+    def _sidebar_status_text(server_present, mode):
+        """(dot_css_class, status_text) for the sidebar footer."""
+        if not server_present:
+            return "error", "Server assente"
+        return "success", f"Pronto — {ControlPanel._mode_text(mode)}"
+
+    @staticmethod
+    def _animations_enabled():
+        settings = Gtk.Settings.get_default()
+        return bool(settings and settings.props.gtk_enable_animations)
+
+    def _refresh_sidebar_status(self, server, mode):
+        dot = getattr(self, "sidebar_dot", None)
+        label = getattr(self, "sidebar_status", None)
+        eq = getattr(self, "sidebar_eq", None)
+        if dot is None or label is None:
             return
-        library = badges.get("library")
-        if library is not None:
-            library.set_text(str(n_videos))
-        playlist = badges.get("playlist")
-        if playlist is not None:
-            playlist.set_text(str(n_queue))
-            playlist.set_visible(n_queue > 0)
+        css, text = self._sidebar_status_text(server is not None, mode)
+        playing = False
+        if server is not None:
+            try:
+                paused = bool(server.is_paused_by_user)
+            except Exception:  # noqa: BLE001 - unknown state means not playing
+                paused = True
+            playing = not paused and mode in (MODE_VIDEO, MODE_STREAM, MODE_PLAYLIST)
+        show_eq = bool(playing and self._animations_enabled() and eq is not None)
+        if eq is not None:
+            eq.set_visible(show_eq)
+        dot.set_visible(not show_eq)
+        for cls in ("success", "error"):
+            dot.remove_css_class(cls)
+        dot.add_css_class(css)
+        label.set_text(text)
+        label.set_tooltip_text(
+            "Background service unreachable. Start Apricus." if server is None else text
+        )
+
+    def _show_about(self, *_args):
+        self._make_about_dialog().present(self.window)
+
+    def _make_about_dialog(self):
+        dialog = Adw.AboutDialog()
+        dialog.set_application_name("Apricus")
+        dialog.set_version(self.version)
+        dialog.set_comments("Live wallpaper for Linux. Community fork of Hidamari.")
+        dialog.set_website("https://github.com/fabx-dev/apricus")
+        dialog.add_link("GitHub", "https://github.com/fabx-dev/apricus")
+        dialog.set_developers(["fabx-dev https://github.com/fabx-dev"])
+        dialog.set_artists(["Apricus icon: original"])
+        dialog.set_application_icon("io.github.fabx_dev.Apricus")
+        dialog.set_license_type(Gtk.License.GPL_3_0)
+        return dialog
 
     def _on_sidebar_selected(self, _sidebar, row):
         if row is not None:
@@ -1286,7 +1382,7 @@ class ControlPanel(Adw.Application):
                     size = os.path.getsize(current)
                 except OSError:
                     size = None
-                rows["line2"].set_subtitle("Local file")
+                rows["line2"].set_subtitle("Local web page")
                 rows["line3"].set_subtitle(current)
                 rows["line4"].set_subtitle(
                     f"Web page — {self._format_file_size(size)}" if size is not None else "Web page"
@@ -2412,14 +2508,14 @@ class ControlPanel(Adw.Application):
         box.append(row)
         self.webpage_apply_btn = apply_btn
         file_group = Adw.PreferencesGroup()
-        file_group.set_title("Local file")
+        file_group.set_title("Local web page")
         self.web_file_row = Adw.ActionRow()
-        self.web_file_row.set_title("No file chosen")
-        self.web_file_row.set_subtitle("Choose an HTML file on this PC")
+        self.web_file_row.set_title("No page chosen")
+        self.web_file_row.set_subtitle("Choose an HTML web page on this PC")
         file_icon = Gtk.Image.new_from_icon_name("x-office-document-symbolic")
         self.web_file_row.add_prefix(file_icon)
         choose_btn = Gtk.Button(label="Choose…")
-        choose_btn.set_tooltip_text("Choose local HTML file")
+        choose_btn.set_tooltip_text("Choose local HTML web page")
         choose_btn.set_valign(Gtk.Align.CENTER)
         choose_btn.connect("clicked", self.on_webpage_choose_file)
         self.web_file_row.add_suffix(choose_btn)
@@ -2739,10 +2835,10 @@ class ControlPanel(Adw.Application):
         current = (config.get(CONFIG_KEY_DATA_SOURCE) or {}).get("Default", "")
         if not current:
             return
-        if "://" not in current and os.path.isfile(current):
+        if "://" not in current and current.lower().endswith((".html", ".htm")):
             self._refresh_web_file_row()
             self._update_web_hero(current, "")
-        else:
+        elif "://" in current:
             self.webpage_entry.set_text(current)
             self._update_web_hero(current, "")
 
@@ -2791,17 +2887,27 @@ class ControlPanel(Adw.Application):
             return
         config = getattr(self, "config", None) or {}
         current = (config.get(CONFIG_KEY_DATA_SOURCE) or {}).get("Default", "")
-        if current and "://" not in current and os.path.isfile(current):
-            try:
-                size = os.path.getsize(current)
-            except OSError:
-                size = None
-            row.set_title(self._plain(os.path.basename(current)))
-            row.set_subtitle(
-                self._plain(
-                    f"{current} — {self._format_file_size(size)}" if size is not None else current
-                )
+        is_web_file = (
+            config.get(CONFIG_KEY_MODE) == MODE_WEBPAGE
+            and bool(current)
+            and "://" not in current
+            and current.lower().endswith((".html", ".htm"))
+            and os.path.isfile(current)
+        )
+        if not is_web_file:
+            row.set_title("No page chosen")
+            row.set_subtitle("Choose an HTML web page on this PC")
+            return
+        try:
+            size = os.path.getsize(current)
+        except OSError:
+            size = None
+        row.set_title(self._plain(os.path.basename(current)))
+        row.set_subtitle(
+            self._plain(
+                f"{current} — {self._format_file_size(size)}" if size is not None else current
             )
+        )
 
     def _refresh_web_details(self):
         group = getattr(self, "web_details", None)
@@ -2824,7 +2930,7 @@ class ControlPanel(Adw.Application):
                 size = None
             rows["title"].set_subtitle(os.path.basename(current))
             rows["address"].set_subtitle(current)
-            rows["source"].set_subtitle(f"Local file — {self._format_file_size(size)}")
+            rows["source"].set_subtitle(f"Local web page — {self._format_file_size(size)}")
         else:
             rows["title"].set_subtitle("…")
             rows["address"].set_subtitle(current)
@@ -2932,7 +3038,7 @@ class ControlPanel(Adw.Application):
 
     def on_webpage_choose_file(self, *_args):
         dialog = Gtk.FileDialog()
-        dialog.set_title("Choose a HTML file")
+        dialog.set_title("Choose a local HTML web page")
         html_filter = Gtk.FileFilter()
         html_filter.set_name("HTML files")
         html_filter.add_pattern("*.html")
@@ -2966,28 +3072,196 @@ class ControlPanel(Adw.Application):
         dialog.connect("response", lambda *_: dialog.close())
         dialog.present(self.window)
 
+    def _settings_switch_row(self, parent, title, subtitle, active, sensitive=True):
+        row = Adw.ActionRow()
+        row.set_title(title)
+        row.set_subtitle(subtitle)
+        switch = Gtk.Switch()
+        switch.set_valign(Gtk.Align.CENTER)
+        switch.set_active(bool(active))
+        switch.set_sensitive(sensitive)
+        parent.add(row)
+        row.add_suffix(switch)
+        return row, switch
+
     def _settings_page(self):
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
         box.set_margin_top(24)
         box.set_margin_bottom(24)
         box.set_margin_start(24)
         box.set_margin_end(24)
-        mute_row = Adw.ActionRow()
-        mute_row.set_title("Mute")
-        self.mute_switch = Gtk.Switch()
-        self.mute_switch.set_valign(Gtk.Align.CENTER)
-        self.mute_switch.connect("state-set", self.on_mute_toggled)
-        mute_row.add_suffix(self.mute_switch)
-        box.append(mute_row)
-        vol_row = Adw.ActionRow()
-        vol_row.set_title("Volume")
-        self.volume_scale = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, 0, 100, 1)
-        self.volume_scale.set_hexpand(True)
-        self.volume_scale.set_valign(Gtk.Align.CENTER)
-        self.volume_scale.connect("value-changed", self.on_volume_changed)
-        vol_row.add_suffix(self.volume_scale)
-        box.append(vol_row)
+        config = getattr(self, "config", None) or {}
+        behaviour = Adw.PreferencesGroup()
+        behaviour.set_title("Behaviour")
+        self.static_row, self.static_switch = self._settings_switch_row(
+            behaviour,
+            "Static wallpaper",
+            "Keep the last video frame as wallpaper",
+            bool(config.get(CONFIG_KEY_STATIC_WALLPAPER, True)),
+            sensitive=is_gnome(),
+        )
+        if not is_gnome():
+            self.static_row.set_subtitle("Only on GNOME")
+        self.static_switch.connect("state-set", self._on_settings_flag, CONFIG_KEY_STATIC_WALLPAPER)
+        wayland = is_wayland()
+        self.pause_max_row, self.pause_max_switch = self._settings_switch_row(
+            behaviour,
+            "Pause when maximized",
+            "Pause playback when a window is maximized",
+            bool(config.get(CONFIG_KEY_PAUSE_WHEN_MAXIMIZED, True)),
+            sensitive=not wayland,
+        )
+        if wayland:
+            self.pause_max_row.set_subtitle("Requires X11")
+        self.pause_max_switch.connect(
+            "state-set", self._on_settings_flag, CONFIG_KEY_PAUSE_WHEN_MAXIMIZED
+        )
+        self.mute_max_row, self.mute_max_switch = self._settings_switch_row(
+            behaviour,
+            "Mute when maximized",
+            "Mute audio when a window is maximized",
+            bool(config.get(CONFIG_KEY_MUTE_WHEN_MAXIMIZED, False)),
+            sensitive=not wayland,
+        )
+        if wayland:
+            self.mute_max_row.set_subtitle("Requires X11")
+        self.mute_max_switch.connect(
+            "state-set", self._on_settings_flag, CONFIG_KEY_MUTE_WHEN_MAXIMIZED
+        )
+        box.append(behaviour)
+        startup = Adw.PreferencesGroup()
+        startup.set_title("Startup")
+        self.autostart_row, self.autostart_switch = self._settings_switch_row(
+            startup,
+            "Start wallpaper at login",
+            "Start only the wallpaper service at login",
+            self._autostart_enabled(),
+        )
+        self._update_autostart_subtitle(self.autostart_switch.get_active())
+        self.autostart_switch.connect("state-set", self._on_autostart_toggled)
+        box.append(startup)
+        system = Adw.PreferencesGroup()
+        system.set_title("System")
+        config_row = Adw.ActionRow()
+        config_row.set_title("Open configuration")
+        config_row.set_subtitle(self._short_config_path())
+        config_btn = Gtk.Button(label="Open")
+        config_btn.set_valign(Gtk.Align.CENTER)
+        config_btn.connect("clicked", self._on_open_config)
+        config_row.add_suffix(config_btn)
+        system.add(config_row)
+        help_row = Adw.ActionRow()
+        help_row.set_title("How to select videos")
+        help_row.set_subtitle("Selection shortcuts for the library")
+        help_btn = Gtk.Button(label="Show")
+        help_btn.set_valign(Gtk.Align.CENTER)
+        help_btn.connect("clicked", self._on_selection_help)
+        help_row.add_suffix(help_btn)
+        system.add(help_row)
+        box.append(system)
+        info = Adw.PreferencesGroup()
+        info.set_title("Info")
+        about_row = Adw.ActionRow()
+        about_row.set_title("About Apricus")
+        about_row.set_subtitle(f"Version {self.version} · GPL-3.0-or-later")
+        about_btn = Gtk.Button(label="Open")
+        about_btn.set_valign(Gtk.Align.CENTER)
+        about_btn.connect("clicked", self._show_about)
+        about_row.add_suffix(about_btn)
+        info.add(about_row)
+        box.append(info)
         return self._scroll_page(self._clamp_page(box))
+
+    @staticmethod
+    def _short_config_path():
+        home = os.path.expanduser("~")
+        return CONFIG_PATH.replace(home, "~")
+
+    @staticmethod
+    def _autostart_enabled():
+        try:
+            return os.path.isfile(AUTOSTART_DESKTOP_PATH)
+        except OSError:
+            return False
+
+    def _update_autostart_subtitle(self, enabled):
+        row = getattr(self, "autostart_row", None)
+        if row is None:
+            return
+        row.set_subtitle(
+            "Wallpaper service starts at login"
+            if enabled
+            else "Starts only the wallpaper service at login"
+        )
+
+    def _on_autostart_toggled(self, switch, *args):
+        if getattr(self, "_autostart_busy", False):
+            return False
+        want = bool(switch.get_active())
+        self._autostart_busy = True
+        try:
+            setup_autostart(want)
+        except Exception as e:  # noqa: BLE001 - report, then roll back
+            logger.warning(f"[GUI4] Autostart change failed: {e}")
+            switch.set_active(not want)
+            self._show_error("Could not change the startup setting.")
+            return False
+        finally:
+            self._autostart_busy = False
+        actual = self._autostart_enabled()
+        if actual != want:
+            self._autostart_busy = True
+            try:
+                switch.set_active(actual)
+            finally:
+                self._autostart_busy = False
+            self._show_error("Could not change the startup setting.")
+            return False
+        self._update_autostart_subtitle(actual)
+        self._toast("Startup enabled" if actual else "Startup disabled")
+        return False
+
+    _SETTINGS_FLAG_ATTRS = {
+        CONFIG_KEY_STATIC_WALLPAPER: "is_static_wallpaper",
+        CONFIG_KEY_PAUSE_WHEN_MAXIMIZED: "is_pause_when_maximized",
+        CONFIG_KEY_MUTE_WHEN_MAXIMIZED: "is_mute_when_maximized",
+    }
+
+    def _on_settings_flag(self, switch, _state, key):
+        if getattr(self, "_syncing_flags", False):
+            return False
+        want = bool(switch.get_active())
+        server = self._server()
+        if server is not None:
+            try:
+                setattr(server, self._SETTINGS_FLAG_ATTRS[key], want)
+            except Exception as e:  # noqa: BLE001 - keep config, report
+                logger.warning(f"[GUI4] Server flag update failed: {e}")
+        self.config = ConfigUtil().load()
+        self.config[key] = want
+        ConfigUtil().save(self.config)
+        return False
+
+    def _on_open_config(self, *_args):
+        try:
+            Gio.AppInfo.launch_default_for_uri(GLib.filename_to_uri(CONFIG_PATH))
+        except GLib.Error as e:
+            logger.warning(f"[GUI4] Could not open config: {e.message}")
+            self._show_error("Could not open the configuration file.")
+
+    def _on_selection_help(self, *_args):
+        dialog = Adw.AlertDialog(
+            heading="How to select videos",
+            body=(
+                "Click to select a video.\n"
+                "Ctrl+click or Shift+click selects more than one.\n"
+                "Apply lets you choose the monitor."
+            ),
+        )
+        dialog.add_response("ok", "OK")
+        dialog.set_default_response("ok")
+        dialog.connect("response", lambda *_: dialog.close())
+        dialog.present(self.window)
 
     # -- refresh + handlers ---------------------------------------------
 
@@ -3000,25 +3274,18 @@ class ControlPanel(Adw.Application):
         self._reload_queue_store()
         self._refresh_playlist_status()
         self._refresh_now_playing()
-        is_playlist = mode == MODE_PLAYLIST
-        self.mute_switch.set_state(bool(self.config.get(CONFIG_KEY_MUTE)))
-        self.volume_scale.set_value(int(self.config.get(CONFIG_KEY_VOLUME, 50)))
-        self.volume_scale.set_sensitive(not is_playlist)
-        self.mute_switch.set_sensitive(not is_playlist)
         self.shuffle_check.set_active(bool(self.config.get("playlist_shuffle")))
         playlist = (self.config.get("playlist") or {}).get("Default", [])
         self.playlist_status.set_text(
             f"{len(playlist)} videos in queue"
             + (" (muted by design)" if mode == MODE_PLAYLIST else "")
         )
-        self.mute_switch.set_state(bool(self.config.get(CONFIG_KEY_MUTE)))
-        self.volume_scale.set_value(int(self.config.get(CONFIG_KEY_VOLUME, 50)))
-        self._refresh_badges(n_videos, len(self.playlist_paths))
         self._update_queue_actions()
         self._refresh_web_details()
         banner = getattr(self, "server_banner", None)
         if banner is not None:
             banner.set_revealed(server is None)
+        self._refresh_sidebar_status(server, mode)
 
     def _reload_library_store(self):
         from apricus.gui.gtk4lib import VideoItem
@@ -3042,15 +3309,6 @@ class ControlPanel(Adw.Application):
 
     def on_playlist_apply(self, *_args):
         self._apply_queue()
-
-    def on_mute_toggled(self, _switch, state):
-        server = self._server()
-        if server is not None:
-            server.is_mute = state
-        self.config = ConfigUtil().load()
-        self.config[CONFIG_KEY_MUTE] = state
-        ConfigUtil().save(self.config)
-        return False
 
     def on_volume_changed(self, scale):
         volume = int(scale.get_value())
