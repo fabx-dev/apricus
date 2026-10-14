@@ -136,6 +136,11 @@ statically but not yet executed end-to-end; back up
 Note for scripters: the D-Bus methods `stream`, `webpage` and `video` take
 `(url, monitor)` — pass `"all"` to apply on every monitor, as both panels do.
 
+Rollback: 2.0 keeps the config at version 5 and only adds keys, which older
+versions ignore and preserve (verified against the 1.0 loader). To revert,
+quit Apricus and restore `~/.config/apricus/config.json.bak` over
+`config.json` — or just keep using the file, 1.0 reads it as-is.
+
 ## Known limitations of this RC
 
 - GTK4 panel: Italian complete; German/French/Spanish/Japanese strings still

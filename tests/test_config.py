@@ -422,3 +422,52 @@ def test_public_http_url_combines_scheme_and_dns(monkeypatch):
         socket, "getaddrinfo", lambda *a, **k: (_ for _ in ()).throw(OSError("dns"))
     )
     assert public_http_url("https://example.com/v") is None
+
+
+def test_update03_readonly_dir_save_raises_and_keeps_original(tmp_path, monkeypatch):
+    """RC2-UPDATE-03: realistic write failure (chmod 555 dir): save raises
+    OSError, the original file is byte-identical, no .tmp lingers."""
+    import os
+
+    from apricus import commons
+    from apricus.utils import ConfigUtil
+
+    new_dir = _isolated_dirs(tmp_path, monkeypatch)
+    raw = json.dumps(dict(commons.CONFIG_TEMPLATE))
+    (new_dir / "config.json").write_text(raw)
+    os.chmod(new_dir, 0o555)
+    try:
+        import pytest
+
+        changed = dict(commons.CONFIG_TEMPLATE)
+        changed["audio_volume"] = 44
+        with pytest.raises(OSError):
+            ConfigUtil().save(changed)
+        assert (new_dir / "config.json").read_text() == raw
+        assert not (new_dir / "config.json.tmp").exists()
+        assert not (new_dir / "config.json.bak").exists()
+    finally:
+        os.chmod(new_dir, 0o755)
+
+
+def test_update04_unknown_keys_ignored_and_preserved(tmp_path, monkeypatch):
+    """RC2-UPDATE-04: forward-compat property behind safe downgrade —
+    unknown keys (e.g. written by a newer version) pass _check, survive
+    load, and are written back by save (v1.0 code reads the same way:
+    inclusive key check + wholesale dump, verified via git show v1.0)."""
+    from unittest.mock import patch
+
+    from apricus import commons
+    from apricus.utils import ConfigUtil
+
+    new_dir = _isolated_dirs(tmp_path, monkeypatch)
+    cfg = dict(commons.CONFIG_TEMPLATE)
+    cfg["newer_feature"] = {"x": 1}
+    assert ConfigUtil._check(cfg) is True
+    (new_dir / "config.json").write_text(json.dumps(cfg))
+    with patch("apricus.monitor.MonitorInfo.monitors", return_value=[]):
+        loaded = ConfigUtil().load()
+    assert loaded["newer_feature"] == {"x": 1}
+    loaded["audio_volume"] = 45
+    ConfigUtil().save(loaded)
+    assert json.loads((new_dir / "config.json").read_text())["newer_feature"] == {"x": 1}
