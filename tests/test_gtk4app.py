@@ -1452,6 +1452,10 @@ def download_favicon_validates_and_normalizes():
     real_public = _U.public_http_url
     # DNS gate is orthogonal here (fake hosts): accept, keep testing decode.
     _U.public_http_url = lambda url: url
+    # fetch_public resolves `requests` lazily from the real module: route it
+    # into the scripted fake (which tolerates the allow_redirects kwarg).
+    real_get = real_requests_mod.get
+    real_requests_mod.get = lambda *a, **k: appmod.requests.get(*a, **k)
     try:
         # 1. Valid PNG -> ok + normalized file on disk.
         appmod.requests = _Requests([("png", _Resp(200, "image/png", png))])
@@ -1479,6 +1483,7 @@ def download_favicon_validates_and_normalizes():
     finally:
         appmod.requests = real_requests
         app.ControlPanel._favicon_path = real_path
+        real_requests_mod.get = real_get
         _U.public_http_url = real_public
 
 
@@ -1788,12 +1793,14 @@ def stream_thumb_id_table():
 @check
 def stream_row_fetch_respects_type_and_size():
     import apricus.gui.gtk4app as appmod
+    import requests as real_requests
 
     calls = []
 
     class _Resp:
         def __init__(self, body, ctype="image/jpeg"):
             self._body = body
+            self.status_code = 200
             self.headers = {"Content-Type": ctype}
 
         def iter_content(self, size):
@@ -1804,12 +1811,19 @@ def stream_row_fetch_respects_type_and_size():
             pass
 
     class _Requests:
-        def get(self, url, timeout=10, stream=True):
+        # fetch_public resolves requests lazily from the real module and
+        # passes allow_redirects=False: accept and ignore extra kwargs.
+        def get(self, url, **kwargs):
             assert "i.ytimg.com" in url, url
             return _Resp(b"\x89PNG\r\n\x1a\n" + b"0" * 100)
 
-    real = appmod.requests
-    appmod.requests = _Requests()
+    real_get = real_requests.get
+    real_requests.get = _Requests().get
+    import apricus.utils as _U
+
+    real_public = _U.public_http_url
+    # DNS gating is covered by dedicated tests; here exercise type/size.
+    _U.public_http_url = lambda url: url
     try:
         obj, _ = _panel(_base_config(), [])
         data = obj._fetch_row_thumb("https://youtu.be/abc123XYZ_-")
@@ -1820,13 +1834,14 @@ def stream_row_fetch_respects_type_and_size():
         assert calls == ["get"]
         # Oversize body: rejected.
         class _Big(_Requests):
-            def get(self, url, timeout=10, stream=True):
+            def get(self, url, **kwargs):
                 return _Resp(b"0" * (512 * 1024 + 1))
 
-        appmod.requests = _Big()
+        real_requests.get = _Big().get
         assert obj._fetch_row_thumb("https://youtu.be/abc123XYZ_-") is None
     finally:
-        appmod.requests = real
+        real_requests.get = real_get
+        _U.public_http_url = real_public
 
 
 @check
@@ -2032,6 +2047,8 @@ def capped_get_enforces_incremental_limit():
 
         def __init__(self, chunks):
             self._chunks = chunks
+            self.status_code = 200
+            self.headers = {}
 
         def iter_content(self, size):
             yield from self._chunks
@@ -2041,22 +2058,26 @@ def capped_get_enforces_incremental_limit():
 
     made = []
 
-    def fake_get(url, timeout, stream=True):
+    def fake_get(url, **kwargs):
+        # fetch_public resolves requests at call time from the real module.
+        assert kwargs.get("allow_redirects") is False, kwargs
         resp = _Resp(list(made.pop(0)))
         fake_get.last = resp
         return resp
 
-    old = appmod.requests.get
-    appmod.requests.get = fake_get
+    import requests as real_requests
+
+    old = real_requests.get
+    real_requests.get = fake_get
     try:
         made.append([b"x" * 100, b"y" * 100])
-        assert appmod._capped_get("https://h/x", 5, 1024) == b"x" * 100 + b"y" * 100
+        assert appmod._capped_get("https://93.184.216.34/x", 5, 1024) == b"x" * 100 + b"y" * 100
         assert fake_get.last.closed, "socket must be closed"
         made.append([b"z" * 70000])
-        assert appmod._capped_get("https://h/big", 5, 65536) is None
+        assert appmod._capped_get("https://93.184.216.34/big", 5, 65536) is None
         assert fake_get.last.closed, "socket must be closed on overflow too"
     finally:
-        appmod.requests.get = old
+        real_requests.get = old
 
 
 @check
@@ -2102,6 +2123,75 @@ def url_gates_reject_without_network():
         assert obj._check_web_url("http://192.168.1.1/") is not None
     finally:
         appmod.requests.get, appmod.requests.head = old_get, old_head
+
+
+@check
+def redirect_landings_are_refused_without_contact():
+    """Redirect chains are followed hop-by-hop; a hop to a non-public host
+    stops the chain BEFORE any request to it (recorded request lists prove
+    the forbidden host is never contacted). Covers favicon, row-thumb and
+    _capped_get (hero/titles)."""
+    import apricus.gui.gtk4app as appmod
+    import requests as real_requests
+
+    class _Resp:
+        def __init__(self, status=200, ctype="image/png", body=b"", location=""):
+            self.status_code = status
+            self.headers = {"Content-Type": ctype}
+            if location:
+                self.headers["Location"] = location
+            self._body = body
+
+        def iter_content(self, size):
+            yield self._body
+
+        def close(self):
+            pass
+
+    requested = []
+
+    def fake_get(url, **kwargs):
+        requested.append(url)
+        return fake_get.script.pop(0)
+
+    old_get = real_requests.get
+    real_requests.get = fake_get
+    try:
+        obj, _ = _panel(_base_config(), [])
+        redir = _Resp(302, "text/html", b"", location="http://127.0.0.1:9000/x")
+
+        # 1. favicon: public entry, redirect to loopback.
+        fake_get.script = [redir]
+        requested.clear()
+        path, reason = obj._download_favicon("93.184.216.34")
+        assert (path, reason) == (None, "error"), (path, reason)
+        assert requested == ["https://93.184.216.34/favicon.ico"], requested
+
+        # 2. row thumbnail: redirect from the fixed CDN host to loopback.
+        fake_get.script = [redir]
+        requested.clear()
+        assert obj._fetch_row_thumb("https://youtu.be/0x5mf8BUJZY") is None
+        assert requested == ["https://i.ytimg.com/vi/0x5mf8BUJZY/mqdefault.jpg"], requested
+
+        # 2b. shared helper path (hero/titles) with the same shape.
+        fake_get.script = [redir]
+        requested.clear()
+        assert appmod._capped_get("http://93.184.216.34/t.jpg", 5, 65536) is None
+        assert requested == ["http://93.184.216.34/t.jpg"], requested
+
+        # 3. legit redirect chain still lands data (no regression).
+        fake_get.script = [
+            _Resp(301, "text/html", b"", location="https://93.184.216.34/final"),
+            _Resp(200, "image/jpeg", b"JPEGDATA"),
+        ]
+        requested.clear()
+        assert appmod._capped_get("http://93.184.216.34/t.jpg", 5, 65536) == b"JPEGDATA"
+        assert requested == [
+            "http://93.184.216.34/t.jpg",
+            "https://93.184.216.34/final",
+        ], requested
+    finally:
+        real_requests.get = old_get
 
 
 @check
@@ -2341,6 +2431,10 @@ def test_capped_get_enforces_incremental_limit():
 
 def test_url_gates_reject_without_network():
     _run("url_gates_reject_without_network")
+
+
+def test_redirect_landings_are_refused_without_contact():
+    _run("redirect_landings_are_refused_without_contact")
 
 
 def test_stream_meta_title_persists_in_history():

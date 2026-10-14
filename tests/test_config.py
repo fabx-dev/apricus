@@ -426,7 +426,11 @@ def test_public_http_url_combines_scheme_and_dns(monkeypatch):
 
 def test_update03_readonly_dir_save_raises_and_keeps_original(tmp_path, monkeypatch):
     """RC2-UPDATE-03: realistic write failure (chmod 555 dir): save raises
-    OSError, the original file is byte-identical, no .tmp lingers."""
+    OSError, the original file is byte-identical, no .tmp lingers.
+
+    Requires a non-privileged user: root bypasses file permission checks,
+    so under root/privileged CI this drill cannot raise and must be skipped
+    (it asserts nothing about full-disk failures either)."""
     import os
 
     from apricus import commons
@@ -471,3 +475,143 @@ def test_update04_unknown_keys_ignored_and_preserved(tmp_path, monkeypatch):
     loaded["audio_volume"] = 45
     ConfigUtil().save(loaded)
     assert json.loads((new_dir / "config.json").read_text())["newer_feature"] == {"x": 1}
+
+
+class _FakeRedirectResponse:
+    def __init__(self, status=200, headers=None, body=b"", location=""):
+        hdrs = dict(headers or {})
+        if location:
+            hdrs["Location"] = location
+        self.status_code = status
+        self.headers = hdrs
+        self._body = body
+        self.closed = False
+
+    def iter_content(self, size):
+        yield self._body
+
+    def close(self):
+        self.closed = True
+
+
+class _RecordingTransport:
+    """Fake requests module: records every requested URL, serves scripted
+    responses. Proves forbidden hosts are never contacted (no sockets)."""
+
+    def __init__(self, script):
+        self.script = list(script)
+        self.requested = []
+
+    def get(self, url, **kwargs):
+        self.requested.append(url)
+        item = self.script.pop(0)
+        if isinstance(item, BaseException):
+            raise item
+        return item
+
+    @property
+    def exceptions(self):
+        import requests as real_requests
+
+        return real_requests.exceptions
+
+
+def _patched_transport(monkeypatch, script):
+    import requests
+
+    transport = _RecordingTransport(script)
+    monkeypatch.setattr(requests, "get", transport.get)
+    return transport
+
+
+def test_fetch_public_plain_ok(monkeypatch):
+    from apricus.utils import fetch_public
+
+    body = b"hello"
+    t = _patched_transport(
+        monkeypatch,
+        [_FakeRedirectResponse(200, {"Content-Type": "text/html"}, body)],
+    )
+    data, status, ctype, reason = fetch_public("http://93.184.216.34/", 5, 65536)
+    assert (data, status, ctype, reason) == (body, 200, "text/html", "ok")
+    assert t.requested == ["http://93.184.216.34/"]
+
+
+def test_fetch_public_refuses_redirect_to_local_without_second_request(monkeypatch):
+    """Core SSRF case: public entry, 302 to 127.0.0.1. The forbidden host
+    must never be requested (single recorded request)."""
+    from apricus.utils import fetch_public
+
+    t = _patched_transport(
+        monkeypatch,
+        [_FakeRedirectResponse(302, {}, b"", location="http://127.0.0.1:9000/admin")],
+    )
+    data, status, ctype, reason = fetch_public("http://93.184.216.34/", 5, 65536)
+    assert (data, reason) == (None, "refused")
+    assert t.requested == ["http://93.184.216.34/"]
+
+
+def test_fetch_public_multi_hop_public_then_local(monkeypatch):
+    from apricus.utils import fetch_public
+
+    t = _patched_transport(
+        monkeypatch,
+        [
+            _FakeRedirectResponse(301, {}, b"", location="http://93.184.216.35/next"),
+            _FakeRedirectResponse(302, {}, b"", location="http://10.0.0.5/"),
+        ],
+    )
+    data, _s, _c, reason = fetch_public("http://93.184.216.34/", 5, 65536)
+    assert (data, reason) == (None, "refused")
+    assert t.requested == ["http://93.184.216.34/", "http://93.184.216.35/next"]
+
+
+def test_fetch_public_relative_location_and_too_many_redirects(monkeypatch):
+    from apricus.utils import fetch_public
+
+    loop = "http://93.184.216.34/"
+    t = _patched_transport(
+        monkeypatch,
+        [_FakeRedirectResponse(302, {}, b"", location="/loop")] * 5,
+    )
+    data, _s, _c, reason = fetch_public(loop, 5, 65536, max_redirects=3)
+    assert (data, reason) == (None, "refused")
+    assert t.requested == [loop] + ["http://93.184.216.34/loop"] * 3
+
+
+def test_fetch_public_too_large_and_errors(monkeypatch):
+    import requests as real_requests
+
+    from apricus.utils import fetch_public
+
+    t = _patched_transport(
+        monkeypatch, [_FakeRedirectResponse(200, {"Content-Type": "image/png"}, b"x" * 99999)]
+    )
+    assert fetch_public("http://93.184.216.34/i.png", 5, 100)[3] == "too_large"
+    assert t.requested == ["http://93.184.216.34/i.png"]
+
+    t = _patched_transport(monkeypatch, [real_requests.exceptions.Timeout("slow")])
+    assert fetch_public("http://93.184.216.34/", 5, 100)[3] == "timeout"
+
+    t = _patched_transport(monkeypatch, [real_requests.exceptions.ConnectionError("down")])
+    assert fetch_public("http://93.184.216.34/", 5, 100)[3] == "connection"
+
+    t = _patched_transport(monkeypatch, [])
+    assert fetch_public("ftp://93.184.216.34/x", 5, 100)[3] == "refused"
+    assert t.requested == []
+
+
+def test_fetch_public_legit_redirect_chain_works(monkeypatch):
+    """Normal behavior preserved: public http->https upgrade lands data."""
+    from apricus.utils import fetch_public
+
+    t = _patched_transport(
+        monkeypatch,
+        [
+            _FakeRedirectResponse(301, {}, b"", location="https://93.184.216.34/v.mp4"),
+            _FakeRedirectResponse(200, {"Content-Type": "video/mp4"}, b"DATA"),
+        ],
+    )
+    data, status, ctype, reason = fetch_public("http://93.184.216.34/v.mp4", 5, 65536)
+    assert (data, status, ctype, reason) == (b"DATA", 200, "video/mp4", "ok")
+    assert t.requested == ["http://93.184.216.34/v.mp4", "https://93.184.216.34/v.mp4"]

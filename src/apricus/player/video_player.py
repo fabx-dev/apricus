@@ -11,7 +11,6 @@ import time
 from threading import Timer
 
 import gi
-import requests
 import yt_dlp
 
 gi.require_version("Gtk", "3.0")
@@ -884,23 +883,14 @@ class VideoPlayer(BasePlayer):
             thumb_url = meta.get("thumbnail")
             data = None
             if thumb_url and thumb_url.startswith("https://"):
-                response = requests.get(thumb_url, timeout=15, stream=True)
-                try:
-                    if "image" not in response.headers.get("Content-Type", ""):
-                        data = None
-                    else:
-                        chunks = []
-                        total = 0
-                        for chunk in response.iter_content(65536):
-                            total += len(chunk)
-                            if total > 2 * 1024 * 1024:
-                                chunks = []
-                                break
-                            chunks.append(chunk)
-                        data = b"".join(chunks) or None
-                finally:
-                    response.close()
-                if data and (not check_magic(data) or decode_size(data) is None):
+                from apricus.utils import fetch_public
+
+                data, _status, content_type, _reason = fetch_public(
+                    thumb_url, timeout=15, max_bytes=2 * 1024 * 1024
+                )
+                if data is None or "image" not in content_type:
+                    data = None
+                elif not check_magic(data) or decode_size(data) is None:
                     data = None
             if data is None:
                 # Direct video URLs have no thumbnail metadata: extract a

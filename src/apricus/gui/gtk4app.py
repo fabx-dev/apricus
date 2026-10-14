@@ -76,28 +76,14 @@ APP_ID = f"{PROJECT}.gui4"
 def _capped_get(url, timeout, max_bytes):
     """GET at most max_bytes of a URL; None on any failure or overflow.
 
-    Incremental cap (mirrors _fetch_row_thumb): hostile infinite bodies
-    are dropped mid-stream instead of filling RAM before a post-hoc check.
+    Thin wrapper over :func:`apricus.utils.fetch_public`: redirects are
+    followed hop-by-hop with every hop re-validated, and hostile infinite
+    bodies are dropped mid-stream instead of filling RAM.
     """
-    from apricus.utils import valid_http_url
+    from apricus.utils import fetch_public
 
-    if not valid_http_url(url):
-        return None
-    try:
-        response = requests.get(url, timeout=timeout, stream=True)
-        try:
-            chunks = []
-            total = 0
-            for chunk in response.iter_content(65536):
-                total += len(chunk)
-                if total > max_bytes:
-                    return None
-                chunks.append(chunk)
-            return b"".join(chunks)
-        finally:
-            response.close()
-    except requests.exceptions.RequestException:
-        return None
+    data, _status, _content_type, _reason = fetch_public(url, timeout, max_bytes)
+    return data
 
 
 class ControlPanel(Adw.Application):
@@ -1873,37 +1859,20 @@ class ControlPanel(Adw.Application):
 
         Returns (path_or_None, reason) where reason is "ok", "http_NNN",
         "bad_content_type", "empty", "bad_magic", "decode_failed",
-        "timeout", "connection" or "error". Only transient reasons
+        "timeout", "connection" or "error" (also for refused non-public
+        hops; oversized bodies report "empty"). Only transient reasons
         (timeout, connection, http_5xx) deserve a retry.
         """
         url = f"https://{host}/favicon.ico"
-        from apricus.utils import public_http_url
+        from apricus.utils import fetch_public
 
-        if not public_http_url(url):
-            return None, "error"
-        try:
-            response = requests.get(url, timeout=8, stream=True)
-            try:
-                status = response.status_code
-                content_type = response.headers.get("Content-Type", "")
-                chunks = []
-                total = 0
-                for chunk in response.iter_content(65536):
-                    total += len(chunk)
-                    if total > 100 * 1024:
-                        data = None
-                        break
-                    chunks.append(chunk)
-                else:
-                    data = b"".join(chunks)
-            finally:
-                response.close()
-        except requests.exceptions.Timeout:
+        data, status, content_type, reason = fetch_public(url, timeout=8, max_bytes=100 * 1024)
+        if reason == "timeout":
             return None, "timeout"
-        except requests.exceptions.ConnectionError:
+        if reason == "connection":
             return None, "connection"
-        except (requests.exceptions.RequestException, OSError) as e:
-            logger.debug(f"[GUI4] Favicon download failed for {host}: {e}")
+        if reason in ("error", "refused"):
+            logger.debug(f"[GUI4] Favicon download failed for {host}: {reason}")
             return None, "error"
         if status != 200:
             reason = f"http_{status}"
@@ -2202,33 +2171,18 @@ class ControlPanel(Adw.Application):
 
     def _fetch_row_thumb(self, url):
         """Size-limited thumbnail bytes for a row, or None (fallback)."""
+        from apricus.utils import fetch_public
+
         video_id = self._youtube_thumb_id(url)
         if not video_id:
             return None
-        try:
-            response = requests.get(
-                f"https://i.ytimg.com/vi/{video_id}/mqdefault.jpg",
-                timeout=10,
-                stream=True,
-            )
-            content_type = response.headers.get("Content-Type", "")
-            if "image" not in content_type:
-                response.close()
-                return None
-            chunks = []
-            total = 0
-            for chunk in response.iter_content(65536):
-                total += len(chunk)
-                if total > 512 * 1024:
-                    response.close()
-                    return None
-                chunks.append(chunk)
-            response.close()
-            data = b"".join(chunks)
-        except requests.exceptions.RequestException as e:
-            logger.debug(f"[GUI4] Row thumbnail download failed: {e}")
-            return None
-        if not data:
+        data, _status, content_type, reason = fetch_public(
+            f"https://i.ytimg.com/vi/{video_id}/mqdefault.jpg",
+            timeout=10,
+            max_bytes=512 * 1024,
+        )
+        if data is None or "image" not in content_type:
+            logger.debug(f"[GUI4] Row thumbnail refused ({reason})")
             return None
         return data
 
@@ -3037,36 +2991,20 @@ class ControlPanel(Adw.Application):
         self.web_detect_spinner.set_spinning(spinning)
 
     def _check_web_details(self, url, generation):
-        from apricus.utils import public_http_url
+        from apricus.utils import fetch_public
 
         title, ok, detail = "", False, ""
-        if not public_http_url(url):
+        body, status, content_type, reason = fetch_public(url, timeout=10, max_bytes=64 * 1024)
+        if reason != "ok":
+            GLib.idle_add(self._apply_web_details, generation, url, "", False, "")
             return
-        try:
-            response = requests.get(url, timeout=10, stream=True)
-            try:
-                status = response.status_code
-                if not public_http_url(response.url):
-                    return
-                content_type = response.headers.get("Content-Type", "")
-                chunks = []
-                total = 0
-                for chunk in response.iter_content(65536):
-                    total += len(chunk)
-                    if total > 64 * 1024:
-                        break
-                    chunks.append(chunk)
-                body = b"".join(chunks)
-            finally:
-                response.close()
-            if status >= 400:
-                detail = f"Error code: {status}"
-            else:
-                ok = True
-                title = self._extract_html_title(body) if "html" in content_type else ""
-                detail = f"{self._web_domain(url)} — reachable"
-        except requests.exceptions.RequestException as e:
-            detail = str(e)[:160]
+        body = body or b""
+        if status >= 400:
+            detail = f"Error code: {status}"
+        else:
+            ok = True
+            title = self._extract_html_title(body) if "html" in content_type else ""
+            detail = f"{self._web_domain(url)} — reachable"
         GLib.idle_add(self._apply_web_details, generation, url, title, ok, detail)
 
     def _apply_web_details(self, generation, url, title, ok, detail):

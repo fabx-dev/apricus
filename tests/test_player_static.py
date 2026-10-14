@@ -94,7 +94,7 @@ def test_preview_static_fetches_thumbnail_for_unknown_url(monkeypatch, tmp_path)
             pass
 
     monkeypatch.setattr(player_mod.yt_dlp, "YoutubeDL", _FakeYdl)
-    monkeypatch.setattr(player_mod.requests, "get", lambda *a, **k: _Resp())
+    monkeypatch.setattr("apricus.utils.fetch_public", lambda *a, **k: (png, 200, "image/png", "ok"))
     monkeypatch.setattr("apricus.utils.public_http_url", lambda url: url)
     from gi.repository import GLib
 

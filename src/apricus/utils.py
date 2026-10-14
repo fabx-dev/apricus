@@ -230,6 +230,62 @@ def public_http_url(url):
     return clean
 
 
+def fetch_public(url, timeout, max_bytes, max_redirects=3):
+    """GET *url*, following at most *max_redirects* hops, every hop public.
+
+    Returns (data, status, content_type, reason); reason is 'ok', 'timeout',
+    'connection', 'error', 'refused' or 'too_large'. Never raises.
+
+    Redirects are followed manually with ``allow_redirects=False`` and each
+    hop is re-validated *before* any byte is read from it, so the HTTP
+    library never touches a forbidden host — a post-hoc check of the final
+    URL would still have downloaded from it. Bodies are capped
+    incrementally like the row-thumbnail path.
+
+    Residual limits (explicit, not solved here): DNS is resolved per hop,
+    so rebinding between check and fetch is possible; libraries that
+    follow redirects internally (yt-dlp/FFmpeg/VLC) are NOT mediated —
+    gate their entry URLs with :func:`public_http_url` instead.
+    """
+    from urllib.parse import urljoin
+
+    import requests
+
+    current = url
+    hops = 0
+    while True:
+        if public_http_url(current) is None:
+            return None, 0, "", "refused"
+        try:
+            response = requests.get(current, timeout=timeout, stream=True, allow_redirects=False)
+        except requests.exceptions.Timeout:
+            return None, 0, "", "timeout"
+        except requests.exceptions.ConnectionError:
+            return None, 0, "", "connection"
+        except requests.exceptions.RequestException:
+            return None, 0, "", "error"
+        try:
+            location = response.headers.get("Location", "")
+            if response.status_code in (301, 302, 303, 307, 308) and location:
+                hops += 1
+                if hops > max_redirects:
+                    return None, 0, "", "refused"
+                current = urljoin(current, location)
+                continue
+            status = response.status_code
+            content_type = response.headers.get("Content-Type", "")
+            chunks = []
+            total = 0
+            for chunk in response.iter_content(65536):
+                total += len(chunk)
+                if total > max_bytes:
+                    return None, 0, "", "too_large"
+                chunks.append(chunk)
+            return b"".join(chunks), status, content_type, "ok"
+        finally:
+            response.close()
+
+
 def setup_autostart(autostart):
     if is_flatpak():
         """
