@@ -148,6 +148,10 @@ Note for scripters: the D-Bus methods `stream`, `webpage` and `video` take
 - Streaming or web pages hosted on local-network addresses (intranet,
   `localhost`) are refused: pasted URLs are resolved and probed
   automatically, so the app does not fetch non-public hosts.
+- Flatpak sandbox: video folders outside `xdg-videos` are invisible to the
+  app, and it cannot create folders there (read-only `xdg-videos:ro`
+  permission, changed from 1.0). Use the classic install for custom
+  library locations outside Videos.
 
 ## Installation (from source)
 

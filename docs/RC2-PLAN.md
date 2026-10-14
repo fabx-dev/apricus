@@ -49,9 +49,9 @@ No item is VERIFIED without fresh evidence on the RC2 baseline.
 
 | ID | Pri | Description | Initial state | Rationale | Tests needed | Acceptance | Deps | Regression risk |
 |---|---|---|---|---|---|---|---|---|
-| RC2-PKG-01 | P1 | `xdg-videos:ro` impact note: custom `video_dir` outside `xdg-videos` invisible in sandbox; folder creation from app impossible — document in README/troubleshooting | OPEN | Behavior change vs 1.0 (`:create` → `:ro`) undocumented | Doc review | Note present and accurate | — | None |
-| RC2-PKG-02 | P1 | Re-validate: `meson.build` version, `pyproject`/`uv.lock` sync, AppData release block + notes, manifest JSON, pypi-deps == pyproject deps (post-Pillow) | OPEN (must re-run after any change) | Single-source-of-truth drifted twice already | Parse + cross-check script/test | All equal, no 3.7 residue | — | None |
-| RC2-PKG-03 | P2 | Release-notes draft for RC2 (features, fixes since RC1, known limits, install/rollback instructions) | OPEN | Needed before any tag | Doc review | Notes accurate, no invented artifacts | RC2-FLAT-01 | None |
+| RC2-PKG-01 | P1 | `xdg-videos:ro` impact note: custom `video_dir` outside `xdg-videos` invisible in sandbox; folder creation from app impossible — document in README/troubleshooting | VERIFIED (README Known-limitations entry added) | Behavior change vs 1.0 (`:create` → `:ro`) undocumented | Doc review | Note present and accurate | — | None |
+| RC2-PKG-02 | P1 | Re-validate: `meson.build` version, `pyproject`/`uv.lock` sync, AppData release block + notes, manifest JSON, pypi-deps == pyproject deps (post-Pillow) | VERIFIED (2.0.0-rc1 / 2.0.0rc1 aligned; pypi-deps module set == pyproject deps; manifest parses) | Single-source-of-truth drifted twice already | Parse + cross-check script/test | All equal, no 3.7 residue | — | None |
+| RC2-PKG-03 | P2 | Release-notes draft for RC2 (features, fixes since RC1, known limits, install/rollback instructions) | VERIFIED (draft section appended below; update at tag time, do not publish) | Needed before any tag | Doc review | Notes accurate, no invented artifacts | RC2-FLAT-01 | None |
 
 ## 6. Stability & tech debt
 
@@ -91,3 +91,16 @@ met, all RC2 items VERIFIED.
    complete/review if still supported; RC2 accepts partial valid catalogs.
 3. Tag strategy: `v2.0.0-rc1` / `v2.0.0-rc2` candidates as above; nothing
    created, pushed, merged, or released without explicit authorization.
+
+## RC2 draft release notes (DRAFT - update at tag time, do not publish)
+
+- Direct 1.0 upgrade: same app ID, config preserved; first save after
+  backfill now keeps a `.bak` rollback copy.
+- Streaming/Webpage D-Bus calls take `(url, monitor)` like video does.
+- Non-public (intranet/`localhost`) stream and web hosts are refused.
+- Unbounded downloads are capped incrementally everywhere.
+- GTK4 panel strings marked for translation; Italian complete.
+- Flatpak: Deno 2.9.7 bundled and verified in-sandbox; Pillow dropped.
+- Known limits: sandbox playback and real 1.0→2.0 update not yet run
+  end-to-end; de/fr/es/ja catalogs partial; private-IP blocking may
+  affect intranet use (see README).
