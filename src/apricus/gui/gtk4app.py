@@ -1877,9 +1877,9 @@ class ControlPanel(Adw.Application):
         (timeout, connection, http_5xx) deserve a retry.
         """
         url = f"https://{host}/favicon.ico"
-        from apricus.utils import valid_http_url
+        from apricus.utils import public_http_url
 
-        if not valid_http_url(url):
+        if not public_http_url(url):
             return None, "error"
         try:
             response = requests.get(url, timeout=8, stream=True)
@@ -2533,10 +2533,12 @@ class ControlPanel(Adw.Application):
 
     def _check_stream_url(self, url):
         """Validate a streaming URL with yt-dlp; None when valid, else error."""
-        from apricus.utils import valid_http_url
+        from apricus.utils import public_http_url, valid_http_url
 
         if not valid_http_url(url):
             return "URL not supported."
+        if not public_http_url(url):
+            return "Local network addresses are not supported."
         try:
             with yt_dlp.YoutubeDL(base_options()) as ydl:
                 ydl.extract_info(url, download=False)
@@ -2552,16 +2554,16 @@ class ControlPanel(Adw.Application):
 
     def _check_direct_url(self, url):
         """Fast-path HEAD check; None when playable, 'fallback' for yt-dlp."""
-        from apricus.utils import valid_http_url
+        from apricus.utils import public_http_url
 
-        if not valid_http_url(url):
+        if not public_http_url(url):
             return "fallback"
         try:
             response = requests.head(url, timeout=5, allow_redirects=True)
             content_type = response.headers.get("Content-Type", "")
             landed = response.url
             response.close()
-            if not valid_http_url(landed):
+            if not public_http_url(landed):
                 return "fallback"
             if "video/" in content_type or "mpegurl" in content_type or "dash+xml" in content_type:
                 return None
@@ -3035,14 +3037,16 @@ class ControlPanel(Adw.Application):
         self.web_detect_spinner.set_spinning(spinning)
 
     def _check_web_details(self, url, generation):
+        from apricus.utils import public_http_url
+
         title, ok, detail = "", False, ""
+        if not public_http_url(url):
+            return
         try:
             response = requests.get(url, timeout=10, stream=True)
             try:
-                from apricus.utils import valid_http_url
-
                 status = response.status_code
-                if not valid_http_url(response.url):
+                if not public_http_url(response.url):
                     return
                 content_type = response.headers.get("Content-Type", "")
                 chunks = []
@@ -3252,10 +3256,12 @@ class ControlPanel(Adw.Application):
 
     def _check_web_url(self, url):
         """Validate a web page URL; None when valid, else error."""
-        from apricus.utils import valid_http_url
+        from apricus.utils import public_http_url, valid_http_url
 
         if not valid_http_url(url):
             return "Not a valid http(s) URL."
+        if not public_http_url(url):
+            return "Local network addresses are not supported."
         try:
             response = requests.get(url, timeout=10, stream=True)
             try:
@@ -3265,8 +3271,8 @@ class ControlPanel(Adw.Application):
                 response.close()
         except requests.exceptions.RequestException as e:
             return str(e)
-        if not valid_http_url(landed):
-            return "Redirects to an unsupported address."
+        if not public_http_url(landed):
+            return "Redirects to a local network address."
         if status >= 400:
             return f"Error code: {status}"
         return None

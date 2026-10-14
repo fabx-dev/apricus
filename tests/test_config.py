@@ -359,3 +359,66 @@ def test_update05_second_boot_is_stable(tmp_path, monkeypatch):
         second = ConfigUtil().load()
     ConfigUtil().save(second)
     assert (new_dir / "config.json").read_text() == stable
+
+
+def test_resolves_public_blocks_non_public_ips():
+    """RC2-SEC-03: loopback/private/link-local/multicast never pass."""
+    from apricus.utils import resolves_public
+
+    assert resolves_public("93.184.216.34") is True
+    for bad in (
+        "127.0.0.1",
+        "::1",
+        "10.0.0.1",
+        "172.16.0.1",
+        "192.168.1.1",
+        "169.254.10.20",
+        "224.0.0.1",
+        "0.0.0.0",
+        "",
+        None,
+    ):
+        assert resolves_public(bad) is False, bad
+
+
+def test_resolves_public_fails_closed_on_dns_error(monkeypatch):
+    import socket
+
+    from apricus.utils import resolves_public
+
+    monkeypatch.setattr(
+        socket, "getaddrinfo", lambda *a, **k: (_ for _ in ()).throw(OSError("dns"))
+    )
+    assert resolves_public("example.com") is False
+
+
+def test_resolves_public_uses_all_addresses(monkeypatch):
+    """One non-public address among several poisons the host (rebind-safe)."""
+    import socket
+
+    from apricus.utils import resolves_public
+
+    def fake(host, *a, **k):
+        return [
+            (socket.AF_INET, None, None, "", ("93.184.216.34", 0)),
+            (socket.AF_INET, None, None, "", ("127.0.0.1", 0)),
+        ]
+
+    monkeypatch.setattr(socket, "getaddrinfo", fake)
+    assert resolves_public("example.com") is False
+
+
+def test_public_http_url_combines_scheme_and_dns(monkeypatch):
+    import socket
+
+    from apricus.utils import public_http_url
+
+    assert public_http_url("https://93.184.216.34/v.mp4") == "https://93.184.216.34/v.mp4"
+    assert public_http_url("http://127.0.0.1:8080/x") is None
+    assert public_http_url("http://10.1.2.3/v") is None
+    assert public_http_url("http://user:pass@93.184.216.34/") is None
+    assert public_http_url("file:///etc/passwd") is None
+    monkeypatch.setattr(
+        socket, "getaddrinfo", lambda *a, **k: (_ for _ in ()).throw(OSError("dns"))
+    )
+    assert public_http_url("https://example.com/v") is None

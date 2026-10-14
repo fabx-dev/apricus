@@ -95,6 +95,7 @@ def test_preview_static_fetches_thumbnail_for_unknown_url(monkeypatch, tmp_path)
 
     monkeypatch.setattr(player_mod.yt_dlp, "YoutubeDL", _FakeYdl)
     monkeypatch.setattr(player_mod.requests, "get", lambda *a, **k: _Resp())
+    monkeypatch.setattr("apricus.utils.public_http_url", lambda url: url)
     from gi.repository import GLib
 
     monkeypatch.setattr(GLib, "idle_add", lambda func, *args: func(*args))
@@ -122,6 +123,7 @@ def test_preview_static_ignores_unresolvable_url(monkeypatch, tmp_path):
             return {}
 
     monkeypatch.setattr(player_mod.yt_dlp, "YoutubeDL", _FakeYdl)
+    monkeypatch.setattr("apricus.utils.public_http_url", lambda url: url)
     # Deterministic: run the generator directly instead of the thread.
     obj._generate_stream_static("https://stream.example/live")
     assert wb.applied == []
@@ -144,6 +146,7 @@ def test_extract_remote_frame_uses_forced_8bit_cmd(monkeypatch, tmp_path):
         return _Result()
 
     monkeypatch.setattr(player_mod.subprocess, "run", fake_run)
+    monkeypatch.setattr("apricus.utils.public_http_url", lambda url: url)
     real_mkstemp = player_mod.tempfile.mkstemp
     monkeypatch.setattr(
         player_mod.tempfile, "mkstemp", lambda **k: (os.open(out, os.O_CREAT | os.O_WRONLY), out)

@@ -88,6 +88,24 @@ def test_get_formats_rejects_non_http_without_network(monkeypatch):
             yt_utils.get_formats(bad)
 
 
+def test_get_formats_rejects_non_public_hosts_without_network(monkeypatch):
+    """RC2-SEC-03: loopback/private literals never reach YoutubeDL
+    (numeric IPs need no DNS, so this test uses no network)."""
+
+    def _bomb(*args, **kwargs):
+        raise AssertionError("YoutubeDL must not run for non-public hosts")
+
+    monkeypatch.setattr(yt_utils.youtube_dl, "YoutubeDL", _bomb)
+    for bad in (
+        "http://127.0.0.1/v.mp4",
+        "http://10.0.0.1/v.mp4",
+        "http://192.168.1.1/v.mp4",
+        "http://169.254.10.20/v.mp4",
+    ):
+        with pytest.raises(ValueError, match="[Ll]ocal network"):
+            yt_utils.get_formats(bad)
+
+
 def test_legacy_callsite_uses_shared_options():
     """control.py (GTK3 legacy) must use base_options(), verified by AST
     so the suite never imports Gtk 3.0 in-process."""

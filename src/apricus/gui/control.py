@@ -706,10 +706,13 @@ class ControlPanel(Gtk.Application):
 
     def _check_url(self, url):
         # Check if the url is valid
-        from apricus.utils import valid_http_url
+        from apricus.utils import public_http_url, valid_http_url
 
         if not valid_http_url(url):
             self._show_error(_("Not a valid http(s) URL."))
+            return False
+        if not public_http_url(url):
+            self._show_error(_("Local network addresses are not supported."))
             return False
         try:
             response = requests.get(url, timeout=10, stream=True)
@@ -722,7 +725,7 @@ class ControlPanel(Gtk.Application):
             logger.error(f"[GUI] Failed to access {url}. Error:\n{e}")
             self._show_error(_("Failed to access {url}. Error:\n{error}").format(url=url, error=e))
             return False
-        if not valid_http_url(landed) or status >= 400:
+        if not public_http_url(landed) or status >= 400:
             logger.error(f"[GUI] Failed to access {url}. Error code: {status}")
             self._show_error(
                 _("Failed to access {url}. Error code: {code}").format(url=url, code=status)
@@ -732,10 +735,13 @@ class ControlPanel(Gtk.Application):
 
     def _check_yt_dlp(self, raw_url):
         # Check if the url is valid (yt_dlp)
-        from apricus.utils import valid_http_url
+        from apricus.utils import public_http_url, valid_http_url
 
         if not valid_http_url(raw_url):
             self._show_error(_("Not a valid http(s) URL."))
+            return False
+        if not public_http_url(raw_url):
+            self._show_error(_("Local network addresses are not supported."))
             return False
         try:
             with yt_dlp.YoutubeDL(base_options()) as ydl:

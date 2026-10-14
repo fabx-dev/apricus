@@ -145,6 +145,9 @@ Note for scripters: the D-Bus methods `stream`, `webpage` and `video` take
 - End-to-end 1.0 → 2.0 update not yet executed; procedure documented above.
 - YouTube playback without a JS runtime may 403 on protected videos;
   install Deno (classic) or use the Flatpak (bundled).
+- Streaming or web pages hosted on local-network addresses (intranet,
+  `localhost`) are refused: pasted URLs are resolved and probed
+  automatically, so the app does not fetch non-public hosts.
 
 ## Installation (from source)
 

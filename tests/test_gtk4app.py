@@ -1447,6 +1447,11 @@ def download_favicon_validates_and_normalizes():
     real_path = app.ControlPanel._favicon_path
     app.ControlPanel._favicon_path = staticmethod(lambda host: f"{tmp}/{host}.png")
     real_requests = appmod.requests
+    import apricus.utils as _U
+
+    real_public = _U.public_http_url
+    # DNS gate is orthogonal here (fake hosts): accept, keep testing decode.
+    _U.public_http_url = lambda url: url
     try:
         # 1. Valid PNG -> ok + normalized file on disk.
         appmod.requests = _Requests([("png", _Resp(200, "image/png", png))])
@@ -1474,6 +1479,7 @@ def download_favicon_validates_and_normalizes():
     finally:
         appmod.requests = real_requests
         app.ControlPanel._favicon_path = real_path
+        _U.public_http_url = real_public
 
 
 @check
@@ -2088,6 +2094,12 @@ def url_gates_reject_without_network():
         assert obj._check_web_url("http://user:pass@example.com/") is not None
         path, reason = obj._download_favicon("user@example.com")
         assert (path, reason) == (None, "error"), (path, reason)
+        # RC2-SEC-03: non-public literals rejected before any socket.
+        assert obj._check_stream_url("http://127.0.0.1/v") == (
+            "Local network addresses are not supported."
+        )
+        assert obj._check_direct_url("http://10.0.0.1/v.mp4") == "fallback"
+        assert obj._check_web_url("http://192.168.1.1/") is not None
     finally:
         appmod.requests.get, appmod.requests.head = old_get, old_head
 

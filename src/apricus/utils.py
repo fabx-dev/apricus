@@ -170,6 +170,66 @@ def valid_http_url(url):
     return url
 
 
+def resolves_public(hostname):
+    """True when *hostname* resolves only to public IP addresses.
+
+    Returns False for loopback, private, link-local, multicast, reserved
+    and unspecified addresses, and when DNS resolution fails (fail closed:
+    a name that cannot be resolved cannot be fetched either). Used to keep
+    validation probes and metadata fetches off the local network; it does
+    not cover DNS rebinding between check and use (documented residual).
+    """
+    import ipaddress
+    import socket
+
+    if not hostname:
+        return False
+    try:
+        infos = socket.getaddrinfo(hostname, None, family=socket.AF_UNSPEC)
+    except OSError:
+        return False
+    if not infos:
+        return False
+    for info in infos:
+        try:
+            ip = ipaddress.ip_address(info[4][0])
+        except ValueError:
+            return False
+        if (
+            ip.is_private
+            or ip.is_loopback
+            or ip.is_link_local
+            or ip.is_multicast
+            or ip.is_reserved
+            or ip.is_unspecified
+        ):
+            return False
+    return True
+
+
+def public_http_url(url):
+    """Return *url* when it is fetchable http(s) on a public host, else None.
+
+    Combines :func:`valid_http_url` with :func:`resolves_public`. Local
+    development and intranet hosts (including `localhost`) are rejected:
+    streaming from the local network is intentionally unsupported because
+    pasted URLs are resolved and probed automatically (SSRF). Callers
+    surface a dedicated message for this case.
+    """
+    from urllib.parse import urlsplit
+
+    clean = valid_http_url(url)
+    if clean is None:
+        return None
+    try:
+        host = urlsplit(clean).hostname
+    except ValueError:
+        return None
+    if not resolves_public(host):
+        return None
+    return clean
+
+
 def setup_autostart(autostart):
     if is_flatpak():
         """
