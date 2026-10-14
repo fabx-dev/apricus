@@ -46,6 +46,12 @@ sudo dnf install python3-pillow python3-pydbus python3-requests python3-setproct
 > The Flatpak build derives its `pypi-deps.json` from it via `make pypi-deps`
 > (which runs `pkgs/flatpak/generate-pypi-deps.sh`).
 
+Streaming YouTube may need a JavaScript runtime for yt-dlp challenge solving:
+Deno ≥ 2.3 is recommended (`deno --version` to check; get it from
+https://github.com/denoland/deno/releases — distro packages are often
+outdated). Without it, some YouTube formats are missing, but the rest of
+the app keeps working. The Flatpak bundles Deno (see `pkgs/flatpak/deno.json`).
+
 #### Linting and formatting
 [Ruff](https://docs.astral.sh/ruff/) handles both linting and formatting (configured in `pyproject.toml`):
 ```bash
@@ -99,7 +105,7 @@ This removes exactly what `make install` installed (from the same `PREFIX`).
 ## Build as Flatpak
 First, please make sure you have `flatpak` and `flatpak-builder` installed on your system. For more details, please refer to the [Flatpak official documentation](https://docs.flatpak.org/en/latest/first-build.html).
 
-All Flatpak packaging files live under [`pkgs/flatpak`](../pkgs/flatpak/), including the manifest `io.github.fabx_dev.Apricus.json`, the bundled build modules (`vlc.json`, `pypi-deps.json`), VLC patches (`libvlc/`), and the `shared-modules` submodule.
+All Flatpak packaging files live under [`pkgs/flatpak`](../pkgs/flatpak/), including the manifest `io.github.fabx_dev.Apricus.json`, the bundled build modules (`vlc.json`, `pypi-deps.json`, `deno.json`), VLC patches (`libvlc/`), and the `shared-modules` submodule.
 
 ### Environment Setup
 For Flatpak development, VSCode with the Flatpak extension (`bilelmoussaoui.flatpak-vscode`) is recommended. Alternatively, GNOME Builder is also useful when building Flatpak applications.

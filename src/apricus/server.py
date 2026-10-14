@@ -256,6 +256,8 @@ class ApricusServer:
         video = None
         if mode == MODE_VIDEO and data_source:
             video = data_source
+        elif mode == MODE_STREAM and data_source:
+            video = data_source
         elif mode == MODE_PLAYLIST:
             playlist = ConfigUtil().load().get(CONFIG_KEY_PLAYLIST) or {}
             for queue in [playlist.get("Default")] + [

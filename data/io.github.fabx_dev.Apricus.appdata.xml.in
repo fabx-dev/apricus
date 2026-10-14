@@ -26,6 +26,17 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="2.0.0-rc1" date="2026-10-14" type="development">
+      <description>
+        <ul>
+          <li>Release candidate: new GTK4 panel (Library, Playlist, Now Playing, Streaming, Web Page, Settings)</li>
+          <li>Streaming rows with thumbnails (cached, lazy, max 2 concurrent) and LIVE badge</li>
+          <li>Shared yt-dlp options with bundled Deno runtime in the Flatpak</li>
+          <li>Static wallpaper pinned under streams (thumbnail or extracted frame)</li>
+          <li>Direct upgrade of the 1.0 install: same app ID, config and data preserved</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.0" date="2026-10-12" type="stable">
       <description>
         <ul>

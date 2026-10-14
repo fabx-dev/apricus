@@ -65,6 +65,7 @@ from apricus.utils import (
     setup_autostart,
     setup_logging,
 )
+from apricus.yt_utils import base_options
 
 logger = logging.getLogger(LOGGER_NAME)
 
@@ -114,6 +115,13 @@ class ControlPanel(Adw.Application):
         self.toasts = None
         self.config = ConfigUtil().load()
         self.playlist_paths = list((self.config.get("playlist") or {}).get("Default", []))
+
+    def do_shutdown(self):
+        pool = getattr(self, "_stream_thumb_pool", None)
+        if pool is not None:
+            pool.shutdown(wait=False, cancel_futures=True)
+            self._stream_thumb_pool = None
+        super().do_shutdown()
 
     def do_activate(self):
         if self.window is None:
@@ -1435,7 +1443,7 @@ class ControlPanel(Adw.Application):
         }
         thumb_url = None
         try:
-            with yt_dlp.YoutubeDL({"noplaylist": True, "socket_timeout": 15, "quiet": True}) as ydl:
+            with yt_dlp.YoutubeDL(base_options(quiet=True)) as ydl:
                 meta = ydl.extract_info(url, download=False) or {}
             title = meta.get("title")
             if title:
@@ -1458,8 +1466,16 @@ class ControlPanel(Adw.Application):
             if height:
                 info["line4"] = ("Quality", f"{height}p", "video-display-symbolic")
             thumb_url = self._stream_thumb_url(meta)
-        except Exception as e:  # noqa: BLE001 - rows keep safe defaults
-            logger.debug(f"[GUI4] Stream info failed for {url}: {e}")
+            from apricus.stream_thumbs import is_live_meta
+
+            GLib.idle_add(
+                self._update_stream_live_flag_idle,
+                url,
+                is_live_meta(meta),
+                meta.get("title") or "",
+            )
+        except Exception:  # noqa: BLE001 - rows keep safe defaults, no URL in logs
+            logger.debug("[GUI4] Stream info failed")
         GLib.idle_add(self._apply_np_details, generation, info, None)
         if thumb_url:
             try:
@@ -1714,7 +1730,14 @@ class ControlPanel(Adw.Application):
         box.add_controller(drop_text)
         self._update_stream_type()
         self._reload_stream_lists()
-        return self._scroll_page(self._clamp_page(box))
+        page = self._scroll_page(self._clamp_page(box))
+        vadj = page.get_vadjustment()
+        vadj.connect("value-changed", self._on_stream_scroll)
+        vadj.connect("changed", self._on_stream_scroll)
+        return page
+
+    def _on_stream_scroll(self, *_args):
+        self._schedule_visible_thumbs()
 
     def _on_stream_icon_press(self, entry, position):
         if position == Gtk.EntryIconPosition.SECONDARY:
@@ -1962,11 +1985,29 @@ class ControlPanel(Adw.Application):
         row.set_name(url)
         row.set_title(self._plain(self._stream_row_title(entry)))
         row.set_subtitle(self._plain(url))
-        mono = self._web_monogram(self._stream_site(url))
-        avatar = Adw.Avatar(text=mono, size=32)
-        avatar.set_show_initials(bool(mono))
+        thumb_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
+        thumb_box.set_size_request(64, 36)
+        thumb_box.set_valign(Gtk.Align.CENTER)
+        overlay = Gtk.Overlay()
+        avatar = Adw.Avatar(text=self._web_monogram(self._stream_site(url)), size=32)
         avatar.set_tooltip_text(self._stream_site(url))
-        row.add_prefix(avatar)
+        overlay.set_child(avatar)
+        picture = Gtk.Picture()
+        picture.set_content_fit(Gtk.ContentFit.COVER)
+        picture.set_size_request(64, 36)
+        picture.set_can_shrink(True)
+        picture.set_visible(False)
+        overlay.add_overlay(picture)
+        if entry.get("is_live"):
+            badge = Gtk.Label(label="LIVE")
+            badge.add_css_class("stream-live-badge")
+            badge.set_valign(Gtk.Align.START)
+            badge.set_halign(Gtk.Align.START)
+            overlay.add_overlay(badge)
+        thumb_box.append(overlay)
+        row.add_prefix(thumb_box)
+        row._thumb_picture = picture
+        row._thumb_avatar = avatar
         star = Gtk.ToggleButton()
         star.add_css_class("flat")
         star.set_icon_name("starred-symbolic" if favorite else "non-starred-symbolic")
@@ -2015,6 +2056,179 @@ class ControlPanel(Adw.Application):
         self.saved_group.set_visible(not empty)
         self.recent_list.set_visible(not empty)
         self.stream_empty.set_visible(empty)
+        self._thumb_generation = getattr(self, "_thumb_generation", 0) + 1
+        self._schedule_visible_thumbs()
+
+    def _thumb_cache(self):
+        from apricus.stream_thumbs import ThumbCache
+
+        cache = getattr(self, "_stream_thumb_cache", None)
+        if cache is None:
+            cache = ThumbCache(os.path.join(GLib.get_user_cache_dir(), "apricus", "stream-thumbs"))
+            self._stream_thumb_cache = cache
+        return cache
+
+    def _thumb_fetcher(self):
+        from apricus.stream_thumbs import ThumbFetcher
+
+        fetcher = getattr(self, "_stream_thumb_fetcher", None)
+        if fetcher is None:
+            fetcher = ThumbFetcher(self._thumb_cache(), max_concurrent=2)
+            self._stream_thumb_fetcher = fetcher
+        return fetcher
+
+    def _thumb_pool(self):
+        from concurrent.futures import ThreadPoolExecutor
+
+        pool = getattr(self, "_stream_thumb_pool", None)
+        if pool is None:
+            pool = ThreadPoolExecutor(max_workers=2, thread_name_prefix="streamthumb")
+            self._stream_thumb_pool = pool
+        return pool
+
+    def _visible_stream_rows(self):
+        """(listbox, row, url) for mapped rows currently in the viewport."""
+        found = []
+        for listbox in (
+            getattr(self, "saved_list", None),
+            getattr(self, "recent_list", None),
+        ):
+            if listbox is None or not listbox.get_mapped():
+                continue
+            scrolled = listbox.get_ancestor(Gtk.ScrolledWindow)
+            if scrolled is None:
+                continue
+            viewport = scrolled.get_child()
+            if viewport is None:
+                continue
+            vadj = scrolled.get_vadjustment()
+            top, bottom = vadj.get_value(), vadj.get_value() + vadj.get_page_size()
+            child = listbox.get_first_child()
+            while child is not None:
+                url = child.get_name()
+                if url and child.get_mapped():
+                    ok, bounds = child.compute_bounds(viewport)
+                    if ok:
+                        y, height = bounds.origin.y, bounds.size.height
+                        if height > 0 and y + height >= top and y <= bottom:
+                            found.append((listbox, child, url))
+                child = child.get_next_sibling()
+        return found
+
+    def _schedule_visible_thumbs(self):
+        if getattr(self, "_thumb_debounce", None) is not None:
+            GLib.source_remove(self._thumb_debounce)
+            self._thumb_debounce = None
+
+        def _later():
+            self._thumb_debounce = None
+            self._fetch_visible_thumbs()
+            return False
+
+        self._thumb_debounce = GLib.timeout_add(150, _later)
+
+    def _fetch_visible_thumbs(self):
+        generation = getattr(self, "_thumb_generation", 0)
+        for _listbox, row, url in self._visible_stream_rows():
+            picture = getattr(row, "_thumb_picture", None)
+            if picture is None or picture.get_visible():
+                continue  # already has a texture (or no picture slot)
+            entry_live = self._stream_entry_live(url)
+            self._thumb_pool().submit(self._fetch_row_thumb_job, generation, row, url, entry_live)
+
+    def _stream_entry_live(self, url):
+        for entry in self._load_stream_data()[0]:
+            if entry["url"] == url:
+                return bool(entry.get("is_live"))
+        return False
+
+    @staticmethod
+    def _youtube_thumb_id(url):
+        import re
+
+        match = re.search(
+            r"(?:youtu\.be/|youtube\.com/(?:watch\?.*v=|shorts/|live/|embed/))([A-Za-z0-9_-]{6,})",
+            url or "",
+        )
+        return match.group(1) if match else ""
+
+    def _fetch_row_thumb(self, url):
+        """Size-limited thumbnail bytes for a row, or None (fallback)."""
+        video_id = self._youtube_thumb_id(url)
+        if not video_id:
+            return None
+        try:
+            response = requests.get(
+                f"https://i.ytimg.com/vi/{video_id}/mqdefault.jpg",
+                timeout=10,
+                stream=True,
+            )
+            content_type = response.headers.get("Content-Type", "")
+            if "image" not in content_type:
+                response.close()
+                return None
+            chunks = []
+            total = 0
+            for chunk in response.iter_content(65536):
+                total += len(chunk)
+                if total > 512 * 1024:
+                    response.close()
+                    return None
+                chunks.append(chunk)
+            response.close()
+            data = b"".join(chunks)
+        except requests.exceptions.RequestException as e:
+            logger.debug(f"[GUI4] Row thumbnail download failed: {e}")
+            return None
+        if not data:
+            return None
+        return data
+
+    def _fetch_row_thumb_job(self, generation, row, url, is_live):
+        self._thumb_fetcher().fetch(
+            url,
+            self._fetch_row_thumb,
+            lambda path, reason: GLib.idle_add(self._apply_row_thumb, generation, row, url, path),
+            is_live=is_live,
+        )
+
+    def _apply_row_thumb(self, generation, row, url, path):
+        if generation != getattr(self, "_thumb_generation", generation):
+            return False
+        try:
+            alive = row.get_parent() is not None and row.get_name() == url
+        except Exception:  # noqa: BLE001 - destroyed row
+            return False
+        if not alive or not path:
+            return False
+        picture = getattr(row, "_thumb_picture", None)
+        avatar = getattr(row, "_thumb_avatar", None)
+        if picture is None:
+            return False
+        picture.set_filename(path)
+        picture.set_visible(True)
+        if avatar is not None:
+            avatar.set_visible(False)
+        return False
+
+    def _update_stream_live_flag(self, url, is_live, title=""):
+        history, favorites = self._load_stream_data()
+        changed = False
+        for entry in history:
+            if entry["url"] != url:
+                continue
+            if bool(entry.get("is_live")) != bool(is_live):
+                entry["is_live"] = bool(is_live)
+                changed = True
+            if title and entry.get("title") != title:
+                entry["title"] = title[:200]
+                changed = True
+        if changed:
+            self._save_stream_data(history, favorites)
+
+    def _update_stream_live_flag_idle(self, url, is_live, title=""):
+        self._update_stream_live_flag(url, is_live, title)
+        return False
 
     def _on_saved_row_activated(self, _listbox, row):
         url = row.get_name()
@@ -2270,7 +2484,7 @@ class ControlPanel(Adw.Application):
     def _check_stream_url(self, url):
         """Validate a streaming URL with yt-dlp; None when valid, else error."""
         try:
-            with yt_dlp.YoutubeDL({"noplaylist": True, "socket_timeout": 15}) as ydl:
+            with yt_dlp.YoutubeDL(base_options()) as ydl:
                 ydl.extract_info(url, download=False)
         except Exception as e:  # noqa: BLE001 - any backend failure is a bad URL
             return self._classify_stream_error(str(e))
@@ -2278,18 +2492,9 @@ class ControlPanel(Adw.Application):
 
     @staticmethod
     def _classify_stream_error(message):
-        low = (message or "").lower()
-        if "sign in to confirm" in low or "bot" in low:
-            return "YouTube is asking for bot verification. Try again later."
-        if "private" in low or "login" in low or "sign in" in low:
-            return "This video needs login or is private."
-        if "drm" in low or "widevine" in low:
-            return "DRM-protected streams are not supported."
-        if "unsupported url" in low:
-            return "URL not supported."
-        if "404" in low or "not found" in low:
-            return "Not found (404)."
-        return " ".join(message.split(" ")[1:]) or message
+        from apricus.yt_utils import classify_stream_error
+
+        return classify_stream_error(message)
 
     def _check_direct_url(self, url):
         """Fast-path HEAD check; None when playable, 'fallback' for yt-dlp."""

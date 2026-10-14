@@ -1,5 +1,7 @@
 [project]
 name = "apricus"
+# NOTE: dev-only metadata (uv package = false below); the release version
+# lives in meson.build. Kept at the upstream number on purpose.
 version = "3.7"
 description = "Live wallpaper for Linux. Written in Python."
 readme = "README.md"

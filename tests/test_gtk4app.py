@@ -571,6 +571,54 @@ def stream_url_check_accepts_and_rejects():
 
 
 @check
+def stream_callsites_share_js_runtime_options():
+    """Both gtk4app yt-dlp call-sites must use the shared base_options()
+    (regression: a new call-site forgetting the runtime silently degrades
+    extraction). js_runtimes is pinned only when a Deno binary is known;
+    otherwise the key is omitted so yt-dlp keeps its PATH discovery."""
+    import apricus.gui.gtk4app as appmod
+    from apricus.yt_utils import js_runtime_options
+
+    seen = []
+
+    class _RecordingYdl:
+        def __init__(self, params):
+            seen.append(dict(params))
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def extract_info(self, url, download=False):
+            return {"title": "T", "formats": []}
+
+    class _RecordingYtDlp:
+        YoutubeDL = _RecordingYdl
+
+    old = appmod.yt_dlp
+    appmod.yt_dlp = _RecordingYtDlp()
+    try:
+        obj, _ = _panel(_base_config(), [])
+        expected_js = js_runtime_options()
+        obj._check_stream_url("https://www.youtube.com/watch?v=ok")
+        assert seen and seen[-1].get("noplaylist") is True, seen
+        assert seen[-1].get("remote_components") == [], seen
+        if expected_js:
+            assert seen[-1].get("js_runtimes") == expected_js, seen
+        else:
+            assert "js_runtimes" not in seen[-1], seen
+        assert seen[-1].get("quiet") is not True
+        obj.np_detail_rows = {}
+        obj._info_np_stream("https://www.youtube.com/watch?v=ok", 1)
+        assert seen and seen[-1].get("noplaylist") is True, seen
+        assert seen[-1].get("quiet") is True, "info path keeps quiet"
+    finally:
+        appmod.yt_dlp = old
+
+
+@check
 def finish_stream_apply_records_and_opens_chooser():
     import apricus.gui.gtk4app as appmod
 
@@ -1719,6 +1767,249 @@ def settings_has_no_mute_volume_or_lucky():
 
 
 @check
+def stream_thumb_id_table():
+    thumb_id = app.ControlPanel._youtube_thumb_id
+    assert thumb_id("https://youtu.be/abc123XYZ_-") == "abc123XYZ_-"
+    assert thumb_id("https://www.youtube.com/watch?v=abc123XYZ_-&t=10") == "abc123XYZ_-"
+    assert thumb_id("https://www.youtube.com/shorts/abc123XYZ_-") == "abc123XYZ_-"
+    assert thumb_id("https://www.youtube.com/live/abc123XYZ_-") == "abc123XYZ_-"
+    assert thumb_id("https://www.twitch.tv/someone") == ""
+    assert thumb_id("https://example.com/v.mp4") == ""
+    assert thumb_id("") == ""
+    assert thumb_id(None) == ""
+
+
+@check
+def stream_row_fetch_respects_type_and_size():
+    import apricus.gui.gtk4app as appmod
+
+    calls = []
+
+    class _Resp:
+        def __init__(self, body, ctype="image/jpeg"):
+            self._body = body
+            self.headers = {"Content-Type": ctype}
+
+        def iter_content(self, size):
+            calls.append("get")
+            yield self._body
+
+        def close(self):
+            pass
+
+    class _Requests:
+        def get(self, url, timeout=10, stream=True):
+            assert "i.ytimg.com" in url, url
+            return _Resp(b"\x89PNG\r\n\x1a\n" + b"0" * 100)
+
+    real = appmod.requests
+    appmod.requests = _Requests()
+    try:
+        obj, _ = _panel(_base_config(), [])
+        data = obj._fetch_row_thumb("https://youtu.be/abc123XYZ_-")
+        assert data and data.startswith(b"\x89PNG"), data[:8] if data else None
+        assert calls == ["get"]
+        # Non-YouTube: no network at all.
+        assert obj._fetch_row_thumb("https://www.twitch.tv/someone") is None
+        assert calls == ["get"]
+        # Oversize body: rejected.
+        class _Big(_Requests):
+            def get(self, url, timeout=10, stream=True):
+                return _Resp(b"0" * (512 * 1024 + 1))
+
+        appmod.requests = _Big()
+        assert obj._fetch_row_thumb("https://youtu.be/abc123XYZ_-") is None
+    finally:
+        appmod.requests = real
+
+
+@check
+def stream_row_apply_validates_target():
+    obj, _ = _panel(_base_config(), [])
+    painted = []
+
+    class _Pic:
+        def set_filename(self, path):
+            painted.append(("file", path))
+
+        def set_visible(self, visible):
+            painted.append(("visible", visible))
+
+    class _Avatar:
+        def set_visible(self, visible):
+            painted.append(("avatar", visible))
+
+    class _Row:
+        def __init__(self, name, parent):
+            self._name = name
+            self._parent = parent
+
+        def get_name(self):
+            return self._name
+
+        def get_parent(self):
+            return self._parent
+
+    obj._thumb_generation = 5
+    row, pic, avatar = _Row("https://w.example/v", object()), _Pic(), _Avatar()
+    row._thumb_picture, row._thumb_avatar = pic, avatar
+    # Stale generation: untouched.
+    assert obj._apply_row_thumb(4, row, "https://w.example/v", "/tmp/x.png") is False
+    assert painted == []
+    # Destroyed row: untouched.
+    assert obj._apply_row_thumb(5, _Row("https://w.example/v", None), "https://w.example/v", "/tmp/x.png") is False
+    assert painted == []
+    # URL replaced: untouched.
+    assert obj._apply_row_thumb(5, row, "https://other.example/", "/tmp/x.png") is False
+    assert painted == []
+    # Null path: untouched.
+    assert obj._apply_row_thumb(5, row, "https://w.example/v", None) is False
+    assert painted == []
+    # Valid: file set, picture shown, avatar hidden.
+    assert obj._apply_row_thumb(5, row, "https://w.example/v", "/tmp/x.png") is False
+    assert ("file", "/tmp/x.png") in painted
+    assert ("visible", True) in painted
+    assert ("avatar", False) in painted
+
+
+@check
+def stream_row_widgets_have_thumb_slot_and_live_badge():
+    import os
+
+    assert os.environ.get("DISPLAY"), "needs a display (run under Xvfb)"
+    from gi.repository import Adw, Gtk
+
+    Adw.init()
+    obj = app.ControlPanel.__new__(app.ControlPanel)
+    row = obj._stream_row(
+        {"url": "https://w.example/v", "title": "T", "site": "w", "kind": "page", "is_live": True},
+        False,
+    )
+    pic = getattr(row, "_thumb_picture", None)
+    assert pic is not None and isinstance(pic, Gtk.Picture)
+    assert pic.get_size_request() == (64, 36)
+    assert pic.get_visible() is False
+    texts = []
+
+    def walk(widget):
+        if isinstance(widget, Gtk.Label) and widget.get_text():
+            texts.append(widget.get_text())
+        child = widget.get_first_child() if hasattr(widget, "get_first_child") else None
+        while child is not None:
+            walk(child)
+            child = child.get_next_sibling()
+
+    walk(row)
+    assert "LIVE" in texts, texts
+    plain = obj._stream_row(
+        {"url": "https://w.example/v", "title": "T", "site": "w", "kind": "page"},
+        False,
+    )
+
+    def walk2(widget, out):
+        if isinstance(widget, Gtk.Label) and widget.get_text():
+            out.append(widget.get_text())
+        child = widget.get_first_child() if hasattr(widget, "get_first_child") else None
+        while child is not None:
+            walk2(child, out)
+            child = child.get_next_sibling()
+
+    texts2 = []
+    walk2(plain, texts2)
+    assert "LIVE" not in texts2, texts2
+
+
+@check
+def visible_stream_rows_on_mapped_window():
+    """Real mapped window: visible-row computation must not raise and must
+    find the rows (regression: wrong compute_point arity broke it live)."""
+    import os
+    import tempfile
+    import time
+
+    assert os.environ.get("DISPLAY"), "needs a display (run under Xvfb)"
+    from gi.repository import Adw, GLib, Gtk
+
+    from apricus.stream_thumbs import ThumbCache
+
+    Adw.init()
+    obj = app.ControlPanel.__new__(app.ControlPanel)
+    obj.version = "test"
+    obj.config = {
+        "mode": "MODE_NULL",
+        "data_source": {"Default": ""},
+        "playlist": {"Default": []},
+        "playlist_shuffle": False,
+        "video_dir": None,
+        "is_mute": False,
+        "audio_volume": 50,
+        "stream_history": [
+            {
+                "url": "https://w.example/1",
+                "title": "One",
+                "site": "w.example",
+                "kind": "page",
+                "last_used": 2,
+            },
+            {
+                "url": "https://w.example/2",
+                "title": "Two",
+                "site": "w.example",
+                "kind": "page",
+                "last_used": 1,
+            },
+        ],
+        "stream_favorites": [],
+    }
+    obj.playlist_paths = []
+    obj._server = lambda: None
+    obj._stream_thumb_cache = ThumbCache(tempfile.mkdtemp(prefix="apricus-thumbtest-"))
+    page = obj._streaming_page()
+    window = Adw.ApplicationWindow()
+    window.set_default_size(900, 900)
+    window.set_content(page)
+    window.present()
+    deadline = time.time() + 10
+    rows = []
+    while time.time() < deadline:
+        while GLib.main_context_default().pending():
+            GLib.main_context_default().iteration(False)
+        rows = obj._visible_stream_rows()
+        if len(rows) >= 2:
+            break
+        time.sleep(0.2)
+    assert len(rows) == 2, [(r.get_name() if hasattr(r, "get_name") else None) for _, r, _ in rows]
+    assert {url for _, _, url in rows} == {"https://w.example/1", "https://w.example/2"}
+    obj._fetch_visible_thumbs()
+    time.sleep(1)
+    for _ in range(20):
+        while GLib.main_context_default().pending():
+            GLib.main_context_default().iteration(False)
+    window.close()
+
+
+@check
+def stream_meta_title_persists_in_history():
+    import apricus.gui.gtk4app as appmod
+
+    store = _ConfigStore(_base_config())
+    old = _patch_config(None, store)
+    try:
+        obj, _ = _panel(_base_config(), [])
+        obj._record_stream_use("https://w.example/v", title="", kind="page")
+        obj._update_stream_live_flag("https://w.example/v", False, "Real Title Here")
+        entries = [e for e in store.config["stream_history"] if e["url"] == "https://w.example/v"]
+        assert entries and entries[0]["title"] == "Real Title Here", entries
+        # Empty title never wipes a known one.
+        obj._update_stream_live_flag("https://w.example/v", True, "")
+        entries = [e for e in store.config["stream_history"] if e["url"] == "https://w.example/v"]
+        assert entries[0]["title"] == "Real Title Here", entries
+        assert entries[0]["is_live"] is True
+    finally:
+        appmod.ConfigUtil = old
+
+
+@check
 def toast_without_overlay_is_noop():
     obj, _ = _panel(_base_config(), [])
     obj._toast("hello")  # must not raise without a ToastOverlay
@@ -1929,6 +2220,10 @@ def test_stream_url_check_accepts_and_rejects():
     _run("stream_url_check_accepts_and_rejects")
 
 
+def test_stream_callsites_share_js_runtime_options():
+    _run("stream_callsites_share_js_runtime_options")
+
+
 def test_finish_stream_apply_persists_and_calls_server():
     _run("finish_stream_apply_records_and_opens_chooser")
 
@@ -1963,6 +2258,30 @@ def test_source_row_shows_folder_or_empty():
 
 def test_toast_without_overlay_is_noop():
     _run("toast_without_overlay_is_noop")
+
+
+def test_stream_meta_title_persists_in_history():
+    _run("stream_meta_title_persists_in_history")
+
+
+def test_visible_stream_rows_on_mapped_window():
+    _run_display("visible_stream_rows_on_mapped_window")
+
+
+def test_stream_thumb_id_table():
+    _run("stream_thumb_id_table")
+
+
+def test_stream_row_fetch_respects_type_and_size():
+    _run("stream_row_fetch_respects_type_and_size")
+
+
+def test_stream_row_apply_validates_target():
+    _run("stream_row_apply_validates_target")
+
+
+def test_stream_row_widgets_have_thumb_slot_and_live_badge():
+    _run_display("stream_row_widgets_have_thumb_slot_and_live_badge")
 
 
 def test_autostart_enabled_reflects_disk():

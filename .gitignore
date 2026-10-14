@@ -16,4 +16,5 @@ _build/
 .flatpak/
 .flatpak-builder/
 build-flatpak/
+build-flatpak*/
 *.flatpak

@@ -1,5 +1,5 @@
-# SOME DESCRIPTIVE TITLE.
-# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# Apricus - Live wallpaper for Linux
+# Copyright (C) 2022 Jeff Shee (jeffshee8969@gmail.com)
 # This file is distributed under the same license as the apricus package.
 # FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
 #
@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: apricus\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-12 02:12+0200\n"
+"POT-Creation-Date: 2026-10-14 03:55+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -17,25 +17,25 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-#: src/apricus/gui/control.py:124
+#: src/apricus/gui/control.py:125
 #, python-brace-format
 msgid "Set For {monitor}"
 msgstr ""
 
 #. add all option
-#: src/apricus/gui/control.py:129
+#: src/apricus/gui/control.py:130
 msgid "Set For All"
 msgstr ""
 
-#: src/apricus/gui/control.py:241
+#: src/apricus/gui/control.py:242
 msgid "Couldn't connect to server"
 msgstr ""
 
-#: src/apricus/gui/control.py:254
+#: src/apricus/gui/control.py:255
 msgid "Welcome to Apricus 🤗"
 msgstr ""
 
-#: src/apricus/gui/control.py:258
+#: src/apricus/gui/control.py:259
 msgid ""
 "Quickstart for adding local videos:\n"
 " ・Click the folder icon to open your video folder\n"
@@ -44,113 +44,113 @@ msgid ""
 " ・Click to select, Ctrl+click for more than one"
 msgstr ""
 
-#: src/apricus/gui/control.py:275
+#: src/apricus/gui/control.py:276
 msgid "Oops!"
 msgstr ""
 
-#: src/apricus/gui/control.py:293
+#: src/apricus/gui/control.py:297
 #, python-brace-format
 msgid "Choose video folder (current: {folder})"
 msgstr ""
 
-#: src/apricus/gui/control.py:294
+#: src/apricus/gui/control.py:298
 msgid "none chosen yet"
 msgstr ""
 
-#: src/apricus/gui/control.py:300
+#: src/apricus/gui/control.py:304
 msgid "Cancel"
 msgstr ""
 
-#: src/apricus/gui/control.py:302
+#: src/apricus/gui/control.py:306
 msgid "Choose"
 msgstr ""
 
-#: src/apricus/gui/control.py:325
+#: src/apricus/gui/control.py:329
 msgid "No Video Selected"
 msgstr ""
 
-#: src/apricus/gui/control.py:328
+#: src/apricus/gui/control.py:332
 msgid ""
 "There are no video selected.\n"
 "Please choose one first (Ctrl+click for more than one)."
 msgstr ""
 
-#: src/apricus/gui/control.py:367
+#: src/apricus/gui/control.py:371
 msgid "Please choose a HTML file"
 msgstr ""
 
-#: src/apricus/gui/control.py:398
+#: src/apricus/gui/control.py:402
 msgid "#"
 msgstr ""
 
-#: src/apricus/gui/control.py:398
+#: src/apricus/gui/control.py:402
 msgid "Video"
 msgstr ""
 
-#: src/apricus/gui/control.py:412
+#: src/apricus/gui/control.py:416
 #, python-brace-format
 msgid "Playlist ({n}, paused)"
 msgstr ""
 
-#: src/apricus/gui/control.py:414
+#: src/apricus/gui/control.py:418
 #, python-brace-format
 msgid "Playlist ({n})"
 msgstr ""
 
-#: src/apricus/gui/control.py:414 src/apricus/assets/control.ui:1113
+#: src/apricus/gui/control.py:418 src/apricus/assets/control.ui:1113
 msgid "Playlist"
-msgstr ""
-
-#: src/apricus/gui/control.py:431
-#, python-brace-format
-msgid "Added {a}, {d} already in queue (total {n})"
 msgstr ""
 
 #: src/apricus/gui/control.py:435
 #, python-brace-format
+msgid "Added {a}, {d} already in queue (total {n})"
+msgstr ""
+
+#: src/apricus/gui/control.py:439
+#, python-brace-format
 msgid "Added {a} to queue (total {n})"
 msgstr ""
 
-#: src/apricus/gui/control.py:437
+#: src/apricus/gui/control.py:441
 #, python-brace-format
 msgid "Already in queue (total {n})"
 msgstr ""
 
-#: src/apricus/gui/control.py:449 src/apricus/assets/control.ui:456
+#: src/apricus/gui/control.py:453 src/apricus/assets/control.ui:456
 msgid "No selection"
 msgstr ""
 
-#: src/apricus/gui/control.py:451
+#: src/apricus/gui/control.py:455
 msgid "1 video selected"
 msgstr ""
 
-#: src/apricus/gui/control.py:453
+#: src/apricus/gui/control.py:457
 #, python-brace-format
 msgid "{n} videos selected"
 msgstr ""
 
-#: src/apricus/gui/control.py:460
+#: src/apricus/gui/control.py:464
 msgid "This video is already the active wallpaper"
 msgstr ""
 
-#: src/apricus/gui/control.py:463
+#: src/apricus/gui/control.py:467
 msgid "Apply the selected video as wallpaper"
 msgstr ""
 
-#: src/apricus/gui/control.py:485
+#: src/apricus/gui/control.py:489
 #, python-brace-format
 msgid "Add to playlist ({n})"
 msgstr ""
 
-#: src/apricus/gui/control.py:485 src/apricus/assets/control.ui:487
+#: src/apricus/gui/control.py:489 src/apricus/assets/control.ui:487
 msgid "Add to playlist"
 msgstr ""
 
-#: src/apricus/gui/control.py:500
+#: src/apricus/gui/control.py:504
 msgid "Selecting videos"
 msgstr ""
 
-#: src/apricus/gui/control.py:503
+#: src/apricus/gui/control.py:507
 msgid ""
 " ・Click a video to select it\n"
 " ・Ctrl+click adds or removes single videos\n"
@@ -158,74 +158,74 @@ msgid ""
 " ・Right-click a video to set it on a monitor"
 msgstr ""
 
-#: src/apricus/gui/control.py:616
+#: src/apricus/gui/control.py:620
 msgid "Disabled in playlist mode (muted by design)"
 msgstr ""
 
-#: src/apricus/gui/control.py:618 src/apricus/assets/control.ui:154
+#: src/apricus/gui/control.py:622 src/apricus/assets/control.ui:154
 msgid "Volume control"
 msgstr ""
 
-#: src/apricus/gui/control.py:709
+#: src/apricus/gui/control.py:714
 #, python-brace-format
 msgid ""
 "Failed to access {url}. Error:\n"
 "{error}"
 msgstr ""
 
-#: src/apricus/gui/control.py:714
+#: src/apricus/gui/control.py:719
 #, python-brace-format
 msgid "Failed to access {url}. Error code: {code}"
 msgstr ""
 
-#: src/apricus/gui/control.py:730
+#: src/apricus/gui/control.py:735
 #, python-brace-format
 msgid ""
 "Failed to stream {url}. Error:\n"
 "{error}"
 msgstr ""
 
-#: src/apricus/gui/control.py:818
+#: src/apricus/gui/control.py:823
 msgid "Choose a video folder to begin"
 msgstr ""
 
-#: src/apricus/gui/control.py:820
+#: src/apricus/gui/control.py:825
 #, python-brace-format
 msgid "Videos in {folder} ({count})"
 msgstr ""
 
-#: src/apricus/gui/control.py:824
+#: src/apricus/gui/control.py:829
 #, python-brace-format
 msgid "No videos in {folder}"
 msgstr ""
 
 #.
-#: src/apricus/menu.py:97
+#: src/apricus/menu.py:95
 msgid "Show Apricus"
 msgstr ""
 
 #.
-#: src/apricus/menu.py:100
+#: src/apricus/menu.py:98
 msgid "Toggle Mute Audio"
 msgstr ""
 
 #.
-#: src/apricus/menu.py:103 src/apricus/assets/control.ui:1155
+#: src/apricus/menu.py:101 src/apricus/assets/control.ui:1155
 msgid "Toggle Play/Pause"
 msgstr ""
 
 #.
-#: src/apricus/menu.py:106
+#: src/apricus/menu.py:104
 msgid "Reload"
 msgstr ""
 
 #.
-#: src/apricus/menu.py:109 src/apricus/assets/control.ui:1174
+#: src/apricus/menu.py:107 src/apricus/assets/control.ui:1174
 msgid "I'm Feeling Lucky"
 msgstr ""
 
 #.
-#: src/apricus/menu.py:112 src/apricus/assets/control.ui:269
+#: src/apricus/menu.py:110 src/apricus/assets/control.ui:269
 msgid "Quit Apricus"
 msgstr ""
 

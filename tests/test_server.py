@@ -46,6 +46,26 @@ def test_single_other_video_plays():
     assert _run(["M1"], ["/b.mp4"]) == ["/b.mp4"]
 
 
+def test_preview_static_forwards_stream_url_to_player():
+    """Streams must pre-apply static like videos (regression: streams
+    pruned the previous static and pinned nothing -> blue fallback)."""
+    from unittest.mock import patch
+
+    calls = []
+
+    class _FakePlayer:
+        def preview_static(self, video):
+            calls.append(video)
+
+    with patch.object(srv, "get_instance", return_value=_FakePlayer()):
+        srv.ApricusServer._preview_static("MODE_STREAM", "https://example.com/live")
+        assert calls == ["https://example.com/live"], calls
+        srv.ApricusServer._preview_static("MODE_VIDEO", "/v/a.mp4")
+        assert calls[-1] == "/v/a.mp4"
+        srv.ApricusServer._preview_static("MODE_STREAM", "")
+        assert len(calls) == 2, "empty source must not touch the player"
+
+
 def _setup_stub(monitors):
     s = srv.ApricusServer.__new__(srv.ApricusServer)
     s.config = {

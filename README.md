@@ -14,7 +14,9 @@ by Jeff Shee (GPL-3.0, same license). It picks up where Hidamari left off:
 **fast login startup, a robust player, per-monitor correctness, and a cleaner
 path to Wayland and multi-desktop support**.
 
-> Status: active development on `master`.
+> Status: **2.0.0 RC1** — release candidate on branch `gtk4-migration`.
+> This is a test version: please report issues before the stable 2.0.0.
+> It upgrades Apricus 1.0 directly (same app ID, config and data preserved).
 
 ## Features
 
@@ -29,7 +31,9 @@ path to Wayland and multi-desktop support**.
 - Multi-monitor support, per-monitor video <sup>6</sup>
 - Video library folder of your choice, shown in the panel <sup>7</sup>
 - Streaming URL support via yt-dlp <sup>8</sup>
+- Streaming rows with cached thumbnails and LIVE badge <sup>11</sup>
 - Webpage as wallpaper <sup>9</sup>
+- New GTK4 panel: Library, Playlist, Now Playing, Streaming, Web Page, Settings <sup>12</sup>
 - Interface in English, Italian, German, French, Spanish and Japanese <sup>10</sup>
 
 <sup>1</sup> Currently GNOME only.
@@ -46,10 +50,18 @@ identical screens no longer overwrite each other.
 <sup>7</sup> Flat scan: each folder shows its own videos. Nothing is assumed:
 on first run you choose the folder, unless a Hidamari library already exists
 (reused automatically).
-<sup>8</sup> Tested with YouTube.
+<sup>8</sup> Tested with YouTube (needs Deno ≥ 2.3 on the system; included in the Flatpak).
 <sup>9</sup> Anything from a plain page to WebGL content. JavaScript stays on
 (pages need it); local-file access from remote pages is blocked.
-<sup>10</sup> Selected automatically from the system locale.
+<sup>10</sup> Selected automatically from the system locale. In this RC the new
+GTK4 panel is English-only (translations still cover the classic panel);
+marking and translating the new strings is planned before stable 2.0.0.
+<sup>11</sup> Thumbnails are cached under `~/.cache/apricus/stream-thumbs/`,
+loaded lazily (max 2 concurrent downloads), with a monogram fallback when
+no image is available. The LIVE badge appears only for confirmed live
+streams.
+<sup>12</sup> Set `APRICUS_GTK4=1` to open the new panel (`APRICUS_GTK4_TAB`
+selects the starting section). The classic GTK3 panel remains the default.
 
 ## What changed vs upstream
 
@@ -97,6 +109,37 @@ on first run you choose the folder, unless a Hidamari library already exists
 **Removed vs upstream**
 - Static-wallpaper blur: it only added startup cost for a wallpaper that sits
   underneath the video — frames are now saved sharp and Pillow is gone
+
+## New in 2.0.0 RC1
+
+- GTK4 panel (`APRICUS_GTK4=1`): sidebar with Library, Playlist, Now Playing,
+  Streaming, Web Page and Settings; visual playlist rows with drag-and-drop
+  and undo; monitor chooser on Library/Streaming/Web Page apply
+- Streaming thumbnails: cached, lazy, deduplicated, max 2 concurrent
+  downloads; LIVE badge only from confirmed stream metadata
+- Shared yt-dlp options (`yt_utils.base_options()`); Deno JavaScript runtime
+  bundled in the Flatpak (`pkgs/flatpak/deno.json`), optional on classic
+  installs (YouTube formats degrade gracefully without it)
+- Static wallpaper stays pinned under streams (downloaded thumbnail or
+  extracted frame) instead of falling back to blue
+- Real stream titles persisted in history instead of bare hostnames
+
+## Upgrade from 1.0
+
+Same application ID (`io.github.fabx_dev.Apricus`), same config
+(`~/.config/apricus/config.json`) and cache directories. 1.0 configs are
+read and migrated, never wiped. The 1.0 → 2.0 update path has been reviewed
+statically but not yet executed end-to-end; back up
+`~/.config/apricus/` before testing the RC over a 1.0 install.
+
+## Known limitations of this RC
+
+- New GTK4 panel is English-only (see <sup>10</sup> above).
+- `make flatpak` installs over the current Flatpak; to keep 1.0 installed,
+  build to a separate directory and do not install the RC yet.
+- End-to-end 1.0 → 2.0 update not yet executed; procedure documented above.
+- YouTube playback without a JS runtime may 403 on protected videos;
+  install Deno (classic) or use the Flatpak (bundled).
 
 ## Installation (from source)
 

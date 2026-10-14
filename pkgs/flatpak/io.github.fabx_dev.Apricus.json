@@ -9,6 +9,8 @@
         "--share=ipc",
         "--device=dri",
         "--socket=x11",
+        "--socket=wayland",
+        "--socket=fallback-x11",
         "--socket=pulseaudio",
         "--filesystem=xdg-videos:ro",
         "--talk-name=org.gnome.Shell.Extensions",
@@ -42,6 +44,7 @@
         "vlc.json",
         "shared-modules/libappindicator/libappindicator-gtk3-introspection-12.10.json",
         "pypi-deps.json",
+        "deno.json",
         {
             "name": "gnome-desktop",
             "buildsystem": "meson",
@@ -136,9 +139,13 @@
                         ".flatpak",
                         ".flatpak-builder",
                         ".venv",
+                        ".pytest_cache",
+                        ".ruff_cache",
+                        ".vscode",
                         "_build",
                         "build-flatpak",
-                        ".ruff_cache"
+                        "build-flatpak2",
+                        "build-flatpak3"
                     ]
                 }
             ]

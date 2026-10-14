@@ -5,11 +5,14 @@ import os
 import random
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 from threading import Timer
 
 import gi
+import requests
+import yt_dlp
 
 gi.require_version("Gtk", "3.0")
 gi.require_version("Gdk", "3.0")
@@ -639,6 +642,16 @@ class VideoPlayer(BasePlayer):
 
         if self.config[CONFIG_KEY_STATIC_WALLPAPER] and self.mode == MODE_VIDEO:
             self.set_static_wallpaper()
+        elif self.config[CONFIG_KEY_STATIC_WALLPAPER] and self.mode == MODE_STREAM:
+            # Streams have no local frame: pin the stream thumbnail as the
+            # static underneath (previously streams pruned it -> blue).
+            default_source = (data_source or {}).get("Default", "")
+            if default_source.startswith(("http://", "https://")):
+                threading.Thread(
+                    target=self._generate_stream_static,
+                    args=(default_source,),
+                    daemon=True,
+                ).start()
         elif self.config[CONFIG_KEY_STATIC_WALLPAPER] and self.mode == MODE_PLAYLIST:
             # Static frame from the first queued video only; per-transition
             # refreshes would thrash ffmpeg on every video change.
@@ -850,8 +863,81 @@ class VideoPlayer(BasePlayer):
             GLib.idle_add(self._apply_static_wallpaper, cached)
 
     def _apply_static_wallpaper(self, static_wallpaper_path):
+        self._last_static_path = static_wallpaper_path
         self.wallpaper.apply_static(static_wallpaper_path)
         return False
+
+    def _generate_stream_static(self, url):
+        """Pin a downloaded thumbnail as static for streams (background)."""
+        from apricus.stream_thumbs import check_magic, decode_size
+        from apricus.yt_utils import base_options
+
+        try:
+            with yt_dlp.YoutubeDL(base_options(quiet=True)) as ydl:
+                meta = ydl.extract_info(url, download=False) or {}
+            thumb_url = meta.get("thumbnail")
+            data = None
+            if thumb_url and thumb_url.startswith("https://"):
+                response = requests.get(thumb_url, timeout=15, stream=True)
+                try:
+                    data = b"".join(response.iter_content(65536))
+                finally:
+                    response.close()
+                if len(data) > 2 * 1024 * 1024 or not data or not check_magic(data):
+                    data = None
+                elif decode_size(data) is None:
+                    data = None
+            if data is None:
+                # Direct video URLs have no thumbnail metadata: extract a
+                # frame like local files do (8-bit forced by the helper).
+                import re
+
+                if not re.search(r"\.(mp4|webm|mov)(\?|#|$)", (url or "").lower()):
+                    return
+                data = self._extract_remote_frame(url)
+                if data is None:
+                    return
+            cached = self._static_cache_path(url)
+            tmp_path = f"{cached}.tmp.png"
+            loader = GdkPixbuf.PixbufLoader.new()
+            loader.write_bytes(GLib.Bytes(data))
+            loader.close()
+            pixbuf = loader.get_pixbuf()
+            if pixbuf is None:
+                return
+            pixbuf.savev(tmp_path, "png", [], [])
+            os.replace(tmp_path, cached)
+        except Exception as e:  # noqa: BLE001 - static stays as-is
+            logger.debug(f"[StaticWallpaper] stream static failed: {e}")
+            return
+        GLib.idle_add(self._apply_static_wallpaper, cached)
+
+    @staticmethod
+    def _extract_remote_frame(url):
+        """Single 8-bit frame from a direct video URL, or None."""
+        fd, tmp = tempfile.mkstemp(suffix=".png", prefix="apricus-static-")
+        os.close(fd)
+        try:
+            ret = subprocess.run(
+                VideoPlayer._static_ffmpeg_cmd(url, "00:00:03", tmp),
+                shell=False,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.STDOUT,
+                timeout=60,
+            )
+            if ret.returncode != 0 or not os.path.isfile(tmp):
+                return None
+            with open(tmp, "rb") as f:
+                return f.read()
+        except (subprocess.TimeoutExpired, OSError) as e:
+            logger.debug(f"[StaticWallpaper] remote frame failed: {e}")
+            return None
+        finally:
+            try:
+                if os.path.isfile(tmp):
+                    os.remove(tmp)
+            except OSError:
+                pass
 
     def preview_static(self, video_path, dbus_context=None):
         """Apply the cached static frame for an upcoming video, if present.
@@ -859,6 +945,7 @@ class VideoPlayer(BasePlayer):
         Called by the server *before* the current player quits, so a video
         switch shows the new frame instead of the previous one. Cache misses
         are ignored: the new player refreshes in background as usual.
+        For stream URLs the thumbnail is fetched in background instead.
         """
         if not self.wallpaper.supports_static or not video_path:
             return False
@@ -868,13 +955,21 @@ class VideoPlayer(BasePlayer):
             self._apply_static_wallpaper(cached)
             perf.mark("player: static preview applied")
             return True
+        if video_path.startswith(("http://", "https://")):
+            threading.Thread(
+                target=self._generate_stream_static, args=(video_path,), daemon=True
+            ).start()
         return False
 
     def _live_cache_paths(self):
         # Static caches for the currently configured videos (instant
         # wallpaper on next login). Legacy random-named caches match
-        # nothing and go.
+        # nothing and go. The currently applied static is always kept so
+        # pruning can never pull the wallpaper from under a live desktop.
         keep = set()
+        current = getattr(self, "_last_static_path", None)
+        if current:
+            keep.add(os.path.abspath(current))
         try:
             for video in self.data_source.values():
                 if video:

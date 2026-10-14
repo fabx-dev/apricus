@@ -584,6 +584,7 @@ class ConfigUtil:
                     "site": entry.get("site") or "",
                     "kind": entry.get("kind") or "page",
                     "last_used": entry.get("last_used") or 0,
+                    "is_live": bool(entry.get("is_live")),
                 }
             )
         clean.sort(key=lambda e: e["last_used"], reverse=True)

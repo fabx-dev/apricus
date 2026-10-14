@@ -52,6 +52,7 @@ from apricus.utils import (
     setup_autostart,
     setup_logging,
 )
+from apricus.yt_utils import base_options
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(LOGGER_NAME)
@@ -725,7 +726,7 @@ class ControlPanel(Gtk.Application):
     def _check_yt_dlp(self, raw_url):
         # Check if the url is valid (yt_dlp)
         try:
-            with yt_dlp.YoutubeDL({"noplaylist": True, "socket_timeout": 15}) as ydl:
+            with yt_dlp.YoutubeDL(base_options()) as ydl:
                 ydl.extract_info(raw_url, download=False)
         except (yt_dlp.utils.DownloadError, ValueError) as e:
             s = " ".join(str(e).split(" ")[1:])
