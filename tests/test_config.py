@@ -173,3 +173,124 @@ def test_load_versionless_modern_config_stamps_and_keeps_data(tmp_path, monkeypa
     assert loaded["version"] == commons.CONFIG_VERSION
     assert loaded["video_dir"] == str(videos)
     assert loaded["audio_volume"] == 50
+
+
+def test_valid_http_url_allows_and_blocks():
+    from apricus.utils import valid_http_url
+
+    assert valid_http_url("https://example.com/v.mp4") == "https://example.com/v.mp4"
+    assert valid_http_url("http://localhost:8080/x") == "http://localhost:8080/x"
+    assert valid_http_url("  https://example.com/  ") == "https://example.com/"
+    assert valid_http_url("HTTPS://EXAMPLE.COM/") == "HTTPS://EXAMPLE.COM/"
+    assert valid_http_url("file:///etc/passwd") is None
+    assert valid_http_url("ftp://example.com/x") is None
+    assert valid_http_url("http://user:pass@example.com/") is None
+    assert valid_http_url("https://user@example.com/") is None
+    assert valid_http_url("https:///no-host") is None
+    assert valid_http_url("nota url") is None
+    assert valid_http_url("") is None
+    assert valid_http_url(None) is None
+    assert valid_http_url(123) is None
+
+
+def _isolated_dirs(tmp_path, monkeypatch):
+    import apricus.utils as U
+    from apricus import commons
+
+    new_dir = tmp_path / "apricus"
+    new_dir.mkdir()
+    monkeypatch.setattr(commons, "CONFIG_DIR", str(new_dir))
+    monkeypatch.setattr(commons, "CONFIG_PATH", str(new_dir / "config.json"))
+    monkeypatch.setattr(U, "CONFIG_DIR", str(new_dir))
+    monkeypatch.setattr(U, "CONFIG_PATH", str(new_dir / "config.json"))
+    return new_dir
+
+
+def test_first_save_after_backfill_writes_backup(tmp_path, monkeypatch):
+    """A valid-but-outdated config (1.0 shape) must leave a .bak with the
+    original content on the first save after backfill (regression: the
+    backup was skipped because the old file failed _check)."""
+    from unittest.mock import patch
+
+    from apricus import commons
+    from apricus.utils import ConfigUtil
+
+    new_dir = _isolated_dirs(tmp_path, monkeypatch)
+    old_shape = dict(commons.CONFIG_TEMPLATE)
+    del old_shape["stream_history"]
+    del old_shape["web_history"]
+    old_shape["audio_volume"] = 42
+    (new_dir / "config.json").write_text(json.dumps(old_shape))
+    with patch("apricus.monitor.MonitorInfo.monitors", return_value=[]):
+        loaded = ConfigUtil().load()
+    assert loaded["audio_volume"] == 42
+    assert loaded["stream_history"] == []
+    # Load alone must not rewrite the disk...
+    assert "stream_history" not in json.loads((new_dir / "config.json").read_text())
+    assert not (new_dir / "config.json.bak").exists()
+    # ...but the first save backs up the original bytes.
+    loaded["audio_volume"] = 43
+    ConfigUtil().save(loaded)
+    bak = json.loads((new_dir / "config.json.bak").read_text())
+    assert bak["audio_volume"] == 42
+    assert "stream_history" not in bak
+    assert json.loads((new_dir / "config.json").read_text())["audio_volume"] == 43
+
+
+def test_backfill_preserves_unknown_keys_and_second_save_is_noop(tmp_path, monkeypatch):
+    """Unknown keys survive load+save; a second identical save writes nothing."""
+    from unittest.mock import patch
+
+    from apricus import commons
+    from apricus.utils import ConfigUtil
+
+    new_dir = _isolated_dirs(tmp_path, monkeypatch)
+    cfg = dict(commons.CONFIG_TEMPLATE)
+    cfg["future_key"] = {"nested": [1, 2]}
+    (new_dir / "config.json").write_text(json.dumps(cfg))
+    with patch("apricus.monitor.MonitorInfo.monitors", return_value=[]):
+        loaded = ConfigUtil().load()
+    assert loaded["future_key"] == {"nested": [1, 2]}
+    ConfigUtil().save(loaded)
+    assert json.loads((new_dir / "config.json").read_text())["future_key"] == {"nested": [1, 2]}
+    before = (new_dir / "config.json").read_text()
+    ConfigUtil().save(loaded)
+    assert (new_dir / "config.json").read_text() == before
+
+
+def test_corrupt_file_saves_without_backup_but_writes_new(tmp_path, monkeypatch):
+    """Unparseable disk content cannot be backed up, but save must still
+    write the new config (no partial file left behind)."""
+    from apricus import commons
+    from apricus.utils import ConfigUtil
+
+    new_dir = _isolated_dirs(tmp_path, monkeypatch)
+    (new_dir / "config.json").write_text("{broken")
+    cfg = dict(commons.CONFIG_TEMPLATE)
+    ConfigUtil().save(cfg)
+    assert not (new_dir / "config.json.bak").exists()
+    assert json.loads((new_dir / "config.json").read_text())["version"] == commons.CONFIG_VERSION
+    assert not (new_dir / "config.json.tmp").exists()
+
+
+def test_save_failure_keeps_original_file(tmp_path, monkeypatch):
+    """A write error must not destroy the existing config."""
+    import pytest
+
+    from apricus import commons
+    from apricus.utils import ConfigUtil
+
+    new_dir = _isolated_dirs(tmp_path, monkeypatch)
+    (new_dir / "config.json").write_text(json.dumps(dict(commons.CONFIG_TEMPLATE)))
+    # Point the dir at a regular file: makedirs fails with OSError.
+    blocker = tmp_path / "blocker"
+    blocker.write_text("x")
+    import apricus.utils as U
+
+    monkeypatch.setattr(U, "CONFIG_DIR", str(blocker))
+    monkeypatch.setattr(commons, "CONFIG_DIR", str(blocker))
+    changed = dict(commons.CONFIG_TEMPLATE)
+    changed["audio_volume"] = 43
+    with pytest.raises(OSError):
+        ConfigUtil().save(changed)
+    assert json.loads((new_dir / "config.json").read_text())["version"] == commons.CONFIG_VERSION

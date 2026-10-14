@@ -2068,6 +2068,31 @@ def toast_records_message():
 
 
 @check
+def url_gates_reject_without_network():
+    """SSRF gates: credentialed/non-http URLs and bad redirect landings
+    are rejected before any socket is opened."""
+    import apricus.gui.gtk4app as appmod
+
+    def _bomb(*args, **kwargs):
+        raise AssertionError("no network for rejected URLs")
+
+    old_get, old_head = appmod.requests.get, appmod.requests.head
+    appmod.requests.get = _bomb
+    appmod.requests.head = _bomb
+    try:
+        obj, _ = _panel(_base_config(), [])
+        assert obj._check_stream_url("http://user:pass@example.com/v") == "URL not supported."
+        assert obj._check_stream_url("ftp://example.com/v") == "URL not supported."
+        assert obj._check_direct_url("file:///etc/passwd") == "fallback"
+        assert obj._check_direct_url("https://user@example.com/v.mp4") == "fallback"
+        assert obj._check_web_url("http://user:pass@example.com/") is not None
+        path, reason = obj._download_favicon("user@example.com")
+        assert (path, reason) == (None, "error"), (path, reason)
+    finally:
+        appmod.requests.get, appmod.requests.head = old_get, old_head
+
+
+@check
 def shell_refresh_reveals_banner_and_badges():
     import os
     import tempfile
@@ -2300,6 +2325,10 @@ def test_toast_without_overlay_is_noop():
 
 def test_capped_get_enforces_incremental_limit():
     _run("capped_get_enforces_incremental_limit")
+
+
+def test_url_gates_reject_without_network():
+    _run("url_gates_reject_without_network")
 
 
 def test_stream_meta_title_persists_in_history():

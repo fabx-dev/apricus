@@ -43,6 +43,10 @@ def base_options(*, quiet=False):
 
 
 def get_formats(raw_url):
+    from apricus.utils import valid_http_url
+
+    if not valid_http_url(raw_url):
+        raise ValueError(f"URL not supported: {raw_url}")
     with youtube_dl.YoutubeDL(base_options()) as ydl:
         info = ydl.extract_info(raw_url, download=False) or {}
     formats = info.get("formats") or []

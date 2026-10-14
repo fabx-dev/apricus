@@ -141,6 +141,35 @@ def is_flatpak():
     return os.path.isfile("/.flatpak-info")
 
 
+def valid_http_url(url):
+    """Return a stripped http(s) URL, or None when it must not be fetched.
+
+    Minimal SSRF gate for user-supplied and metadata-supplied URLs: only
+    http/https, a real hostname, no embedded credentials. Redirect targets
+    and DNS rebinding are NOT resolved here (same-user desktop threat
+    model); callers keep timeouts and size caps, and validation probes
+    re-check the landed URL.
+    """
+    if not url or not isinstance(url, str):
+        return None
+    url = url.strip()
+    try:
+        from urllib.parse import urlsplit
+    except ImportError:  # pragma: no cover - stdlib always present
+        return None
+    try:
+        parts = urlsplit(url)
+    except ValueError:
+        return None
+    if parts.scheme not in ("http", "https"):
+        return None
+    if not parts.hostname:
+        return None
+    if parts.username or parts.password or "@" in (parts.netloc or ""):
+        return None
+    return url
+
+
 def setup_autostart(autostart):
     if is_flatpak():
         """
@@ -798,12 +827,18 @@ class ConfigUtil:
 
     def save(self, config):
         old_config = None
+        old_raw = None
         if os.path.isfile(CONFIG_PATH):
             with open(CONFIG_PATH) as f:
                 json_str = f.read()
                 try:
                     old_config = json.loads(json_str)
                     if not self._check(old_config):
+                        # Valid JSON but outdated (e.g. pre-backfill): keep
+                        # the raw text for backup, so the first save after a
+                        # migration still leaves a rollback copy. Recovery
+                        # keeps accepting only _check-valid backups.
+                        old_raw = json_str
                         old_config = None
                 except json.decoder.JSONDecodeError:
                     old_config = None
@@ -817,6 +852,12 @@ class ConfigUtil:
             try:
                 with open(CONFIG_PATH + ".bak", "w", encoding="utf-8") as f:
                     json.dump(old_config, f, indent=3)
+            except OSError as e:
+                logger.warning(f"[Config] Backup failed: {e}")
+        elif old_raw is not None and old_raw != json.dumps(config, indent=3):
+            try:
+                with open(CONFIG_PATH + ".bak", "w", encoding="utf-8") as f:
+                    f.write(old_raw if old_raw.endswith("\n") else old_raw + "\n")
             except OSError as e:
                 logger.warning(f"[Config] Backup failed: {e}")
         tmp_path = CONFIG_PATH + ".tmp"

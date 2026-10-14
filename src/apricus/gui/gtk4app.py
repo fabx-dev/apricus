@@ -79,6 +79,10 @@ def _capped_get(url, timeout, max_bytes):
     Incremental cap (mirrors _fetch_row_thumb): hostile infinite bodies
     are dropped mid-stream instead of filling RAM before a post-hoc check.
     """
+    from apricus.utils import valid_http_url
+
+    if not valid_http_url(url):
+        return None
     try:
         response = requests.get(url, timeout=timeout, stream=True)
         try:
@@ -1873,6 +1877,10 @@ class ControlPanel(Adw.Application):
         (timeout, connection, http_5xx) deserve a retry.
         """
         url = f"https://{host}/favicon.ico"
+        from apricus.utils import valid_http_url
+
+        if not valid_http_url(url):
+            return None, "error"
         try:
             response = requests.get(url, timeout=8, stream=True)
             try:
@@ -2525,6 +2533,10 @@ class ControlPanel(Adw.Application):
 
     def _check_stream_url(self, url):
         """Validate a streaming URL with yt-dlp; None when valid, else error."""
+        from apricus.utils import valid_http_url
+
+        if not valid_http_url(url):
+            return "URL not supported."
         try:
             with yt_dlp.YoutubeDL(base_options()) as ydl:
                 ydl.extract_info(url, download=False)
@@ -2540,9 +2552,17 @@ class ControlPanel(Adw.Application):
 
     def _check_direct_url(self, url):
         """Fast-path HEAD check; None when playable, 'fallback' for yt-dlp."""
+        from apricus.utils import valid_http_url
+
+        if not valid_http_url(url):
+            return "fallback"
         try:
             response = requests.head(url, timeout=5, allow_redirects=True)
             content_type = response.headers.get("Content-Type", "")
+            landed = response.url
+            response.close()
+            if not valid_http_url(landed):
+                return "fallback"
             if "video/" in content_type or "mpegurl" in content_type or "dash+xml" in content_type:
                 return None
             return "fallback"
@@ -3019,7 +3039,11 @@ class ControlPanel(Adw.Application):
         try:
             response = requests.get(url, timeout=10, stream=True)
             try:
+                from apricus.utils import valid_http_url
+
                 status = response.status_code
+                if not valid_http_url(response.url):
+                    return
                 content_type = response.headers.get("Content-Type", "")
                 chunks = []
                 total = 0
@@ -3228,13 +3252,23 @@ class ControlPanel(Adw.Application):
 
     def _check_web_url(self, url):
         """Validate a web page URL; None when valid, else error."""
+        from apricus.utils import valid_http_url
+
+        if not valid_http_url(url):
+            return "Not a valid http(s) URL."
         try:
             response = requests.get(url, timeout=10, stream=True)
-            response.close()
+            try:
+                status = response.status_code
+                landed = response.url
+            finally:
+                response.close()
         except requests.exceptions.RequestException as e:
             return str(e)
-        if response.status_code >= 400:
-            return f"Error code: {response.status_code}"
+        if not valid_http_url(landed):
+            return "Redirects to an unsupported address."
+        if status >= 400:
+            return f"Error code: {status}"
         return None
 
     def on_webpage_apply(self, *_args):

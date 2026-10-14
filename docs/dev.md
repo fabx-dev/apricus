@@ -34,12 +34,12 @@ make run    # meson install into ~/.local, then run it (through the uv env)
 
 - Installing with pip (without uv)
 ```bash
-pip install pillow pydbus python-vlc "yt-dlp[default]" requests setproctitle
+pip install pydbus python-vlc "yt-dlp[default]" requests setproctitle
 ```
 
 - Installing from system-provided packages (Fedora):
 ```bash
-sudo dnf install python3-pillow python3-pydbus python3-requests python3-setproctitle python3-vlc yt-dlp
+sudo dnf install python3-pydbus python3-requests python3-setproctitle python3-vlc yt-dlp
 ```
 
 > `pyproject.toml` is the single source of truth for the Python dependencies.

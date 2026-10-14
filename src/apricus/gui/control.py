@@ -706,25 +706,37 @@ class ControlPanel(Gtk.Application):
 
     def _check_url(self, url):
         # Check if the url is valid
+        from apricus.utils import valid_http_url
+
+        if not valid_http_url(url):
+            self._show_error(_("Not a valid http(s) URL."))
+            return False
         try:
             response = requests.get(url, timeout=10, stream=True)
-            response.close()
+            try:
+                status = response.status_code
+                landed = response.url
+            finally:
+                response.close()
         except requests.exceptions.RequestException as e:
             logger.error(f"[GUI] Failed to access {url}. Error:\n{e}")
             self._show_error(_("Failed to access {url}. Error:\n{error}").format(url=url, error=e))
             return False
-        if response.status_code >= 400:
-            logger.error(f"[GUI] Failed to access {url}. Error code: {response.status_code}")
+        if not valid_http_url(landed) or status >= 400:
+            logger.error(f"[GUI] Failed to access {url}. Error code: {status}")
             self._show_error(
-                _("Failed to access {url}. Error code: {code}").format(
-                    url=url, code=response.status_code
-                )
+                _("Failed to access {url}. Error code: {code}").format(url=url, code=status)
             )
             return False
         return True
 
     def _check_yt_dlp(self, raw_url):
         # Check if the url is valid (yt_dlp)
+        from apricus.utils import valid_http_url
+
+        if not valid_http_url(raw_url):
+            self._show_error(_("Not a valid http(s) URL."))
+            return False
         try:
             with yt_dlp.YoutubeDL(base_options()) as ydl:
                 ydl.extract_info(raw_url, download=False)

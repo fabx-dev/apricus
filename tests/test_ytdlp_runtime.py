@@ -68,6 +68,26 @@ def test_get_formats_empty_raises(monkeypatch):
         yt_utils.get_formats("https://example.com/v")
 
 
+def test_get_formats_rejects_non_http_without_network(monkeypatch):
+    """SSRF gate: ftp/file/credentialed URLs never reach YoutubeDL."""
+
+    def _bomb(*args, **kwargs):
+        raise AssertionError("YoutubeDL must not run for rejected URLs")
+
+    monkeypatch.setattr(yt_utils.youtube_dl, "YoutubeDL", _bomb)
+    for bad in (
+        "ftp://example.com/v.mp4",
+        "file:///etc/passwd",
+        "http://user:pass@example.com/v",
+        "https://user@example.com/v",
+        "nota url",
+        "",
+        None,
+    ):
+        with pytest.raises(ValueError):
+            yt_utils.get_formats(bad)
+
+
 def test_legacy_callsite_uses_shared_options():
     """control.py (GTK3 legacy) must use base_options(), verified by AST
     so the suite never imports Gtk 3.0 in-process."""

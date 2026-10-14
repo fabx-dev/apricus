@@ -870,8 +870,11 @@ class VideoPlayer(BasePlayer):
     def _generate_stream_static(self, url):
         """Pin a downloaded thumbnail as static for streams (background)."""
         from apricus.stream_thumbs import check_magic, decode_size
+        from apricus.utils import valid_http_url
         from apricus.yt_utils import base_options
 
+        if not valid_http_url(url):
+            return
         try:
             with yt_dlp.YoutubeDL(base_options(quiet=True)) as ydl:
                 meta = ydl.extract_info(url, download=False) or {}
@@ -914,8 +917,15 @@ class VideoPlayer(BasePlayer):
             pixbuf = loader.get_pixbuf()
             if pixbuf is None:
                 return
-            pixbuf.savev(tmp_path, "png", [], [])
-            os.replace(tmp_path, cached)
+            try:
+                pixbuf.savev(tmp_path, "png", [], [])
+                os.replace(tmp_path, cached)
+            except Exception:
+                try:
+                    os.remove(tmp_path)
+                except OSError:
+                    pass
+                raise
         except Exception as e:  # noqa: BLE001 - static stays as-is
             logger.debug(f"[StaticWallpaper] stream static failed: {e}")
             return
@@ -924,6 +934,10 @@ class VideoPlayer(BasePlayer):
     @staticmethod
     def _extract_remote_frame(url):
         """Single 8-bit frame from a direct video URL, or None."""
+        from apricus.utils import valid_http_url
+
+        if not valid_http_url(url):
+            return None
         fd, tmp = tempfile.mkstemp(suffix=".png", prefix="apricus-static-")
         os.close(fd)
         try:
