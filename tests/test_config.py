@@ -294,3 +294,68 @@ def test_save_failure_keeps_original_file(tmp_path, monkeypatch):
     with pytest.raises(OSError):
         ConfigUtil().save(changed)
     assert json.loads((new_dir / "config.json").read_text())["version"] == commons.CONFIG_VERSION
+
+
+def test_update01_isolated_10_shape_migration(tmp_path, monkeypatch):
+    """RC2-UPDATE-01: a 1.0-shape config (v5, no stream/web keys) migrates
+    in an isolated dir: load() leaves the disk byte-identical, first save
+    writes a .bak with the exact original bytes."""
+    from unittest.mock import patch
+
+    from apricus import commons
+    from apricus.utils import ConfigUtil
+
+    new_dir = _isolated_dirs(tmp_path, monkeypatch)
+    original = dict(commons.CONFIG_TEMPLATE)
+    for key in ("stream_history", "stream_favorites", "web_history", "web_favorites"):
+        del original[key]
+    original["audio_volume"] = 63
+    original["mode"] = "MODE_VIDEO"
+    raw = json.dumps(original, indent=3)
+    (new_dir / "config.json").write_text(raw)
+    with patch("apricus.monitor.MonitorInfo.monitors", return_value=[]):
+        loaded = ConfigUtil().load()
+    assert loaded["audio_volume"] == 63
+    assert loaded["mode"] == "MODE_VIDEO"
+    assert loaded["stream_history"] == [] and loaded["web_favorites"] == []
+    assert (new_dir / "config.json").read_text() == raw
+    assert not (new_dir / "config.json.bak").exists()
+    loaded["audio_volume"] = 64
+    ConfigUtil().save(loaded)
+    assert (new_dir / "config.json.bak").read_text() == (raw if raw.endswith("\n") else raw + "\n")
+    assert json.loads((new_dir / "config.json").read_text())["audio_volume"] == 64
+
+
+def test_update02_garbage_without_backup_falls_back_to_template(tmp_path, monkeypatch):
+    """RC2-UPDATE-02: garbage with no usable .bak falls back to template
+    instead of crashing; no backup is fabricated."""
+    from unittest.mock import patch
+
+    from apricus import commons
+    from apricus.utils import ConfigUtil
+
+    new_dir = _isolated_dirs(tmp_path, monkeypatch)
+    (new_dir / "config.json").write_text("{not json")
+    with patch("apricus.monitor.MonitorInfo.monitors", return_value=[]):
+        loaded = ConfigUtil().load()
+    assert loaded["version"] == commons.CONFIG_VERSION
+    assert not (new_dir / "config.json.bak").exists()
+
+
+def test_update05_second_boot_is_stable(tmp_path, monkeypatch):
+    """RC2-UPDATE-05: load->save->load->save is byte-stable, no .bak churn."""
+    from unittest.mock import patch
+
+    from apricus import commons
+    from apricus.utils import ConfigUtil
+
+    new_dir = _isolated_dirs(tmp_path, monkeypatch)
+    (new_dir / "config.json").write_text(json.dumps(dict(commons.CONFIG_TEMPLATE)))
+    with patch("apricus.monitor.MonitorInfo.monitors", return_value=[]):
+        first = ConfigUtil().load()
+    ConfigUtil().save(first)
+    stable = (new_dir / "config.json").read_text()
+    with patch("apricus.monitor.MonitorInfo.monitors", return_value=[]):
+        second = ConfigUtil().load()
+    ConfigUtil().save(second)
+    assert (new_dir / "config.json").read_text() == stable
