@@ -190,8 +190,16 @@ class PlayerWindow(Gtk.ApplicationWindow):
         # One-shot first-frame timing (Fase 1b baseline). The same media
         # player instance survives media changes, so attach once here.
         self._first_frame_reported = False
+        # Last VLC failure for the current media (None when healthy).
+        # libvlc reports input errors only via events; without this,
+        # is_playing() stays true on a dead stream and the GUI shows
+        # nothing. Reset on every set_media(), like the frame flag.
+        self._play_error = None
         self.__vlc_widget.player.event_manager().event_attach(
             vlc.EventType.MediaPlayerTimeChanged, self._on_first_time_changed
+        )
+        self.__vlc_widget.player.event_manager().event_attach(
+            vlc.EventType.MediaPlayerEncounteredError, self._on_media_error
         )
 
         self.menu = None
@@ -266,7 +274,30 @@ class PlayerWindow(Gtk.ApplicationWindow):
         return self.__vlc_widget.instance.media_new(*args)
 
     def set_media(self, *args):
+        # New media, new verdict: drop the previous error/frame state so a
+        # stale failure can never mask the fresh attempt (and vice versa).
+        self._play_error = None
+        self._first_frame_reported = False
         self.__vlc_widget.player.set_media(*args)
+
+    def _on_media_error(self, _event):
+        # libvlc gives no message payload: record the fact, never the URL
+        # (stream URLs carry expiring signatures — keep them out of logs).
+        if self._play_error is None:
+            self._play_error = "error"
+            logger.warning(f"[Player:{self.name}] Playback failed ({self._mode})")
+
+    def playback_error(self):
+        """Human-readable failure for the current media, or None.
+
+        Returns None when healthy, after voluntary stop(), and before any
+        media is set. Never contains URLs or tokens.
+        """
+        if self._play_error is None:
+            return None
+        if self._first_frame_reported:
+            return "Playback failed"
+        return "Playback failed before the first frame was shown"
 
     def set_volume(self, *args):
         self.__vlc_widget.player.audio_set_volume(*args)
@@ -739,6 +770,18 @@ class VideoPlayer(BasePlayer):
     @property
     def is_playing(self):
         return not self.is_paused_by_user
+
+    def playback_error(self):
+        """First window failure for the current media, if any (None else).
+
+        Lets the GUI report a dead stream instead of trusting is_playing,
+        which only mirrors the user-pause flag. See PlayerWindow.
+        """
+        for window in self.windows.values():
+            err = window.playback_error()
+            if err is not None:
+                return err
+        return None
 
     def pause_playback(self):
         for _monitor, window in self.windows.items():

@@ -1072,6 +1072,7 @@ class ControlPanel(Adw.Application):
         box.set_margin_end(24)
         self.np_generation = 0
         self._np_current_path = None
+        self._np_queue_shown = None
         # Content (hero + transport + details + queue), hidden on empty state.
         content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
         hero = Gtk.Frame()
@@ -1235,6 +1236,13 @@ class ControlPanel(Adw.Application):
         server = self._server()
         mode = server.mode if server is not None else self.config.get(CONFIG_KEY_MODE)
         current = (self.config.get(CONFIG_KEY_DATA_SOURCE) or {}).get("Default", "")
+        if mode == MODE_PLAYLIST:
+            # A playlist never rewrites data_source.Default, so the hero
+            # would keep showing the previous single video (or nothing).
+            # Follow the queue head instead (loop restarts there).
+            queue = list(getattr(self, "playlist_paths", None) or [])
+            if queue:
+                current = queue[0]
         paused = bool(server.is_paused_by_user) if server is not None else True
         has_content = bool(current)
         content = getattr(self, "np_content", None)
@@ -1558,7 +1566,14 @@ class ControlPanel(Adw.Application):
         show = mode == MODE_PLAYLIST and bool(queue)
         group.set_visible(show)
         if not show:
+            self._np_queue_shown = None
             return
+        # Rebuilding the rows destroys/recreates thumbnails (visible flash
+        # on every refresh, e.g. play/pause): skip when nothing changed.
+        signature = (mode, tuple(queue[:3]))
+        if signature == getattr(self, "_np_queue_shown", None):
+            return
+        self._np_queue_shown = signature
         while True:
             child = box.get_first_child()
             if child is None:

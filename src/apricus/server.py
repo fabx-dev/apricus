@@ -31,12 +31,46 @@ from apricus.commons import (
     MODE_WEBPAGE,
     resolve_video_dir,
 )
-from apricus.gui.control import main as gui_main
-from apricus.menu import show_systray_icon
 from apricus.monitor import Monitors
-from apricus.player.video_player import main as video_player_main
-from apricus.player.web_player import main as web_player_main
 from apricus.utils import ConfigUtil, EndSessionHandler, _authorize, get_video_paths
+
+# NOTE: gui.control, menu and the player mains pin Gtk 3 namespaces at
+# import time (gi forbids two Gtk majors in one process). They must never
+# be imported at server top-level: the forkserver image inherits the
+# parent's loaded namespaces, so any Gtk 3 import here would break GTK4
+# children even though show_gui() imports gtk4app lazily. Each target
+# below imports its real main *inside* the child process instead.
+
+
+def _gui_legacy_target(version, pkgdatadir, localedir):
+    from apricus.gui.control import main as gui_main
+
+    gui_main(version, pkgdatadir, localedir)
+
+
+def _gui_gtk4_target(version, pkgdatadir, localedir):
+    from apricus.gui.gtk4app import main as gui_target
+
+    gui_target(version, pkgdatadir, localedir)
+
+
+def _video_player_target():
+    from apricus.player.video_player import main as video_player_main
+
+    video_player_main()
+
+
+def _web_player_target():
+    from apricus.player.web_player import main as web_player_main
+
+    web_player_main()
+
+
+def _systray_target(mode, localedir):
+    from apricus.menu import show_systray_icon
+
+    show_systray_icon(mode, localedir)
+
 
 loop = GLib.MainLoop()
 logger = logging.getLogger(LOGGER_NAME)
@@ -195,11 +229,11 @@ class ApricusServer:
 
         if mode in [MODE_VIDEO, MODE_STREAM, MODE_PLAYLIST]:
             self.player_process = Process(
-                name=f"apricus-player-{self._player_count}", target=video_player_main
+                name=f"apricus-player-{self._player_count}", target=_video_player_target
             )
         elif mode == MODE_WEBPAGE:
             self.player_process = Process(
-                name=f"apricus-player-{self._player_count}", target=web_player_main
+                name=f"apricus-player-{self._player_count}", target=_web_player_target
             )
         elif mode == MODE_NULL:
             pass
@@ -225,7 +259,7 @@ class ApricusServer:
                         self.sys_icon_process.join(timeout=1)
                 self.sys_icon_process = Process(
                     name="apricus-systray",
-                    target=show_systray_icon,
+                    target=_systray_target,
                     args=(mode, self.localedir),
                 )
                 self.sys_icon_process.start()
@@ -377,12 +411,19 @@ class ApricusServer:
             logger.debug("[Server] GUI already running")
             return
         # GTK4 migration: opt-in via env until the new panel is complete.
-        # Lazy import: Gtk 3 and Gtk 4 namespaces cannot coexist in one process.
+        # Both targets import their toolkit *inside* the child process;
+        # the server image itself stays Gtk-free (see module note above).
+        # The GTK4 panel additionally uses the "spawn" start method (fresh
+        # interpreter): the forkserver image may legitimately hold Gdk 3.0
+        # by the time the GUI starts (player/systray are Gtk3), and gi
+        # forbids a second major in a forked child.
         if os.environ.get("APRICUS_GTK4") == "1":
-            from apricus.gui.gtk4app import main as gui_target
+            gui_ctx = mp.get_context("spawn")
+            gui_target = _gui_gtk4_target
         else:
-            gui_target = gui_main
-        self.gui_process = Process(
+            gui_ctx = mp.get_context(None)
+            gui_target = _gui_legacy_target
+        self.gui_process = gui_ctx.Process(
             name="apricus-gui",
             target=gui_target,
             args=(
@@ -449,14 +490,14 @@ class ApricusServer:
     @property
     def is_paused_by_user(self):
         player = get_instance(DBUS_NAME_PLAYER)
-        if player is not None and player.mode in [MODE_VIDEO, MODE_STREAM]:
+        if player is not None and player.mode in [MODE_VIDEO, MODE_STREAM, MODE_PLAYLIST]:
             return player.is_paused_by_user
         return None
 
     @is_paused_by_user.setter
     def is_paused_by_user(self, is_paused_by_user):
         player = get_instance(DBUS_NAME_PLAYER)
-        if player is not None and player.mode in [MODE_VIDEO, MODE_STREAM]:
+        if player is not None and player.mode in [MODE_VIDEO, MODE_STREAM, MODE_PLAYLIST]:
             player.is_paused_by_user = is_paused_by_user
 
     @property

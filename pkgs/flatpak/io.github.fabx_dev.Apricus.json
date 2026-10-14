@@ -10,7 +10,6 @@
         "--device=dri",
         "--socket=x11",
         "--socket=wayland",
-        "--socket=fallback-x11",
         "--socket=pulseaudio",
         "--filesystem=xdg-videos:ro",
         "--talk-name=org.gnome.Shell.Extensions",

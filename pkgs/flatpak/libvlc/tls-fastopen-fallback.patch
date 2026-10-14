@@ -1,0 +1,19 @@
+--- a/src/network/tls.c
++++ b/src/network/tls.c
+@@ -548,9 +548,14 @@
+             return -1;
+     }
+     else
+-    if (errno != EOPNOTSUPP)
++    if (errno != EOPNOTSUPP
++#ifdef EACCES
++        && errno != EACCES
++#endif
++        )
+         return -1;
+-    /* Fast open not supported or disabled... fallback to normal mode */
++    /* Fast open not supported, disabled or denied (e.g. sandboxed
++     * environments returning EACCES)... fallback to normal mode */
+ #else
+     tls->writev = vlc_tls_SocketWrite;
+ #endif

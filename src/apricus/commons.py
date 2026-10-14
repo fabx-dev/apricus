@@ -83,7 +83,7 @@ CONFIG_KEY_WEB_FAVORITES = "web_favorites"
 CONFIG_TEMPLATE = {
     CONFIG_KEY_VERSION: CONFIG_VERSION,
     CONFIG_KEY_MODE: MODE_NULL,
-    CONFIG_KEY_DATA_SOURCE: None,
+    CONFIG_KEY_DATA_SOURCE: None,  # seeded per-process, see ensure_template_monitors()
     CONFIG_KEY_MUTE: False,
     CONFIG_KEY_VOLUME: 50,
     CONFIG_KEY_STATIC_WALLPAPER: True,
@@ -98,7 +98,7 @@ CONFIG_TEMPLATE = {
     CONFIG_KEY_VIDEO_DIR: None,
     # Per-monitor video queues ({monitor_key: [paths]}); empty queue falls
     # back to "Default". Shuffled order is computed at apply time.
-    CONFIG_KEY_PLAYLIST: None,
+    CONFIG_KEY_PLAYLIST: None,  # seeded per-process, see ensure_template_monitors()
     CONFIG_KEY_SHUFFLE: False,
     # Stream pick-list (no version bump: backfilled like video_dir).
     # History entries: {url, title, site, kind, last_used}.
@@ -111,11 +111,19 @@ CONFIG_TEMPLATE = {
 }
 
 
-# initialize config according to monitors.
-# Must not require a display at import time (headless tools/tests import
-# this module); missing monitors are backfilled by _checkMissingMonitors.
-# The monitor import is lazy so GTK4 processes can import commons without
-# pinning the Gdk 3.0 namespace.
+# Per-monitor template keys are seeded explicitly per process (never at
+# import: importing commons must stay gi-free). MonitorInfo.monitors()
+# pins a Gdk namespace, and gi forbids two majors per process — seeding
+# at import would poison the server/forkserver image with Gdk 3.0 and
+# break future GTK4 children. Each process seeds after committing to its
+# toolkit (or headless, where monitors() is a no-op returning Default).
+def ensure_template_monitors():
+    if CONFIG_TEMPLATE[CONFIG_KEY_DATA_SOURCE] is None:
+        CONFIG_TEMPLATE[CONFIG_KEY_DATA_SOURCE] = _default_data_sources()
+    if CONFIG_TEMPLATE[CONFIG_KEY_PLAYLIST] is None:
+        CONFIG_TEMPLATE[CONFIG_KEY_PLAYLIST] = _default_playlist()
+
+
 def _default_data_sources():
     from apricus.monitor import MonitorInfo
 
@@ -129,9 +137,6 @@ def _default_data_sources():
     return data_sources
 
 
-CONFIG_TEMPLATE[CONFIG_KEY_DATA_SOURCE] = _default_data_sources()
-
-
 def _default_playlist():
     from apricus.monitor import MonitorInfo
 
@@ -143,9 +148,6 @@ def _default_playlist():
         pass
     playlist["Default"] = []
     return playlist
-
-
-CONFIG_TEMPLATE[CONFIG_KEY_PLAYLIST] = _default_playlist()
 
 
 def resolve_video_dir(config=None):

@@ -247,6 +247,10 @@
                 {
                     "type": "patch",
                     "path": "libvlc/vlc-ignore-time-for-cache.patch"
+                },
+                {
+                    "type": "patch",
+                    "path": "libvlc/tls-fastopen-fallback.patch"
                 }
             ]
         }

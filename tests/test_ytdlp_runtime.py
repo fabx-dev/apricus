@@ -171,3 +171,92 @@ def test_flatpak_bundles_pinned_deno():
     assert {"x86_64", "aarch64"} <= arches
     pypi = (root / "pypi-deps.json").read_text()
     assert "deno" not in pypi.lower(), "Deno must not live in generated pypi-deps"
+
+
+def _fmt(url, **kw):
+    base = {"url": url, "vcodec": "h264", "acodec": "none"}
+    base.update(kw)
+    return base
+
+
+def test_optimal_video_picks_closest_valid_height():
+    from apricus.yt_utils import get_optimal_video
+
+    formats = [_fmt("u720", width=1280, height=720), _fmt("u1080", width=1920, height=1080)]
+    assert get_optimal_video(formats, 800) == ("u720", 1280, 720)
+    assert get_optimal_video(formats, 1000) == ("u1080", 1920, 1080)
+
+
+def test_optimal_video_missing_width_returns_none():
+    from apricus.yt_utils import get_optimal_video
+
+    (url, width, height) = get_optimal_video([_fmt("u", height=720)], 800)
+    assert (url, width, height) == ("u", None, 720)
+
+
+def test_optimal_video_missing_height_defers_to_known():
+    from apricus.yt_utils import get_optimal_video
+
+    formats = [_fmt("unknown"), _fmt("u720", width=1280, height=720)]
+    assert get_optimal_video(formats, 800) == ("u720", 1280, 720)
+
+
+def test_optimal_video_without_any_dims_returns_first_with_nones():
+    from apricus.yt_utils import get_optimal_video
+
+    assert get_optimal_video([_fmt("a"), _fmt("b")], 1080) == ("a", None, None)
+
+
+def test_optimal_video_treats_none_and_nonnumeric_as_unknown():
+    from apricus.yt_utils import get_optimal_video
+
+    formats = [
+        _fmt("bad", width="1280x", height="720p"),
+        _fmt("none", width=None, height=None),
+        _fmt("bool", width=True, height=False),
+        _fmt("good", width=640, height=360),
+    ]
+    assert get_optimal_video(formats, 1080) == ("good", 640, 360)
+
+
+def test_optimal_video_mixed_list_prefers_known_height():
+    from apricus.yt_utils import get_optimal_video
+
+    formats = [
+        _fmt("nodims"),
+        _fmt("u480", width=854, height=480),
+        _fmt("u1080", width=1920, height=1080),
+    ]
+    assert get_optimal_video(formats, 1000) == ("u1080", 1920, 1080)
+    assert get_optimal_video(formats, 400) == ("u480", 854, 480)
+
+
+def test_optimal_video_empty_list_still_raises():
+    import pytest
+
+    from apricus.yt_utils import get_optimal_video
+
+    with pytest.raises(ValueError):
+        get_optimal_video([], 1080)
+
+
+def test_optimal_video_generic_extractor_shape_no_keyerror():
+    """Exact regression shape from the RC2 sandbox run: the generic
+    extractor reports a single format with no codec or dimension keys."""
+    from apricus.yt_utils import get_optimal_video
+
+    bbb = (
+        "https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/1080/Big_Buck_Bunny_1080_10s_30MB.mp4"
+    )
+    assert get_optimal_video([{"format_id": "mp4", "ext": "mp4", "url": bbb}], 1080) == (
+        bbb,
+        None,
+        None,
+    )
+
+
+def test_best_selectors_share_dims_safety():
+    from apricus.yt_utils import get_best, get_best_video
+
+    assert get_best([_fmt("a", acodec="aac", quality=3)]) == ("a", None, None)
+    assert get_best_video([_fmt("v", width=1280, height=720)]) == ("v", 1280, 720)

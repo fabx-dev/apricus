@@ -54,6 +54,7 @@ from apricus.commons import (
     LOGGER_NAME,
     MODE_VIDEO,
     TRANSLATION_DOMAIN,
+    ensure_template_monitors,
 )
 
 logger = logging.getLogger(LOGGER_NAME)
@@ -664,6 +665,7 @@ class WindowHandler:
 
 class ConfigUtil:
     def generate_template(self):
+        ensure_template_monitors()
         os.makedirs(CONFIG_DIR, exist_ok=True)
         self.save(CONFIG_TEMPLATE)
 
@@ -836,6 +838,9 @@ class ConfigUtil:
                     break
 
     def load(self):
+        # Seed per-monitor template keys for this process (toolkit already
+        # committed here; never at import — see ensure_template_monitors).
+        ensure_template_monitors()
         if not os.path.isfile(CONFIG_PATH) and os.path.isfile(LEGACY_CONFIG_PATH):
             # First run after migrating from Hidamari: adopt its config so the
             # setup (videos, volume, flags) carries over untouched.
@@ -858,6 +863,15 @@ class ConfigUtil:
                         # shape is current, only the stamp is missing. Stamp
                         # it instead of crashing or mis-migrating.
                         config["version"] = CONFIG_VERSION
+                    # Seeded-template values may be absent (e.g. a config
+                    # written from an unseeded template): restore them from
+                    # the seeded template instead of crashing downstream.
+                    if not isinstance(config.get(CONFIG_KEY_DATA_SOURCE), dict):
+                        config[CONFIG_KEY_DATA_SOURCE] = dict(
+                            CONFIG_TEMPLATE[CONFIG_KEY_DATA_SOURCE]
+                        )
+                    if not isinstance(config.get(CONFIG_KEY_PLAYLIST), dict):
+                        config[CONFIG_KEY_PLAYLIST] = dict(CONFIG_TEMPLATE[CONFIG_KEY_PLAYLIST])
                     # migration to version 4 for data_source type change
                     if config.get("version") <= 3 and CONFIG_VERSION >= 4:
                         self._migrateV3To4(config)

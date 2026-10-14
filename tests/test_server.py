@@ -213,3 +213,131 @@ def test_gui_callsites_pass_monitor_to_dbus():
                 if len(node.args) + len(node.keywords) < 2:
                     bad.append(f"{name}:{node.lineno} .{node.func.attr}()")
     assert not bad, f"call-sites missing the monitor arg: {bad}"
+
+
+def test_server_import_leaves_gtk_namespaces_free(tmp_path):
+    """P0 regression (RC2): importing the server must not pin any Gtk/Gdk
+    major, or GTK4 children of the forkserver can never load Gtk 4.0
+    (gi allows a single major per process).
+
+    Runs in a FRESH subprocess: importing server, then gtk4app with
+    Gtk 4.0, must both succeed — real execution, not AST/grep.
+    """
+    import subprocess
+    import sys
+
+    code = (
+        "import sys; sys.path.insert(0, 'src'); "
+        "import apricus.server as srv; "
+        "bad = [m for m in sys.modules "
+        "if m.split('.')[-1] in ('Gtk', 'Gdk', 'Adw', 'WebKit2', 'AppIndicator3')]; "
+        "assert not bad, f'server pinned GTK namespaces: {bad}'; "
+        "import apricus.gui.gtk4app as g4; "
+        "import gi; assert gi.version_info; "
+        "from gi.repository import Gtk; "
+        "assert Gtk._version == '4.0', Gtk._version; "
+        "print('GTK-ISOLATION-OK')"
+    )
+    proc = subprocess.run(
+        [sys.executable, "-c", code],
+        capture_output=True,
+        text=True,
+        cwd="/home/fabrizio/apricus/apricus",
+        env={**dict(__import__("os").environ), "PYTHONPATH": "src"},
+        timeout=120,
+    )
+    assert "GTK-ISOLATION-OK" in proc.stdout, f"stdout={proc.stdout!r} stderr={proc.stderr[-2000:]}"
+
+
+def test_show_gui_selects_toolkit_without_spawning(monkeypatch):
+    """show_gui must pick the GTK4 trampoline (spawn context) under
+    APRICUS_GTK4=1 and the legacy one (forkserver path) otherwise —
+    without starting any process."""
+    import os
+
+    seen = []
+
+    class _FakeProcess:
+        def __init__(self, name=None, target=None, args=()):
+            seen.append((name, target))
+
+        def start(self):
+            pass
+
+        def is_alive(self):
+            return False
+
+    class _FakeCtx:
+        Process = _FakeProcess
+
+    monkeypatch.setattr(srv, "Process", _FakeProcess)
+    monkeypatch.setattr(srv.mp, "get_context", lambda method: _FakeCtx())
+    s = srv.ApricusServer.__new__(srv.ApricusServer)
+    s.version = "test"
+    s.pkgdatadir = ""
+    s.localedir = ""
+    s.gui_process = None
+    try:
+        os.environ["APRICUS_GTK4"] = "1"
+        s.show_gui()
+        assert seen and seen[-1][1] is srv._gui_gtk4_target, seen
+        del os.environ["APRICUS_GTK4"]
+        s.gui_process = None
+        s.show_gui()
+        assert seen and seen[-1][1] is srv._gui_legacy_target, seen
+    finally:
+        if "APRICUS_GTK4" in os.environ:
+            del os.environ["APRICUS_GTK4"]
+
+
+def test_gui_trampolines_import_only_inside_child():
+    """The server module itself must expose no Gtk symbols: trampolines
+    defer their toolkit imports to call time (AST check, no execution)."""
+    import ast
+    import pathlib
+
+    tree = ast.parse(pathlib.Path("src/apricus/server.py").read_text())
+    top_imports = []
+    for node in tree.body:
+        if isinstance(node, (ast.Import, ast.ImportFrom)):
+            for alias in node.names:
+                top_imports.append(alias.name)
+    banned = [m for m in top_imports if m.split(".")[-1] in ("control", "menu")]
+    assert not banned, f"GTK3 modules at server top-level: {banned}"
+    banned = [m for m in top_imports if "player" in m]
+    assert not banned, f"player modules at server top-level: {banned}"
+
+
+def test_pause_flag_roundtrips_in_playlist_mode():
+    """In MODE_PLAYLIST the pause flag must round-trip like other modes.
+
+    Regression: the getter/setter only accepted VIDEO/STREAM, so in
+    playlist mode the getter returned None (breaking D-Bus bool
+    marshalling and freezing the panel toggle) and the setter silently
+    dropped the request — Play could never resume.
+    """
+    from unittest.mock import patch
+
+    s = srv.ApricusServer.__new__(srv.ApricusServer)
+
+    class _Player:
+        mode = "MODE_PLAYLIST"
+        is_paused_by_user = False
+
+    player = _Player()
+    with patch.object(srv, "get_instance", return_value=player):
+        assert s.is_paused_by_user is False
+        s.is_paused_by_user = True
+        assert player.is_paused_by_user is True
+        assert s.is_paused_by_user is True
+        s.is_paused_by_user = False
+        assert player.is_paused_by_user is False
+
+
+def test_pause_flag_still_none_without_player():
+    from unittest.mock import patch
+
+    s = srv.ApricusServer.__new__(srv.ApricusServer)
+    with patch.object(srv, "get_instance", return_value=None):
+        assert s.is_paused_by_user is None
+        s.is_paused_by_user = True  # must not raise

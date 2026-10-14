@@ -52,6 +52,11 @@ class BasePlayer(Gtk.Application):
 
     def _monitor_detect(self):
         display = Gdk.Display.get_default()
+        if display is None:
+            # No usable display (e.g. sandbox without a forwarded socket):
+            # stay idle with a clear error instead of crashing on None.
+            logger.error("[Player] No Gdk display available; player stays idle")
+            return
         screen = display.get_default_screen()
 
         for i in range(display.get_n_monitors()):

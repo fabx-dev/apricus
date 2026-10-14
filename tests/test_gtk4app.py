@@ -965,6 +965,87 @@ def refresh_now_playing_drives_hero_widgets():
 
 
 @check
+def now_playing_playlist_follows_queue_head():
+    """In MODE_PLAYLIST the hero/title must follow playlist_paths[0]:
+    the server never rewrites data_source.Default on playlist apply, so
+    without this the hero keeps showing the previous single video."""
+
+    def _obj(mode, default, queue):
+        obj, _ = _panel(_base_config(), [])
+        texts = {}
+
+        class _W:
+            def __init__(self, name):
+                self._name = name
+
+            def set_text(self, text):
+                texts[self._name] = text
+
+            def set_visible(self, visible):
+                pass
+
+            def set_icon_name(self, name):
+                pass
+
+            def set_tooltip_text(self, text):
+                pass
+
+            def set_sensitive(self, value):
+                pass
+
+        obj.np_content = _W("content")
+        obj.np_empty = _W("empty")
+        obj.np_badge = _W("badge")
+        obj.np_title = _W("title")
+        obj.np_subtitle = _W("sub")
+        obj.now_playing_status = _W("status")
+        obj.np_play_btn = _W("play")
+        obj.np_eq = _W("eq")
+        obj.np_volume = _W("vol")
+        obj.np_mute_btn = _W("mute")
+
+        class _Srv:
+            pass
+
+        srv = _Srv()
+        srv.mode = mode
+        srv.is_paused_by_user = False
+        obj._server = lambda: srv
+        obj.config = {
+            "mode": mode,
+            "data_source": {"Default": default},
+            "playlist": {"Default": list(queue)},
+            "playlist_shuffle": False,
+            "video_dir": None,
+            "is_mute": False,
+            "audio_volume": 50,
+        }
+        obj.playlist_paths = list(queue)
+        obj._np_current_path = None
+        obj.np_generation = 0
+        loaded = []
+        obj._load_np_hero = lambda path, generation: loaded.append((path, generation))
+        obj._refresh_np_transport = lambda server: None
+        obj._refresh_np_details = lambda mode, current: None
+        obj._refresh_np_queue = lambda mode: None
+        obj._refresh_now_playing()
+        return texts, loaded
+
+    # Queue head wins over a stale Default.
+    texts, loaded = _obj("MODE_PLAYLIST", "/v/old.mp4", ["/v/a.mp4", "/v/b.mp4"])
+    assert texts["title"] == "a.mp4", texts
+    assert loaded == [("/v/a.mp4", 1)], loaded
+    # Empty queue falls back to Default (previous behavior preserved).
+    texts, loaded = _obj("MODE_PLAYLIST", "/v/old.mp4", [])
+    assert texts["title"] == "old.mp4", texts
+    assert loaded == [("/v/old.mp4", 1)], loaded
+    # Non-playlist modes still use Default.
+    texts, loaded = _obj("MODE_VIDEO", "/v/old.mp4", ["/v/a.mp4"])
+    assert texts["title"] == "old.mp4", texts
+    assert loaded == [("/v/old.mp4", 1)], loaded
+
+
+@check
 def now_playing_helpers():
     badge = app.ControlPanel._np_badge
     assert badge("MODE_VIDEO", False) == "Playing"
@@ -2095,6 +2176,52 @@ def toast_records_message():
 
 
 @check
+def now_playing_queue_rows_not_rebuilt_when_unchanged():
+    """Repeated refreshes with the same queue must not destroy/recreate
+    the Up-next rows (visible flash on every refresh, e.g. play/pause)."""
+
+    class _Box:
+        def __init__(self):
+            self.children = ["row-0", "row-1"]
+            self.removed = 0
+
+        def get_first_child(self):
+            return self.children[0] if self.children else None
+
+        def remove(self, child):
+            self.removed += 1
+            self.children.remove(child)
+
+        def append(self, child):
+            self.children.append(child)
+
+    class _Group:
+        def __init__(self):
+            self.visible = None
+
+        def set_visible(self, visible):
+            self.visible = visible
+
+    obj, _ = _panel(_base_config(), [])
+    obj.np_queue_group = _Group()
+    obj.np_queue_box = _Box()
+    obj.playlist_paths = ["/v/a.mp4", "/v/b.mp4"]
+    obj._np_queue_shown = None
+    obj._refresh_np_queue("MODE_PLAYLIST")
+    first_children = list(obj.np_queue_box.children)
+    assert obj.np_queue_box.removed > 0
+    # Same queue again: no row is touched.
+    obj.np_queue_box.removed = 0
+    obj._refresh_np_queue("MODE_PLAYLIST")
+    assert obj.np_queue_box.removed == 0
+    assert list(obj.np_queue_box.children) == first_children
+    # Changed queue: rebuilt.
+    obj.playlist_paths = ["/v/b.mp4", "/v/a.mp4"]
+    obj._refresh_np_queue("MODE_PLAYLIST")
+    assert obj.np_queue_box.removed > 0
+
+
+@check
 def url_gates_reject_without_network():
     """SSRF gates: credentialed/non-http URLs and bad redirect landings
     are rejected before any socket is opened."""
@@ -2559,6 +2686,14 @@ def test_sidebar_streaming_selection_reloads_lists():
 
 def test_refresh_now_playing_drives_hero_widgets():
     _run("refresh_now_playing_drives_hero_widgets")
+
+
+def test_now_playing_playlist_follows_queue_head():
+    _run("now_playing_playlist_follows_queue_head")
+
+
+def test_now_playing_queue_rows_not_rebuilt_when_unchanged():
+    _run_display("now_playing_queue_rows_not_rebuilt_when_unchanged")
 
 
 def test_now_playing_helpers():

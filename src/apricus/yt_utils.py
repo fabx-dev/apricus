@@ -96,10 +96,28 @@ def filter_audio_video(formats):
     return filter(lambda x: x.get("acodec") != "none" and x.get("vcodec") != "none", formats)
 
 
+def _dims(fmt):
+    """(width, height) of a yt-dlp format as ints, None when unknown.
+
+    yt-dlp documents ints, but the generic extractor (direct links) may
+    omit the keys or report None; anything else (strings, bools) is
+    treated as unknown rather than guessed.
+    """
+    dims = []
+    for key in ("width", "height"):
+        value = fmt.get(key)
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            dims.append(None)
+        else:
+            dims.append(int(value))
+    return dims[0], dims[1]
+
+
 def get_best(formats):
     filtered = list(filter_audio_video(formats))
     best = max(filtered, key=lambda x: x.get("quality", -1))
-    return best["url"], best["width"], best["height"]
+    width, height = _dims(best)
+    return best["url"], width, height
 
 
 def get_best_audio(formats):
@@ -115,15 +133,36 @@ def get_best_video(formats):
     if not filtered:
         filtered = list(filter_audio_video(formats))
     best = max(filtered, key=lambda x: x.get("quality", -1))
-    return best["url"], best["width"], best["height"]
+    width, height = _dims(best)
+    return best["url"], width, height
 
 
 def get_optimal_video(formats, height):
+    """Pick the video format closest to *height*, with safe fallbacks.
+
+    Formats without usable dimensions never raise: they sort after every
+    format with a known height, and the winner reports None for unknown
+    dimensions (the player falls back to video_get_size()). When no
+    format passes the codec filters but formats exist (direct links via
+    the generic extractor carry no codec metadata), the first format is
+    used — its URL is the playable file. An empty list still raises
+    ValueError (get_formats never returns one).
+    """
     filtered = list(filter_video(formats))
     if not filtered:
         filtered = list(filter_audio_video(formats))
-    best = min(filtered, key=lambda x: abs(x.get("height", 0) - height))
-    return best["url"], best["width"], best["height"]
+    if not filtered:
+        filtered = list(formats)
+
+    def _distance(fmt):
+        _width, fmt_height = _dims(fmt)
+        if fmt_height is None:
+            return float("inf")
+        return abs(fmt_height - height)
+
+    best = min(filtered, key=_distance)
+    width, best_height = _dims(best)
+    return best["url"], width, best_height
 
 
 if __name__ == "__main__":
