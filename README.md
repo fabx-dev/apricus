@@ -53,9 +53,10 @@ on first run you choose the folder, unless a Hidamari library already exists
 <sup>8</sup> Tested with YouTube (needs Deno ≥ 2.3 on the system; included in the Flatpak).
 <sup>9</sup> Anything from a plain page to WebGL content. JavaScript stays on
 (pages need it); local-file access from remote pages is blocked.
-<sup>10</sup> Selected automatically from the system locale. In this RC the new
-GTK4 panel is English-only (translations still cover the classic panel);
-marking and translating the new strings is planned before stable 2.0.0.
+<sup>10</sup> Selected automatically from the system locale. The classic panel is
+fully translated (it/de/fr/es; ja partial). The new GTK4 panel strings are
+marked for translation: Italian is complete, German/French/Spanish/Japanese
+are in progress and fall back to English where untranslated.
 <sup>11</sup> Thumbnails are cached under `~/.cache/apricus/stream-thumbs/`,
 loaded lazily (max 2 concurrent downloads), with a monogram fallback when
 no image is available. The LIVE badge appears only for confirmed live
@@ -132,9 +133,13 @@ read and migrated, never wiped. The 1.0 → 2.0 update path has been reviewed
 statically but not yet executed end-to-end; back up
 `~/.config/apricus/` before testing the RC over a 1.0 install.
 
+Note for scripters: the D-Bus methods `stream`, `webpage` and `video` take
+`(url, monitor)` — pass `"all"` to apply on every monitor, as both panels do.
+
 ## Known limitations of this RC
 
-- New GTK4 panel is English-only (see <sup>10</sup> above).
+- GTK4 panel: Italian complete; German/French/Spanish/Japanese strings still
+  incomplete (English fallback where untranslated).
 - `make flatpak` installs over the current Flatpak; to keep 1.0 installed,
   build to a separate directory and do not install the RC yet.
 - End-to-end 1.0 → 2.0 update not yet executed; procedure documented above.
@@ -167,7 +172,8 @@ library is reused automatically for compatibility.)
 A Flatpak (`io.github.fabx_dev.Apricus`) builds locally with `make flatpak`;
 ready-made bundles are attached to each
 [GitHub release](https://github.com/fabx-dev/apricus/releases) — install both
-(the second one carries the translations):
+(the second one carries the translations). Bundle file names follow the
+release version (e.g. `apricus-1.0.flatpak` for the 1.0 release):
 
 ```bash
 flatpak install --user apricus-1.0.flatpak apricus-locale.flatpak

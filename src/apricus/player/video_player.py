@@ -880,12 +880,21 @@ class VideoPlayer(BasePlayer):
             if thumb_url and thumb_url.startswith("https://"):
                 response = requests.get(thumb_url, timeout=15, stream=True)
                 try:
-                    data = b"".join(response.iter_content(65536))
+                    if "image" not in response.headers.get("Content-Type", ""):
+                        data = None
+                    else:
+                        chunks = []
+                        total = 0
+                        for chunk in response.iter_content(65536):
+                            total += len(chunk)
+                            if total > 2 * 1024 * 1024:
+                                chunks = []
+                                break
+                            chunks.append(chunk)
+                        data = b"".join(chunks) or None
                 finally:
                     response.close()
-                if len(data) > 2 * 1024 * 1024 or not data or not check_magic(data):
-                    data = None
-                elif decode_size(data) is None:
+                if data and (not check_magic(data) or decode_size(data) is None):
                     data = None
             if data is None:
                 # Direct video URLs have no thumbnail metadata: extract a

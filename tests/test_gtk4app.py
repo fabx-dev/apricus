@@ -1562,11 +1562,11 @@ def web_file_row_ignores_non_webpage_sources():
 @check
 def sidebar_status_text_maps_states():
     css, text = app.ControlPanel._sidebar_status_text(False, "MODE_VIDEO")
-    assert (css, text) == ("error", "Server assente"), (css, text)
+    assert (css, text) == ("error", "Server down"), (css, text)
     css, text = app.ControlPanel._sidebar_status_text(True, "MODE_PLAYLIST")
-    assert (css, text) == ("success", "Pronto — Playlist (muted)"), (css, text)
+    assert (css, text) == ("success", "Ready — Playlist (muted)"), (css, text)
     css, text = app.ControlPanel._sidebar_status_text(True, "BOGUS")
-    assert (css, text) == ("success", "Pronto — Static wallpaper"), (css, text)
+    assert (css, text) == ("success", "Ready — Static wallpaper"), (css, text)
 
 
 @check
@@ -2016,6 +2016,44 @@ def toast_without_overlay_is_noop():
 
 
 @check
+def capped_get_enforces_incremental_limit():
+    """_capped_get must drop oversized bodies mid-stream (P1: unbounded
+    downloads filled RAM before any post-hoc check)."""
+    import apricus.gui.gtk4app as appmod
+
+    class _Resp:
+        closed = False
+
+        def __init__(self, chunks):
+            self._chunks = chunks
+
+        def iter_content(self, size):
+            yield from self._chunks
+
+        def close(self):
+            self.closed = True
+
+    made = []
+
+    def fake_get(url, timeout, stream=True):
+        resp = _Resp(list(made.pop(0)))
+        fake_get.last = resp
+        return resp
+
+    old = appmod.requests.get
+    appmod.requests.get = fake_get
+    try:
+        made.append([b"x" * 100, b"y" * 100])
+        assert appmod._capped_get("https://h/x", 5, 1024) == b"x" * 100 + b"y" * 100
+        assert fake_get.last.closed, "socket must be closed"
+        made.append([b"z" * 70000])
+        assert appmod._capped_get("https://h/big", 5, 65536) is None
+        assert fake_get.last.closed, "socket must be closed on overflow too"
+    finally:
+        appmod.requests.get = old
+
+
+@check
 def toast_records_message():
     obj, _ = _panel(_base_config(), [])
     seen = []
@@ -2258,6 +2296,10 @@ def test_source_row_shows_folder_or_empty():
 
 def test_toast_without_overlay_is_noop():
     _run("toast_without_overlay_is_noop")
+
+
+def test_capped_get_enforces_incremental_limit():
+    _run("capped_get_enforces_incremental_limit")
 
 
 def test_stream_meta_title_persists_in_history():

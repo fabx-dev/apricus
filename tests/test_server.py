@@ -188,3 +188,28 @@ def test_webpage_single_monitor_keeps_other_keys():
         "M9-stale": "/old.mp4",
         "Default": "https://example.com/",
     }
+
+
+def test_gui_callsites_pass_monitor_to_dbus():
+    """Every GUI .stream()/.webpage() call must pass the monitor arg.
+
+    Regression (RC1): the server gained a monitor parameter in 1B but
+    five call-sites still called with one arg. D-Bus signatures are
+    strict, so those calls failed dispatch — including the default
+    GTK3 panel paths.
+    """
+    import ast
+    import pathlib
+
+    bad = []
+    for name in ("src/apricus/gui/control.py", "src/apricus/gui/gtk4app.py"):
+        tree = ast.parse(pathlib.Path(name).read_text())
+        for node in ast.walk(tree):
+            if (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Attribute)
+                and node.func.attr in ("stream", "webpage", "video", "playlist")
+            ):
+                if len(node.args) + len(node.keywords) < 2:
+                    bad.append(f"{name}:{node.lineno} .{node.func.attr}()")
+    assert not bad, f"call-sites missing the monitor arg: {bad}"

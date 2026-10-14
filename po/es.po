@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: apricus\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-12 02:12+0200\n"
+"POT-Creation-Date: 2026-10-14 08:00+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: Fabrizio <fabx-dev>\n"
 "Language-Team: Spanish\n"
@@ -17,24 +17,31 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-#: src/apricus/gui/control.py:124
+#: src/apricus/gui/control.py:125
+#, python-brace-format
 msgid "Set For {monitor}"
 msgstr "Establecer para {monitor}"
 
-#: src/apricus/gui/control.py:129
+#. add all option
+#: src/apricus/gui/control.py:130
 msgid "Set For All"
 msgstr "Establecer para todos"
 
-#: src/apricus/gui/control.py:241
+#: src/apricus/gui/control.py:242
 msgid "Couldn't connect to server"
 msgstr "No se pudo conectar con el servidor"
 
-#: src/apricus/gui/control.py:254
+#: src/apricus/gui/control.py:255
 msgid "Welcome to Apricus 🤗"
 msgstr "Bienvenido a Apricus 🤗"
 
-#: src/apricus/gui/control.py:258
-msgid "Quickstart for adding local videos:\n ・Click the folder icon to open your video folder\n ・Put your videos there\n ・Click the refresh button\n ・Click to select, Ctrl+click for more than one"
+#: src/apricus/gui/control.py:259
+msgid ""
+"Quickstart for adding local videos:\n"
+" ・Click the folder icon to open your video folder\n"
+" ・Put your videos there\n"
+" ・Click the refresh button\n"
+" ・Click to select, Ctrl+click for more than one"
 msgstr ""
 "Guía rápida para añadir vídeos locales:\n"
 " • Haz clic en el icono de la carpeta para abrir tu carpeta de vídeos\n"
@@ -42,169 +49,827 @@ msgstr ""
 " • Haz clic en el botón de actualizar\n"
 " ・Haz clic para seleccionar, Ctrl+clic para varios"
 
-#: src/apricus/gui/control.py:275
+#: src/apricus/gui/control.py:276
 msgid "Oops!"
 msgstr "¡Ups!"
 
-#: src/apricus/gui/control.py:293
+#: src/apricus/gui/control.py:297
+#, python-brace-format
 msgid "Choose video folder (current: {folder})"
 msgstr "Elegir la carpeta de vídeos (actual: {folder})"
 
-#: src/apricus/gui/control.py:294
+#: src/apricus/gui/control.py:298
 msgid "none chosen yet"
 msgstr "ninguna elegida"
 
-#: src/apricus/gui/control.py:300
+#: src/apricus/gui/control.py:304 src/apricus/gui/gtk4app.py:987
+#: src/apricus/gui/gtk4app.py:2545
 msgid "Cancel"
 msgstr "Cancelar"
 
-#: src/apricus/gui/control.py:302
+#: src/apricus/gui/control.py:306
 msgid "Choose"
 msgstr "Elegir"
 
-#: src/apricus/gui/control.py:325
+#: src/apricus/gui/control.py:329
 msgid "No Video Selected"
 msgstr "Ningún vídeo seleccionado"
 
-#: src/apricus/gui/control.py:328
-msgid "There are no video selected.\nPlease choose one first (Ctrl+click for more than one)."
+#: src/apricus/gui/control.py:332
+msgid ""
+"There are no video selected.\n"
+"Please choose one first (Ctrl+click for more than one)."
 msgstr ""
 "No hay ningún vídeo seleccionado.\n"
 "Elige uno primero (Ctrl+clic para varios)."
 
-#: src/apricus/gui/control.py:367
+#: src/apricus/gui/control.py:371
 msgid "Please choose a HTML file"
 msgstr "Elige un archivo HTML"
 
-#: src/apricus/gui/control.py:398
+#: src/apricus/gui/control.py:402
 msgid "#"
 msgstr "#"
 
-#: src/apricus/gui/control.py:398
+#: src/apricus/gui/control.py:402
 msgid "Video"
 msgstr "Vídeo"
 
-#: src/apricus/gui/control.py:412
+#: src/apricus/gui/control.py:416
+#, python-brace-format
 msgid "Playlist ({n}, paused)"
 msgstr "Playlist ({n}, en pausa)"
 
-#: src/apricus/gui/control.py:414
+#: src/apricus/gui/control.py:418
+#, python-brace-format
 msgid "Playlist ({n})"
 msgstr "Playlist ({n})"
 
-#: src/apricus/gui/control.py:414 src/apricus/assets/control.ui:1113
+#: src/apricus/gui/control.py:418 src/apricus/gui/gtk4app.py:134
+#: src/apricus/assets/control.ui:1113
 msgid "Playlist"
 msgstr "Playlist"
 
-#: src/apricus/gui/control.py:431
+#: src/apricus/gui/control.py:435
+#, python-brace-format
 msgid "Added {a}, {d} already in queue (total {n})"
 msgstr "{a} añadidos, {d} ya en la cola (total {n})"
 
-#: src/apricus/gui/control.py:435
+#: src/apricus/gui/control.py:439
+#, python-brace-format
 msgid "Added {a} to queue (total {n})"
 msgstr "{a} añadidos a la cola (total {n})"
 
-#: src/apricus/gui/control.py:437
+#: src/apricus/gui/control.py:441
+#, python-brace-format
 msgid "Already in queue (total {n})"
 msgstr "Ya en la cola (total {n})"
 
-#: src/apricus/gui/control.py:449 src/apricus/assets/control.ui:456
+#: src/apricus/gui/control.py:453 src/apricus/assets/control.ui:456
 msgid "No selection"
 msgstr "Ninguna selección"
 
-#: src/apricus/gui/control.py:451
+#: src/apricus/gui/control.py:455 src/apricus/gui/gtk4app.py:479
 msgid "1 video selected"
 msgstr "1 vídeo seleccionado"
 
-#: src/apricus/gui/control.py:453
+#: src/apricus/gui/control.py:457
+#, python-brace-format
 msgid "{n} videos selected"
 msgstr "{n} vídeos seleccionados"
 
-#: src/apricus/gui/control.py:460
+#: src/apricus/gui/control.py:464
 msgid "This video is already the active wallpaper"
 msgstr "Este vídeo ya es el fondo activo"
 
-#: src/apricus/gui/control.py:463
+#: src/apricus/gui/control.py:467
 msgid "Apply the selected video as wallpaper"
 msgstr "Aplicar el vídeo seleccionado como fondo"
 
-#: src/apricus/gui/control.py:485
+#: src/apricus/gui/control.py:489
+#, python-brace-format
 msgid "Add to playlist ({n})"
 msgstr "Añadir a la playlist ({n})"
 
-#: src/apricus/gui/control.py:485 src/apricus/assets/control.ui:487
+#: src/apricus/gui/control.py:489 src/apricus/gui/gtk4app.py:419
+#: src/apricus/assets/control.ui:487
 msgid "Add to playlist"
 msgstr "Añadir a la playlist"
 
-#: src/apricus/gui/control.py:500
+#: src/apricus/gui/control.py:504
 msgid "Selecting videos"
 msgstr "Seleccionar vídeos"
 
-#: src/apricus/gui/control.py:503
-msgid " ・Click a video to select it\n ・Ctrl+click adds or removes single videos\n ・Shift+click selects a whole range\n ・Right-click a video to set it on a monitor"
+#: src/apricus/gui/control.py:507
+msgid ""
+" ・Click a video to select it\n"
+" ・Ctrl+click adds or removes single videos\n"
+" ・Shift+click selects a whole range\n"
+" ・Right-click a video to set it on a monitor"
 msgstr ""
 " ・Haz clic en un vídeo para seleccionarlo\n"
 " ・Ctrl+clic añade o quita vídeos sueltos\n"
 " ・Mayús+clic selecciona un rango entero\n"
 " ・Clic derecho en un vídeo para asignarlo a un monitor"
 
-#: src/apricus/gui/control.py:616
+#: src/apricus/gui/control.py:620
 msgid "Disabled in playlist mode (muted by design)"
 msgstr "Desactivado en modo playlist (silencioso por diseño)"
 
-#: src/apricus/gui/control.py:618 src/apricus/assets/control.ui:154
+#: src/apricus/gui/control.py:622 src/apricus/assets/control.ui:154
 msgid "Volume control"
 msgstr "Control de volumen"
 
-#: src/apricus/gui/control.py:709
-msgid "Failed to access {url}. Error:\n{error}"
+#: src/apricus/gui/control.py:714
+#, python-brace-format
+msgid ""
+"Failed to access {url}. Error:\n"
+"{error}"
 msgstr ""
 "No se pudo acceder a {url}. Error:\n"
 "{error}"
 
-#: src/apricus/gui/control.py:714
+#: src/apricus/gui/control.py:719
+#, python-brace-format
 msgid "Failed to access {url}. Error code: {code}"
 msgstr "No se pudo acceder a {url}. Código de error: {code}"
 
-#: src/apricus/gui/control.py:730
-msgid "Failed to stream {url}. Error:\n{error}"
+#: src/apricus/gui/control.py:735
+#, python-brace-format
+msgid ""
+"Failed to stream {url}. Error:\n"
+"{error}"
 msgstr ""
 "No se pudo reproducir {url} en continuo. Error:\n"
 "{error}"
 
-#: src/apricus/gui/control.py:818
+#: src/apricus/gui/control.py:823
 msgid "Choose a video folder to begin"
 msgstr "Elige una carpeta de vídeos para empezar"
 
-#: src/apricus/gui/control.py:820
+#: src/apricus/gui/control.py:825
+#, python-brace-format
 msgid "Videos in {folder} ({count})"
 msgstr "Vídeos en {folder} ({count})"
 
-#: src/apricus/gui/control.py:824
+#: src/apricus/gui/control.py:829
+#, python-brace-format
 msgid "No videos in {folder}"
 msgstr "Ningún vídeo en {folder}"
 
-#: src/apricus/menu.py:97
+#: src/apricus/gui/gtk4app.py:133
+msgid "Library"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:135
+msgid "Now Playing"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:136 src/apricus/gui/gtk4app.py:1955
+#: src/apricus/gui/gtk4app.py:1959 src/apricus/assets/control.ui:706
+msgid "Streaming"
+msgstr "Streaming"
+
+#: src/apricus/gui/gtk4app.py:137 src/apricus/gui/gtk4app.py:3018
+#: src/apricus/assets/control.ui:905
+msgid "Web Page"
+msgstr "Página web"
+
+#: src/apricus/gui/gtk4app.py:138
+msgid "Settings"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:157
+msgid "Background service unreachable"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:158
+msgid "Retry"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:295
+msgid "Server down"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:296
+#, python-brace-format
+msgid "Ready — {mode}"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:377 src/apricus/assets/control.ui:314
+msgid "Click to select. Ctrl+click or Shift+click selects more than one."
+msgstr "Haz clic para seleccionar. Ctrl+clic o Mayús+clic para varios."
+
+#: src/apricus/gui/gtk4app.py:396 src/apricus/gui/gtk4app.py:496
+msgid "No folder chosen"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:397 src/apricus/gui/gtk4app.py:399
+#: src/apricus/gui/gtk4app.py:497
+msgid "Choose the folder scanned for local videos"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:398 src/apricus/gui/gtk4app.py:2729
+#, fuzzy
+msgid "Choose…"
+msgstr "Elegir"
+
+#: src/apricus/gui/gtk4app.py:405
+msgid "Open the video folder in the file manager"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:413 src/apricus/assets/control.ui:468
+msgid "Apply selected"
+msgstr "Aplicar selección"
+
+#: src/apricus/gui/gtk4app.py:415
+#, fuzzy
+msgid "Use the selected video as live wallpaper"
+msgstr "Aplicar el vídeo seleccionado como fondo"
+
+#: src/apricus/gui/gtk4app.py:420 src/apricus/assets/control.ui:488
+msgid "Add the selected videos to the playlist queue"
+msgstr "Añadir los vídeos seleccionados a la cola de la playlist"
+
+#: src/apricus/gui/gtk4app.py:424
+#, fuzzy
+msgid "Add selected"
+msgstr "Aplicar selección"
+
+#: src/apricus/gui/gtk4app.py:427
+msgid "Add all"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:429 src/apricus/assets/control.ui:502
+msgid "Add every video in the library to the playlist queue"
+msgstr "Añadir todos los vídeos de la biblioteca a la cola de la playlist"
+
+#: src/apricus/gui/gtk4app.py:442
+#, fuzzy
+msgid "Play/Pause"
+msgstr "Reproducir/Pausar"
+
+#: src/apricus/gui/gtk4app.py:443
+#, fuzzy
+msgid "Toggle playback"
+msgstr "Reproducir/Pausar"
+
+#: src/apricus/gui/gtk4app.py:446
+msgid "Quit"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:447
+msgid "Close the panel. Wallpaper keeps running"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:452
+msgid "More library actions"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:455 src/apricus/assets/control.ui:346
+msgid "Refresh"
+msgstr "Actualizar"
+
+#: src/apricus/gui/gtk4app.py:457
+msgid "Rescan the source folder"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:479
+#, fuzzy
+msgid "{} videos selected"
+msgstr "{n} vídeos seleccionados"
+
+#: src/apricus/gui/gtk4app.py:506
+msgid ""
+"Background service unreachable.\n"
+"Start Apricus to apply wallpapers."
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:571
+msgid "Apply needs a single video"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:573
+#, python-brace-format
+msgid ""
+"You selected {count} videos, but Apply sets one wallpaper.\n"
+"Select just one video to apply it, or add them to the playlist to play them "
+"all in a loop."
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:578 src/apricus/gui/gtk4app.py:3282
+#: src/apricus/gui/gtk4app.py:3475
+msgid "OK"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:627 src/apricus/assets/control.ui:396
+msgid "Choose video folder"
+msgstr "Elegir la carpeta de vídeos"
+
+#: src/apricus/gui/gtk4app.py:681 src/apricus/assets/control.ui:1090
+msgid "Apply playlist"
+msgstr "Aplicar playlist"
+
+#: src/apricus/gui/gtk4app.py:683
+msgid "Apply current order to playback"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:689 src/apricus/assets/control.ui:1077
+msgid "Shuffle"
+msgstr "Aleatorio"
+
+#: src/apricus/gui/gtk4app.py:690
+msgid "Shuffle playlist order randomly"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:692
+#, fuzzy
+msgid "Remove selected"
+msgstr "1 vídeo seleccionado"
+
+#: src/apricus/gui/gtk4app.py:693
+#, fuzzy
+msgid "Remove the selected video from the playlist"
+msgstr "Añadir los vídeos seleccionados a la cola de la playlist"
+
+#: src/apricus/gui/gtk4app.py:696 src/apricus/gui/gtk4app.py:988
+#: src/apricus/gui/gtk4app.py:1711 src/apricus/gui/gtk4app.py:2795
+#: src/apricus/assets/control.ui:1064
+msgid "Clear"
+msgstr "Vaciar"
+
+#: src/apricus/gui/gtk4app.py:698
+#, fuzzy
+msgid "Remove all videos from the playlist"
+msgstr "Añadir los vídeos seleccionados a la cola de la playlist"
+
+#: src/apricus/gui/gtk4app.py:754
+msgid "More actions"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:970
+msgid "Undo"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:979
+#, fuzzy
+msgid "Clear playlist?"
+msgstr "Aplicar playlist"
+
+#: src/apricus/gui/gtk4app.py:981
+#, python-brace-format
+msgid ""
+"This will remove all {n} videos from the playlist. This action cannot be "
+"undone."
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:1000
+#, fuzzy
+msgid "Playlist cleared"
+msgstr "Playlist"
+
+#: src/apricus/gui/gtk4app.py:1026
+msgid "Queue empty — add videos from Library"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:1028
+#, fuzzy, python-brace-format
+msgid "{n} videos in queue (muted by design)"
+msgstr "Desactivado en modo playlist (silencioso por diseño)"
+
+#: src/apricus/gui/gtk4app.py:1030
+#, fuzzy, python-brace-format
+msgid "{n} videos in queue (paused)"
+msgstr "{n} vídeos seleccionados"
+
+#: src/apricus/gui/gtk4app.py:1106
+#, fuzzy
+msgid "Play / Pause"
+msgstr "Reproducir/Pausar"
+
+#: src/apricus/gui/gtk4app.py:1111
+msgid "Mute / Unmute"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:1115 src/apricus/gui/gtk4app.py:1267
+#: src/apricus/gui/gtk4app.py:1269 src/apricus/gui/gtk4app.py:1297
+#: src/apricus/gui/gtk4app.py:1298
+msgid "Mute"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:1123
+#, fuzzy
+msgid "Volume"
+msgstr "Control de volumen"
+
+#: src/apricus/gui/gtk4app.py:1134 src/apricus/gui/gtk4app.py:2762
+msgid "Details"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:1138 src/apricus/gui/gtk4app.py:1424
+msgid "Resolution"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:1139 src/apricus/gui/gtk4app.py:1428
+msgid "Duration"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:1140 src/apricus/gui/gtk4app.py:1430
+msgid "Format"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:1141 src/apricus/gui/gtk4app.py:1435
+msgid "Folder"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:1152
+#, fuzzy
+msgid "Open the containing folder"
+msgstr "Abrir el archivo de configuración"
+
+#: src/apricus/gui/gtk4app.py:1158
+msgid "Up next"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:1166
+msgid "Nothing playing"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:1167
+#, fuzzy
+msgid "Choose a video from the library to start watching."
+msgstr "Elige una carpeta de vídeos para empezar"
+
+#: src/apricus/gui/gtk4app.py:1168
+msgid "Open library"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:1267 src/apricus/gui/gtk4app.py:1298
+msgid "Unmute"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:1269 src/apricus/gui/gtk4app.py:1297
+msgid "Muted"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:1388
+msgid "Title"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:1389
+msgid "Site"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:1390
+msgid "Link"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:1391
+msgid "Type"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:1398 src/apricus/gui/gtk4app.py:2723
+#, fuzzy
+msgid "Local web page"
+msgstr "<b>Página web local</b>"
+
+#: src/apricus/gui/gtk4app.py:1407
+#, fuzzy
+msgid "Web page"
+msgstr "Página web"
+
+#: src/apricus/gui/gtk4app.py:1558
+#, python-brace-format
+msgid "n. {pos} of {total}"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:1664
+msgid "https://… — YouTube, Twitch, live, direct video"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:1679 src/apricus/gui/gtk4app.py:2702
+msgid "Detected"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:1680 src/apricus/gui/gtk4app.py:1931
+#: src/apricus/gui/gtk4app.py:2703
+msgid "Paste a link to detect its type"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:1689 src/apricus/gui/gtk4app.py:2712
+#: src/apricus/assets/control.ui:870
+msgid "Apply"
+msgstr "Aplicar"
+
+#: src/apricus/gui/gtk4app.py:1694
+msgid "Try 10s"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:1695
+msgid "Preview for 10 seconds, then pause"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:1700
+msgid "Saved sources"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:1707 src/apricus/gui/gtk4app.py:2791
+msgid "Recent"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:1721
+msgid "No saved sources yet"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:1723
+msgid ""
+"Paste a YouTube, Twitch or direct video link above. You will find it here."
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:1725
+msgid "Paste from clipboard"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:1956
+msgid "Paste a link to stream it as wallpaper"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:2007
+msgid "LIVE"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:2019 src/apricus/gui/gtk4app.py:2839
+msgid "Remove from saved"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:2019 src/apricus/gui/gtk4app.py:2839
+msgid "Save"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:2026
+msgid "Apply this source now"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:2033
+msgid "Remove from saved (kept in recent)"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:2274
+msgid "Stream history cleared"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:2282 src/apricus/gui/gtk4app.py:2527
+msgid "Not a valid http(s) URL."
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:2298 src/apricus/gui/gtk4app.py:2572
+#, fuzzy, python-brace-format
+msgid ""
+"Failed to stream {url}.\n"
+"Error:\n"
+"{error}"
+msgstr ""
+"No se pudo reproducir {url} en continuo. Error:\n"
+"{error}"
+
+#: src/apricus/gui/gtk4app.py:2310
+msgid "Previewing for 10 seconds"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:2311
+msgid "Stop now"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:2326
+msgid "Preview finished — Apply to keep watching"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:2537
+msgid "Playlist links aren't supported"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:2540
+msgid ""
+"That link points to a playlist or channel. Apricus plays single videos — use "
+"the video's own link."
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:2546
+msgid "Use video anyway"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:2715 src/apricus/gui/gtk4app.py:2854
+#, fuzzy
+msgid "Open in browser"
+msgstr "Abrir la carpeta de vídeos"
+
+#: src/apricus/gui/gtk4app.py:2716
+msgid "Open the entered address in the browser"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:2725 src/apricus/gui/gtk4app.py:3110
+#, fuzzy
+msgid "No page chosen"
+msgstr "ninguna elegida"
+
+#: src/apricus/gui/gtk4app.py:2726 src/apricus/gui/gtk4app.py:3111
+msgid "Choose an HTML web page on this PC"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:2730
+msgid "Choose local HTML web page"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:2736
+msgid "Show the file in the file manager"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:2746
+msgid "Inspiration"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:2778
+msgid "Copy link"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:2784
+msgid "Saved pages"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:2805
+msgid "No saved pages yet"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:2806
+msgid "Apply a link or file above. You will find it here."
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:2847
+msgid "Apply this file now"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:2861
+msgid "Remove from recent (kept in saved)"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:2936
+msgid "Web history cleared"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:3022
+msgid "Type an address above to load a preview"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:3028
+msgid "Example loaded"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:3094
+msgid "Link copied"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:3145
+#, python-brace-format
+msgid "Local web page — {size}"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:3149
+#, python-brace-format
+msgid "Remote — {domain}"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:3156
+msgid "Current wallpaper"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:3156
+msgid "Not applied"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:3205
+#, fuzzy, python-brace-format
+msgid ""
+"Failed to access {url}.\n"
+"Error:\n"
+"{error}"
+msgstr ""
+"No se pudo acceder a {url}. Error:\n"
+"{error}"
+
+#: src/apricus/gui/gtk4app.py:3253
+msgid "Choose a local HTML web page"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:3281
+msgid "Error"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:3307
+msgid "Behaviour"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:3316
+msgid "Only on GNOME"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:3327 src/apricus/gui/gtk4app.py:3339
+msgid "Requires X11"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:3345
+msgid "Startup"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:3356
+msgid "System"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:3358
+#, fuzzy
+msgid "Open configuration"
+msgstr "Abrir el archivo de configuración"
+
+#: src/apricus/gui/gtk4app.py:3360 src/apricus/gui/gtk4app.py:3379
+msgid "Open"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:3366 src/apricus/gui/gtk4app.py:3466
+#: src/apricus/assets/control.ui:255
+msgid "How to select videos"
+msgstr "Cómo seleccionar vídeos"
+
+#: src/apricus/gui/gtk4app.py:3367
+msgid "Selection shortcuts for the library"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:3368
+msgid "Show"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:3375
+msgid "Info"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:3377 src/apricus/assets/control.ui:241
+msgid "About Apricus"
+msgstr "Acerca de Apricus"
+
+#: src/apricus/gui/gtk4app.py:3378
+#, python-brace-format
+msgid "Version {version} · GPL-3.0-or-later"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:3419 src/apricus/gui/gtk4app.py:3430
+msgid "Could not change the startup setting."
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:3433
+msgid "Startup enabled"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:3433
+msgid "Startup disabled"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:3462
+msgid "Could not open the configuration file."
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:3469
+#, fuzzy
+msgid ""
+"Click to select a video.\n"
+"Ctrl+click or Shift+click selects more than one.\n"
+"Apply lets you choose the monitor."
+msgstr "Haz clic para seleccionar. Ctrl+clic o Mayús+clic para varios."
+
+#.
+#: src/apricus/menu.py:95
 msgid "Show Apricus"
 msgstr "Mostrar Apricus"
 
-#: src/apricus/menu.py:100
+#.
+#: src/apricus/menu.py:98
 msgid "Toggle Mute Audio"
 msgstr "Activar/silenciar audio"
 
-#: src/apricus/menu.py:103 src/apricus/assets/control.ui:1155
+#.
+#: src/apricus/menu.py:101 src/apricus/assets/control.ui:1155
 msgid "Toggle Play/Pause"
 msgstr "Reproducir/Pausar"
 
-#: src/apricus/menu.py:106
+#.
+#: src/apricus/menu.py:104
 msgid "Reload"
 msgstr "Recargar"
 
-#: src/apricus/menu.py:109 src/apricus/assets/control.ui:1174
+#.
+#: src/apricus/menu.py:107 src/apricus/assets/control.ui:1174
 msgid "I'm Feeling Lucky"
 msgstr "Voy a tener suerte"
 
-#: src/apricus/menu.py:112 src/apricus/assets/control.ui:269
+#.
+#: src/apricus/menu.py:110 src/apricus/assets/control.ui:269
 msgid "Quit Apricus"
 msgstr "Salir de Apricus"
 
@@ -222,23 +887,33 @@ msgstr "Inicio automático al iniciar sesión"
 
 #: src/apricus/assets/control.ui:98
 msgid "Video frame can be applied as system wallpaper, look great in GNOME"
-msgstr "Un fotograma del vídeo puede usarse como fondo del sistema, queda genial en GNOME"
+msgstr ""
+"Un fotograma del vídeo puede usarse como fondo del sistema, queda genial en "
+"GNOME"
 
 #: src/apricus/assets/control.ui:100
 msgid "Apply static wallpaper"
 msgstr "Aplicar fondo estático"
 
 #: src/apricus/assets/control.ui:113
-msgid "Automatically pauses playback when maximized window or full screen mode is detected"
-msgstr "Pausa automáticamente cuando se detecta una ventana maximizada o a pantalla completa"
+msgid ""
+"Automatically pauses playback when maximized window or full screen mode is "
+"detected"
+msgstr ""
+"Pausa automáticamente cuando se detecta una ventana maximizada o a pantalla "
+"completa"
 
 #: src/apricus/assets/control.ui:115
 msgid "Pause when maximized window"
 msgstr "Pausar si hay ventana maximizada"
 
 #: src/apricus/assets/control.ui:128
-msgid "Automatically mutes playback when maximized window or full screen mode is detected"
-msgstr "Silencia automáticamente cuando se detecta una ventana maximizada o a pantalla completa"
+msgid ""
+"Automatically mutes playback when maximized window or full screen mode is "
+"detected"
+msgstr ""
+"Silencia automáticamente cuando se detecta una ventana maximizada o a "
+"pantalla completa"
 
 #: src/apricus/assets/control.ui:130
 msgid "Mute when maximized window"
@@ -248,51 +923,21 @@ msgstr "Silenciar si hay ventana maximizada"
 msgid "Open config file"
 msgstr "Abrir el archivo de configuración"
 
-#: src/apricus/assets/control.ui:241
-msgid "About Apricus"
-msgstr "Acerca de Apricus"
-
-#: src/apricus/assets/control.ui:255
-msgid "How to select videos"
-msgstr "Cómo seleccionar vídeos"
-
-#: src/apricus/assets/control.ui:314
-msgid "Click to select. Ctrl+click or Shift+click selects more than one."
-msgstr "Haz clic para seleccionar. Ctrl+clic o Mayús+clic para varios."
-
 #: src/apricus/assets/control.ui:330
-msgid "<span size=\"x-large\"><b>Local Video</b></span>\nVideos located in the video folder"
+msgid ""
+"<span size=\"x-large\"><b>Local Video</b></span>\n"
+"Videos located in the video folder"
 msgstr ""
 "<span size=\"x-large\"><b>Vídeo local</b></span>\n"
 "Vídeos en la carpeta de vídeos"
-
-#: src/apricus/assets/control.ui:346
-msgid "Refresh"
-msgstr "Actualizar"
 
 #: src/apricus/assets/control.ui:371
 msgid "Open video folder"
 msgstr "Abrir la carpeta de vídeos"
 
-#: src/apricus/assets/control.ui:396
-msgid "Choose video folder"
-msgstr "Elegir la carpeta de vídeos"
-
-#: src/apricus/assets/control.ui:468
-msgid "Apply selected"
-msgstr "Aplicar selección"
-
-#: src/apricus/assets/control.ui:488
-msgid "Add the selected videos to the playlist queue"
-msgstr "Añadir los vídeos seleccionados a la cola de la playlist"
-
 #: src/apricus/assets/control.ui:501
 msgid "Add all to playlist"
 msgstr "Añadir todos a la playlist"
-
-#: src/apricus/assets/control.ui:502
-msgid "Add every video in the library to the playlist queue"
-msgstr "Añadir todos los vídeos de la biblioteca a la cola de la playlist"
 
 #: src/apricus/assets/control.ui:546
 msgid "View queue"
@@ -303,7 +948,9 @@ msgid "Local Video"
 msgstr "Vídeo local"
 
 #: src/apricus/assets/control.ui:580
-msgid "<span size=\"x-large\"><b>Streaming</b></span>\nVideos from streaming services"
+msgid ""
+"<span size=\"x-large\"><b>Streaming</b></span>\n"
+"Videos from streaming services"
 msgstr ""
 "<span size=\"x-large\"><b>Streaming</b></span>\n"
 "Vídeos de servicios de streaming"
@@ -313,23 +960,25 @@ msgid "<b>Streaming URL</b>"
 msgstr "<b>URL de streaming</b>"
 
 #: src/apricus/assets/control.ui:656
-msgid "💡	This feature uses <i>yt-dlp</i> as backend"
-msgstr "💡	Esta función usa <i>yt-dlp</i> como motor"
+msgid "💡\tThis feature uses <i>yt-dlp</i> as backend"
+msgstr "💡\tEsta función usa <i>yt-dlp</i> como motor"
 
 #: src/apricus/assets/control.ui:670
-msgid "😉	Try playing any YouTube video! <a href=\"https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md\">Supported sites (yt-dlp)</a>"
-msgstr "😉	¡Prueba con cualquier vídeo de YouTube! <a href=\"https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md\">Sitios compatibles (yt-dlp)</a>"
+msgid ""
+"😉\tTry playing any YouTube video! <a href=\"https://github.com/yt-dlp/yt-"
+"dlp/blob/master/supportedsites.md\">Supported sites (yt-dlp)</a>"
+msgstr ""
+"😉\t¡Prueba con cualquier vídeo de YouTube! <a href=\"https://github.com/yt-"
+"dlp/yt-dlp/blob/master/supportedsites.md\">Sitios compatibles (yt-dlp)</a>"
 
 #: src/apricus/assets/control.ui:685 src/apricus/assets/control.ui:812
 msgid "Hint"
 msgstr "Consejo"
 
-#: src/apricus/assets/control.ui:706
-msgid "Streaming"
-msgstr "Streaming"
-
 #: src/apricus/assets/control.ui:720
-msgid "<span size=\"x-large\"><b>Web Page</b></span>\nSet a web page as wallpaper"
+msgid ""
+"<span size=\"x-large\"><b>Web Page</b></span>\n"
+"Set a web page as wallpaper"
 msgstr ""
 "<span size=\"x-large\"><b>Página web</b></span>\n"
 "Establecer una página web como fondo"
@@ -339,10 +988,12 @@ msgid "<b>Web Page URL</b>"
 msgstr "<b>URL de página web</b>"
 
 #: src/apricus/assets/control.ui:796
-msgid "💡	Check this website for some really amazing examples!\n	<a href=\"https://alteredqualia.com/\">https://alteredqualia.com/</a>"
+msgid ""
+"💡\tCheck this website for some really amazing examples!\n"
+"\t<a href=\"https://alteredqualia.com/\">https://alteredqualia.com/</a>"
 msgstr ""
-"💡	¡Mira este sitio para ver ejemplos increíbles!\n"
-"	<a href=\"https://alteredqualia.com/\">https://alteredqualia.com/</a>"
+"💡\t¡Mira este sitio para ver ejemplos increíbles!\n"
+"\t<a href=\"https://alteredqualia.com/\">https://alteredqualia.com/</a>"
 
 #: src/apricus/assets/control.ui:828
 msgid "<b>Local Web Page</b>"
@@ -352,16 +1003,10 @@ msgstr "<b>Página web local</b>"
 msgid "Alternately, you can choose a HTML file on your PC"
 msgstr "También puedes elegir un archivo HTML de tu PC"
 
-#: src/apricus/assets/control.ui:870
-msgid "Apply"
-msgstr "Aplicar"
-
-#: src/apricus/assets/control.ui:905
-msgid "Web Page"
-msgstr "Página web"
-
 #: src/apricus/assets/control.ui:919
-msgid "<span size=\"x-large\"><b>Playlist</b></span>\nMuted loop over your videos"
+msgid ""
+"<span size=\"x-large\"><b>Playlist</b></span>\n"
+"Muted loop over your videos"
 msgstr ""
 "<span size=\"x-large\"><b>Playlist</b></span>\n"
 "Reproducción en bucle de tus vídeos (sin sonido)"
@@ -389,15 +1034,3 @@ msgstr "Bajar"
 #: src/apricus/assets/control.ui:1051
 msgid "Remove"
 msgstr "Quitar"
-
-#: src/apricus/assets/control.ui:1064
-msgid "Clear"
-msgstr "Vaciar"
-
-#: src/apricus/assets/control.ui:1077
-msgid "Shuffle"
-msgstr "Aleatorio"
-
-#: src/apricus/assets/control.ui:1090
-msgid "Apply playlist"
-msgstr "Aplicar playlist"

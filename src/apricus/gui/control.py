@@ -378,7 +378,7 @@ class ControlPanel(Gtk.Application):
         )
         self._save_config()
         if self.server is not None:
-            self.server.webpage(choose.get_path())
+            self.server.webpage(choose.get_path(), "all")
 
     def on_play_pause(self, *_args):
         if self.server is None:
@@ -748,7 +748,7 @@ class ControlPanel(Gtk.Application):
         )
         self._save_config()
         if self.server is not None:
-            self.server.stream(url)
+            self.server.stream(url, "all")
 
     def on_web_page_activate(self, entry: Gtk.Entry, *_):
         url = entry.get_text()
@@ -761,7 +761,7 @@ class ControlPanel(Gtk.Application):
         )
         self._save_config()
         if self.server is not None:
-            self.server.webpage(url)
+            self.server.webpage(url, "all")
 
     def on_icon_view_button_press(self, widget, event):
         if event.button == Gdk.BUTTON_SECONDARY:  # Right click

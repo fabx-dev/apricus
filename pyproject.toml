@@ -1,8 +1,8 @@
 [project]
 name = "apricus"
-# NOTE: dev-only metadata (uv package = false below); the release version
-# lives in meson.build. Kept at the upstream number on purpose.
-version = "3.7"
+# Release version lives in meson.build (single source of truth); this
+# metadata only describes the uv dev environment (package = false below).
+version = "2.0.0rc1"
 description = "Live wallpaper for Linux. Written in Python."
 readme = "README.md"
 license = "GPL-3.0-or-later"
@@ -38,7 +38,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.isort]
-known-first-party = ["hidamari"]
+known-first-party = ["apricus"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

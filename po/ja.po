@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: apricus\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-12 02:12+0200\n"
+"POT-Creation-Date: 2026-10-14 08:00+0200\n"
 "PO-Revision-Date: 2026-07-10 01:30+0900\n"
 "Last-Translator: Jeff Shee <jeffshee8969@gmail.com>\n"
 "Language-Team: Japanese\n"
@@ -16,25 +16,25 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=1; plural=0;\n"
 
-#: src/apricus/gui/control.py:124
+#: src/apricus/gui/control.py:125
 #, python-brace-format
 msgid "Set For {monitor}"
 msgstr "{monitor} に設定"
 
 #. add all option
-#: src/apricus/gui/control.py:129
+#: src/apricus/gui/control.py:130
 msgid "Set For All"
 msgstr "すべてに設定"
 
-#: src/apricus/gui/control.py:241
+#: src/apricus/gui/control.py:242
 msgid "Couldn't connect to server"
 msgstr "サーバーに接続できませんでした"
 
-#: src/apricus/gui/control.py:254
+#: src/apricus/gui/control.py:255
 msgid "Welcome to Apricus 🤗"
 msgstr "Apricus へようこそ 🤗"
 
-#: src/apricus/gui/control.py:258
+#: src/apricus/gui/control.py:259
 #, fuzzy
 msgid ""
 "Quickstart for adding local videos:\n"
@@ -48,32 +48,33 @@ msgstr ""
 " ・動画をそこに入れます\n"
 " ・更新ボタンをクリックします"
 
-#: src/apricus/gui/control.py:275
+#: src/apricus/gui/control.py:276
 msgid "Oops!"
 msgstr "おっと！"
 
-#: src/apricus/gui/control.py:293
+#: src/apricus/gui/control.py:297
 #, fuzzy, python-brace-format
 msgid "Choose video folder (current: {folder})"
 msgstr "Hidamari フォルダーを開く"
 
-#: src/apricus/gui/control.py:294
+#: src/apricus/gui/control.py:298
 msgid "none chosen yet"
 msgstr ""
 
-#: src/apricus/gui/control.py:300
+#: src/apricus/gui/control.py:304 src/apricus/gui/gtk4app.py:987
+#: src/apricus/gui/gtk4app.py:2545
 msgid "Cancel"
 msgstr ""
 
-#: src/apricus/gui/control.py:302
+#: src/apricus/gui/control.py:306
 msgid "Choose"
 msgstr ""
 
-#: src/apricus/gui/control.py:325
+#: src/apricus/gui/control.py:329
 msgid "No Video Selected"
 msgstr "動画が選択されていません"
 
-#: src/apricus/gui/control.py:328
+#: src/apricus/gui/control.py:332
 #, fuzzy
 msgid ""
 "There are no video selected.\n"
@@ -82,85 +83,87 @@ msgstr ""
 "動画が選択されていません。\n"
 "まず動画を1つ選択してください。"
 
-#: src/apricus/gui/control.py:367
+#: src/apricus/gui/control.py:371
 msgid "Please choose a HTML file"
 msgstr "HTML ファイルを選択してください"
 
-#: src/apricus/gui/control.py:398
+#: src/apricus/gui/control.py:402
 msgid "#"
 msgstr ""
 
-#: src/apricus/gui/control.py:398
+#: src/apricus/gui/control.py:402
 #, fuzzy
 msgid "Video"
 msgstr "ローカル動画"
 
-#: src/apricus/gui/control.py:412
+#: src/apricus/gui/control.py:416
 #, python-brace-format
 msgid "Playlist ({n}, paused)"
 msgstr ""
 
-#: src/apricus/gui/control.py:414
+#: src/apricus/gui/control.py:418
 #, python-brace-format
 msgid "Playlist ({n})"
 msgstr ""
 
-#: src/apricus/gui/control.py:414 src/apricus/assets/control.ui:1113
+#: src/apricus/gui/control.py:418 src/apricus/gui/gtk4app.py:134
+#: src/apricus/assets/control.ui:1113
 msgid "Playlist"
-msgstr ""
-
-#: src/apricus/gui/control.py:431
-#, python-brace-format
-msgid "Added {a}, {d} already in queue (total {n})"
 msgstr ""
 
 #: src/apricus/gui/control.py:435
 #, python-brace-format
+msgid "Added {a}, {d} already in queue (total {n})"
+msgstr ""
+
+#: src/apricus/gui/control.py:439
+#, python-brace-format
 msgid "Added {a} to queue (total {n})"
 msgstr ""
 
-#: src/apricus/gui/control.py:437
+#: src/apricus/gui/control.py:441
 #, python-brace-format
 msgid "Already in queue (total {n})"
 msgstr ""
 
-#: src/apricus/gui/control.py:449 src/apricus/assets/control.ui:456
+#: src/apricus/gui/control.py:453 src/apricus/assets/control.ui:456
 msgid "No selection"
 msgstr ""
 
-#: src/apricus/gui/control.py:451
+#: src/apricus/gui/control.py:455 src/apricus/gui/gtk4app.py:479
 #, fuzzy
 msgid "1 video selected"
 msgstr "動画が選択されていません"
 
-#: src/apricus/gui/control.py:453
+#: src/apricus/gui/control.py:457
 #, fuzzy, python-brace-format
 msgid "{n} videos selected"
 msgstr "動画が選択されていません"
 
-#: src/apricus/gui/control.py:460
+#: src/apricus/gui/control.py:464
 msgid "This video is already the active wallpaper"
 msgstr ""
 
-#: src/apricus/gui/control.py:463
+#: src/apricus/gui/control.py:467
 #, fuzzy
 msgid "Apply the selected video as wallpaper"
 msgstr "静止画壁紙を適用"
 
-#: src/apricus/gui/control.py:485
+#: src/apricus/gui/control.py:489
 #, python-brace-format
 msgid "Add to playlist ({n})"
 msgstr ""
 
-#: src/apricus/gui/control.py:485 src/apricus/assets/control.ui:487
+#: src/apricus/gui/control.py:489 src/apricus/gui/gtk4app.py:419
+#: src/apricus/assets/control.ui:487
 msgid "Add to playlist"
 msgstr ""
 
-#: src/apricus/gui/control.py:500
+#: src/apricus/gui/control.py:504
 msgid "Selecting videos"
 msgstr ""
 
-#: src/apricus/gui/control.py:503
+#: src/apricus/gui/control.py:507
 msgid ""
 " ・Click a video to select it\n"
 " ・Ctrl+click adds or removes single videos\n"
@@ -168,15 +171,15 @@ msgid ""
 " ・Right-click a video to set it on a monitor"
 msgstr ""
 
-#: src/apricus/gui/control.py:616
+#: src/apricus/gui/control.py:620
 msgid "Disabled in playlist mode (muted by design)"
 msgstr ""
 
-#: src/apricus/gui/control.py:618 src/apricus/assets/control.ui:154
+#: src/apricus/gui/control.py:622 src/apricus/assets/control.ui:154
 msgid "Volume control"
 msgstr "音量調整"
 
-#: src/apricus/gui/control.py:709
+#: src/apricus/gui/control.py:714
 #, python-brace-format
 msgid ""
 "Failed to access {url}. Error:\n"
@@ -185,12 +188,12 @@ msgstr ""
 "{url} にアクセスできませんでした。エラー:\n"
 "{error}"
 
-#: src/apricus/gui/control.py:714
+#: src/apricus/gui/control.py:719
 #, python-brace-format
 msgid "Failed to access {url}. Error code: {code}"
 msgstr "{url} にアクセスできませんでした。エラーコード: {code}"
 
-#: src/apricus/gui/control.py:730
+#: src/apricus/gui/control.py:735
 #, python-brace-format
 msgid ""
 "Failed to stream {url}. Error:\n"
@@ -199,48 +202,669 @@ msgstr ""
 "{url} のストリーミングに失敗しました。エラー:\n"
 "{error}"
 
-#: src/apricus/gui/control.py:818
+#: src/apricus/gui/control.py:823
 #, fuzzy
 msgid "Choose a video folder to begin"
 msgstr "Hidamari フォルダーを開く"
 
-#: src/apricus/gui/control.py:820
+#: src/apricus/gui/control.py:825
 #, python-brace-format
 msgid "Videos in {folder} ({count})"
 msgstr ""
 
-#: src/apricus/gui/control.py:824
+#: src/apricus/gui/control.py:829
 #, fuzzy, python-brace-format
 msgid "No videos in {folder}"
 msgstr "Hidamari フォルダーを開く"
 
+#: src/apricus/gui/gtk4app.py:133
+msgid "Library"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:135
+msgid "Now Playing"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:136 src/apricus/gui/gtk4app.py:1955
+#: src/apricus/gui/gtk4app.py:1959 src/apricus/assets/control.ui:706
+msgid "Streaming"
+msgstr "ストリーミング"
+
+#: src/apricus/gui/gtk4app.py:137 src/apricus/gui/gtk4app.py:3018
+#: src/apricus/assets/control.ui:905
+msgid "Web Page"
+msgstr "ウェブページ"
+
+#: src/apricus/gui/gtk4app.py:138
+msgid "Settings"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:157
+msgid "Background service unreachable"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:158
+msgid "Retry"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:295
+msgid "Server down"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:296
+#, python-brace-format
+msgid "Ready — {mode}"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:377 src/apricus/assets/control.ui:314
+msgid "Click to select. Ctrl+click or Shift+click selects more than one."
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:396 src/apricus/gui/gtk4app.py:496
+msgid "No folder chosen"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:397 src/apricus/gui/gtk4app.py:399
+#: src/apricus/gui/gtk4app.py:497
+msgid "Choose the folder scanned for local videos"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:398 src/apricus/gui/gtk4app.py:2729
+msgid "Choose…"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:405
+msgid "Open the video folder in the file manager"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:413 src/apricus/assets/control.ui:468
+#, fuzzy
+msgid "Apply selected"
+msgstr "動画が選択されていません"
+
+#: src/apricus/gui/gtk4app.py:415
+#, fuzzy
+msgid "Use the selected video as live wallpaper"
+msgstr "静止画壁紙を適用"
+
+#: src/apricus/gui/gtk4app.py:420 src/apricus/assets/control.ui:488
+msgid "Add the selected videos to the playlist queue"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:424
+#, fuzzy
+msgid "Add selected"
+msgstr "動画が選択されていません"
+
+#: src/apricus/gui/gtk4app.py:427
+msgid "Add all"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:429 src/apricus/assets/control.ui:502
+msgid "Add every video in the library to the playlist queue"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:442
+#, fuzzy
+msgid "Play/Pause"
+msgstr "再生 / 一時停止の切り替え"
+
+#: src/apricus/gui/gtk4app.py:443
+#, fuzzy
+msgid "Toggle playback"
+msgstr "再生 / 一時停止の切り替え"
+
+#: src/apricus/gui/gtk4app.py:446
+msgid "Quit"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:447
+msgid "Close the panel. Wallpaper keeps running"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:452
+msgid "More library actions"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:455 src/apricus/assets/control.ui:346
+msgid "Refresh"
+msgstr "更新"
+
+#: src/apricus/gui/gtk4app.py:457
+msgid "Rescan the source folder"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:479
+#, fuzzy
+msgid "{} videos selected"
+msgstr "動画が選択されていません"
+
+#: src/apricus/gui/gtk4app.py:506
+msgid ""
+"Background service unreachable.\n"
+"Start Apricus to apply wallpapers."
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:571
+msgid "Apply needs a single video"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:573
+#, python-brace-format
+msgid ""
+"You selected {count} videos, but Apply sets one wallpaper.\n"
+"Select just one video to apply it, or add them to the playlist to play them "
+"all in a loop."
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:578 src/apricus/gui/gtk4app.py:3282
+#: src/apricus/gui/gtk4app.py:3475
+msgid "OK"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:627 src/apricus/assets/control.ui:396
+#, fuzzy
+msgid "Choose video folder"
+msgstr "Hidamari フォルダーを開く"
+
+#: src/apricus/gui/gtk4app.py:681 src/apricus/assets/control.ui:1090
+msgid "Apply playlist"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:683
+msgid "Apply current order to playback"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:689 src/apricus/assets/control.ui:1077
+msgid "Shuffle"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:690
+msgid "Shuffle playlist order randomly"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:692
+#, fuzzy
+msgid "Remove selected"
+msgstr "動画が選択されていません"
+
+#: src/apricus/gui/gtk4app.py:693
+msgid "Remove the selected video from the playlist"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:696 src/apricus/gui/gtk4app.py:988
+#: src/apricus/gui/gtk4app.py:1711 src/apricus/gui/gtk4app.py:2795
+#: src/apricus/assets/control.ui:1064
+msgid "Clear"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:698
+msgid "Remove all videos from the playlist"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:754
+msgid "More actions"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:970
+msgid "Undo"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:979
+msgid "Clear playlist?"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:981
+#, python-brace-format
+msgid ""
+"This will remove all {n} videos from the playlist. This action cannot be "
+"undone."
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:1000
+msgid "Playlist cleared"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:1026
+msgid "Queue empty — add videos from Library"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:1028
+#, python-brace-format
+msgid "{n} videos in queue (muted by design)"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:1030
+#, fuzzy, python-brace-format
+msgid "{n} videos in queue (paused)"
+msgstr "動画が選択されていません"
+
+#: src/apricus/gui/gtk4app.py:1106
+#, fuzzy
+msgid "Play / Pause"
+msgstr "再生 / 一時停止の切り替え"
+
+#: src/apricus/gui/gtk4app.py:1111
+msgid "Mute / Unmute"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:1115 src/apricus/gui/gtk4app.py:1267
+#: src/apricus/gui/gtk4app.py:1269 src/apricus/gui/gtk4app.py:1297
+#: src/apricus/gui/gtk4app.py:1298
+msgid "Mute"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:1123
+#, fuzzy
+msgid "Volume"
+msgstr "音量調整"
+
+#: src/apricus/gui/gtk4app.py:1134 src/apricus/gui/gtk4app.py:2762
+msgid "Details"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:1138 src/apricus/gui/gtk4app.py:1424
+msgid "Resolution"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:1139 src/apricus/gui/gtk4app.py:1428
+msgid "Duration"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:1140 src/apricus/gui/gtk4app.py:1430
+msgid "Format"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:1141 src/apricus/gui/gtk4app.py:1435
+msgid "Folder"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:1152
+#, fuzzy
+msgid "Open the containing folder"
+msgstr "設定ファイルを開く"
+
+#: src/apricus/gui/gtk4app.py:1158
+msgid "Up next"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:1166
+msgid "Nothing playing"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:1167
+#, fuzzy
+msgid "Choose a video from the library to start watching."
+msgstr "Hidamari フォルダーを開く"
+
+#: src/apricus/gui/gtk4app.py:1168
+msgid "Open library"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:1267 src/apricus/gui/gtk4app.py:1298
+msgid "Unmute"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:1269 src/apricus/gui/gtk4app.py:1297
+msgid "Muted"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:1388
+msgid "Title"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:1389
+msgid "Site"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:1390
+msgid "Link"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:1391
+msgid "Type"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:1398 src/apricus/gui/gtk4app.py:2723
+#, fuzzy
+msgid "Local web page"
+msgstr "<b>ローカルウェブページ</b>"
+
+#: src/apricus/gui/gtk4app.py:1407
+#, fuzzy
+msgid "Web page"
+msgstr "ウェブページ"
+
+#: src/apricus/gui/gtk4app.py:1558
+#, python-brace-format
+msgid "n. {pos} of {total}"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:1664
+msgid "https://… — YouTube, Twitch, live, direct video"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:1679 src/apricus/gui/gtk4app.py:2702
+msgid "Detected"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:1680 src/apricus/gui/gtk4app.py:1931
+#: src/apricus/gui/gtk4app.py:2703
+msgid "Paste a link to detect its type"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:1689 src/apricus/gui/gtk4app.py:2712
+#: src/apricus/assets/control.ui:870
+msgid "Apply"
+msgstr "適用"
+
+#: src/apricus/gui/gtk4app.py:1694
+msgid "Try 10s"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:1695
+msgid "Preview for 10 seconds, then pause"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:1700
+msgid "Saved sources"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:1707 src/apricus/gui/gtk4app.py:2791
+msgid "Recent"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:1721
+msgid "No saved sources yet"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:1723
+msgid ""
+"Paste a YouTube, Twitch or direct video link above. You will find it here."
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:1725
+msgid "Paste from clipboard"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:1956
+msgid "Paste a link to stream it as wallpaper"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:2007
+msgid "LIVE"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:2019 src/apricus/gui/gtk4app.py:2839
+msgid "Remove from saved"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:2019 src/apricus/gui/gtk4app.py:2839
+msgid "Save"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:2026
+msgid "Apply this source now"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:2033
+msgid "Remove from saved (kept in recent)"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:2274
+msgid "Stream history cleared"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:2282 src/apricus/gui/gtk4app.py:2527
+msgid "Not a valid http(s) URL."
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:2298 src/apricus/gui/gtk4app.py:2572
+#, fuzzy, python-brace-format
+msgid ""
+"Failed to stream {url}.\n"
+"Error:\n"
+"{error}"
+msgstr ""
+"{url} のストリーミングに失敗しました。エラー:\n"
+"{error}"
+
+#: src/apricus/gui/gtk4app.py:2310
+msgid "Previewing for 10 seconds"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:2311
+msgid "Stop now"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:2326
+msgid "Preview finished — Apply to keep watching"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:2537
+msgid "Playlist links aren't supported"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:2540
+msgid ""
+"That link points to a playlist or channel. Apricus plays single videos — use "
+"the video's own link."
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:2546
+msgid "Use video anyway"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:2715 src/apricus/gui/gtk4app.py:2854
+#, fuzzy
+msgid "Open in browser"
+msgstr "Hidamari フォルダーを開く"
+
+#: src/apricus/gui/gtk4app.py:2716
+msgid "Open the entered address in the browser"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:2725 src/apricus/gui/gtk4app.py:3110
+msgid "No page chosen"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:2726 src/apricus/gui/gtk4app.py:3111
+msgid "Choose an HTML web page on this PC"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:2730
+msgid "Choose local HTML web page"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:2736
+msgid "Show the file in the file manager"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:2746
+msgid "Inspiration"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:2778
+msgid "Copy link"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:2784
+msgid "Saved pages"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:2805
+msgid "No saved pages yet"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:2806
+msgid "Apply a link or file above. You will find it here."
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:2847
+msgid "Apply this file now"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:2861
+msgid "Remove from recent (kept in saved)"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:2936
+msgid "Web history cleared"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:3022
+msgid "Type an address above to load a preview"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:3028
+msgid "Example loaded"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:3094
+msgid "Link copied"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:3145
+#, python-brace-format
+msgid "Local web page — {size}"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:3149
+#, python-brace-format
+msgid "Remote — {domain}"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:3156
+msgid "Current wallpaper"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:3156
+msgid "Not applied"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:3205
+#, fuzzy, python-brace-format
+msgid ""
+"Failed to access {url}.\n"
+"Error:\n"
+"{error}"
+msgstr ""
+"{url} にアクセスできませんでした。エラー:\n"
+"{error}"
+
+#: src/apricus/gui/gtk4app.py:3253
+msgid "Choose a local HTML web page"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:3281
+msgid "Error"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:3307
+msgid "Behaviour"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:3316
+msgid "Only on GNOME"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:3327 src/apricus/gui/gtk4app.py:3339
+msgid "Requires X11"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:3345
+msgid "Startup"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:3356
+msgid "System"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:3358
+#, fuzzy
+msgid "Open configuration"
+msgstr "設定ファイルを開く"
+
+#: src/apricus/gui/gtk4app.py:3360 src/apricus/gui/gtk4app.py:3379
+msgid "Open"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:3366 src/apricus/gui/gtk4app.py:3466
+#: src/apricus/assets/control.ui:255
+msgid "How to select videos"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:3367
+msgid "Selection shortcuts for the library"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:3368
+msgid "Show"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:3375
+msgid "Info"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:3377 src/apricus/assets/control.ui:241
+msgid "About Apricus"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:3378
+#, python-brace-format
+msgid "Version {version} · GPL-3.0-or-later"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:3419 src/apricus/gui/gtk4app.py:3430
+msgid "Could not change the startup setting."
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:3433
+msgid "Startup enabled"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:3433
+msgid "Startup disabled"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:3462
+msgid "Could not open the configuration file."
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:3469
+msgid ""
+"Click to select a video.\n"
+"Ctrl+click or Shift+click selects more than one.\n"
+"Apply lets you choose the monitor."
+msgstr ""
+
 #.
-#: src/apricus/menu.py:97
+#: src/apricus/menu.py:95
 msgid "Show Apricus"
 msgstr ""
 
 #.
-#: src/apricus/menu.py:100
+#: src/apricus/menu.py:98
 msgid "Toggle Mute Audio"
 msgstr "音声ミュートの切り替え"
 
 #.
-#: src/apricus/menu.py:103 src/apricus/assets/control.ui:1155
+#: src/apricus/menu.py:101 src/apricus/assets/control.ui:1155
 msgid "Toggle Play/Pause"
 msgstr "再生 / 一時停止の切り替え"
 
 #.
-#: src/apricus/menu.py:106
+#: src/apricus/menu.py:104
 msgid "Reload"
 msgstr "再読み込み"
 
 #.
-#: src/apricus/menu.py:109 src/apricus/assets/control.ui:1174
+#: src/apricus/menu.py:107 src/apricus/assets/control.ui:1174
 msgid "I'm Feeling Lucky"
 msgstr "おまかせ再生"
 
 #.
-#: src/apricus/menu.py:112 src/apricus/assets/control.ui:269
+#: src/apricus/menu.py:110 src/apricus/assets/control.ui:269
 msgid "Quit Apricus"
 msgstr ""
 
@@ -289,18 +913,6 @@ msgstr "ウィンドウ最大化時にミュート"
 msgid "Open config file"
 msgstr "設定ファイルを開く"
 
-#: src/apricus/assets/control.ui:241
-msgid "About Apricus"
-msgstr ""
-
-#: src/apricus/assets/control.ui:255
-msgid "How to select videos"
-msgstr ""
-
-#: src/apricus/assets/control.ui:314
-msgid "Click to select. Ctrl+click or Shift+click selects more than one."
-msgstr ""
-
 #: src/apricus/assets/control.ui:330
 #, fuzzy
 msgid ""
@@ -310,35 +922,13 @@ msgstr ""
 "<span size=\"x-large\"><b>ローカル動画</b></span>\n"
 "Hidamari フォルダー内の動画"
 
-#: src/apricus/assets/control.ui:346
-msgid "Refresh"
-msgstr "更新"
-
 #: src/apricus/assets/control.ui:371
 #, fuzzy
 msgid "Open video folder"
 msgstr "Hidamari フォルダーを開く"
 
-#: src/apricus/assets/control.ui:396
-#, fuzzy
-msgid "Choose video folder"
-msgstr "Hidamari フォルダーを開く"
-
-#: src/apricus/assets/control.ui:468
-#, fuzzy
-msgid "Apply selected"
-msgstr "動画が選択されていません"
-
-#: src/apricus/assets/control.ui:488
-msgid "Add the selected videos to the playlist queue"
-msgstr ""
-
 #: src/apricus/assets/control.ui:501
 msgid "Add all to playlist"
-msgstr ""
-
-#: src/apricus/assets/control.ui:502
-msgid "Add every video in the library to the playlist queue"
 msgstr ""
 
 #: src/apricus/assets/control.ui:546
@@ -377,10 +967,6 @@ msgstr ""
 msgid "Hint"
 msgstr "ヒント"
 
-#: src/apricus/assets/control.ui:706
-msgid "Streaming"
-msgstr "ストリーミング"
-
 #: src/apricus/assets/control.ui:720
 msgid ""
 "<span size=\"x-large\"><b>Web Page</b></span>\n"
@@ -408,14 +994,6 @@ msgstr "<b>ローカルウェブページ</b>"
 #: src/apricus/assets/control.ui:842
 msgid "Alternately, you can choose a HTML file on your PC"
 msgstr "または、PC 上の HTML ファイルを選択することもできます"
-
-#: src/apricus/assets/control.ui:870
-msgid "Apply"
-msgstr "適用"
-
-#: src/apricus/assets/control.ui:905
-msgid "Web Page"
-msgstr "ウェブページ"
 
 #: src/apricus/assets/control.ui:919
 #, fuzzy
@@ -448,18 +1026,6 @@ msgstr ""
 
 #: src/apricus/assets/control.ui:1051
 msgid "Remove"
-msgstr ""
-
-#: src/apricus/assets/control.ui:1064
-msgid "Clear"
-msgstr ""
-
-#: src/apricus/assets/control.ui:1077
-msgid "Shuffle"
-msgstr ""
-
-#: src/apricus/assets/control.ui:1090
-msgid "Apply playlist"
 msgstr ""
 
 #, fuzzy, python-brace-format

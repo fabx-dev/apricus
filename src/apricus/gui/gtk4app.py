@@ -19,6 +19,7 @@ import re
 import sys
 import threading
 import time
+from gettext import gettext as _
 from pathlib import Path
 
 import gi
@@ -70,6 +71,29 @@ from apricus.yt_utils import base_options
 logger = logging.getLogger(LOGGER_NAME)
 
 APP_ID = f"{PROJECT}.gui4"
+
+
+def _capped_get(url, timeout, max_bytes):
+    """GET at most max_bytes of a URL; None on any failure or overflow.
+
+    Incremental cap (mirrors _fetch_row_thumb): hostile infinite bodies
+    are dropped mid-stream instead of filling RAM before a post-hoc check.
+    """
+    try:
+        response = requests.get(url, timeout=timeout, stream=True)
+        try:
+            chunks = []
+            total = 0
+            for chunk in response.iter_content(65536):
+                total += len(chunk)
+                if total > max_bytes:
+                    return None
+                chunks.append(chunk)
+            return b"".join(chunks)
+        finally:
+            response.close()
+    except requests.exceptions.RequestException:
+        return None
 
 
 class ControlPanel(Adw.Application):
@@ -129,12 +153,12 @@ class ControlPanel(Adw.Application):
             self.window.set_title("Apricus")
             self.window.set_default_size(900, 600)
             self.stack = Adw.ViewStack()
-            self.stack.add_titled(self._library_page(), "library", "Library")
-            self.stack.add_titled(self._playlist_page(), "playlist", "Playlist")
-            self.stack.add_titled(self._now_playing_page(), "now-playing", "Now Playing")
-            self.stack.add_titled(self._streaming_page(), "streaming", "Streaming")
-            self.stack.add_titled(self._webpage_page(), "webpage", "Web Page")
-            self.stack.add_titled(self._settings_page(), "settings", "Settings")
+            self.stack.add_titled(self._library_page(), "library", _("Library"))
+            self.stack.add_titled(self._playlist_page(), "playlist", _("Playlist"))
+            self.stack.add_titled(self._now_playing_page(), "now-playing", _("Now Playing"))
+            self.stack.add_titled(self._streaming_page(), "streaming", _("Streaming"))
+            self.stack.add_titled(self._webpage_page(), "webpage", _("Web Page"))
+            self.stack.add_titled(self._settings_page(), "settings", _("Settings"))
             self.stack.set_hexpand(True)
             self.stack.set_vexpand(True)
             self._build_sidebar()
@@ -153,8 +177,8 @@ class ControlPanel(Adw.Application):
             toolbar = Adw.ToolbarView()
             toolbar.add_top_bar(header)
             self.server_banner = Adw.Banner()
-            self.server_banner.set_title("Background service unreachable")
-            self.server_banner.set_button_label("Retry")
+            self.server_banner.set_title(_("Background service unreachable"))
+            self.server_banner.set_button_label(_("Retry"))
             self.server_banner.connect("button-clicked", lambda *_: self._refresh_all())
             toolbar.add_top_bar(self.server_banner)
             toolbar.set_content(self.toasts)
@@ -201,7 +225,7 @@ class ControlPanel(Adw.Application):
         status_row.append(self.sidebar_dot)
         self.sidebar_eq = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=2)
         self.sidebar_eq.set_valign(Gtk.Align.CENTER)
-        for _ in range(3):
+        for _i in range(3):
             bar = Gtk.Box()
             bar.set_size_request(3, 10)
             bar.add_css_class("sb-eq-bar")
@@ -291,8 +315,8 @@ class ControlPanel(Adw.Application):
     def _sidebar_status_text(server_present, mode):
         """(dot_css_class, status_text) for the sidebar footer."""
         if not server_present:
-            return "error", "Server assente"
-        return "success", f"Pronto — {ControlPanel._mode_text(mode)}"
+            return "error", _("Server down")
+        return "success", _("Ready — {mode}").format(mode=ControlPanel._mode_text(mode))
 
     @staticmethod
     def _animations_enabled():
@@ -372,7 +396,9 @@ class ControlPanel(Adw.Application):
         box.set_margin_bottom(16)
         box.set_margin_start(16)
         box.set_margin_end(16)
-        hint = Gtk.Label(label="Click to select. Ctrl+click or Shift+click selects more than one.")
+        hint = Gtk.Label(
+            label=_("Click to select. Ctrl+click or Shift+click selects more than one.")
+        )
         hint.set_xalign(0)
         hint.add_css_class("dim-label")
         box.append(hint)
@@ -390,16 +416,16 @@ class ControlPanel(Adw.Application):
         self.selection_label.set_xalign(0)
         box.append(self.selection_label)
         source_row = Adw.ActionRow()
-        source_row.set_title("No folder chosen")
-        source_row.set_subtitle("Choose the folder scanned for local videos")
-        choose_btn = Gtk.Button(label="Choose…")
-        choose_btn.set_tooltip_text("Choose the folder scanned for local videos")
+        source_row.set_title(_("No folder chosen"))
+        source_row.set_subtitle(_("Choose the folder scanned for local videos"))
+        choose_btn = Gtk.Button(label=_("Choose…"))
+        choose_btn.set_tooltip_text(_("Choose the folder scanned for local videos"))
         choose_btn.set_valign(Gtk.Align.CENTER)
         choose_btn.connect("clicked", self.on_choose_video_dir)
         source_row.add_suffix(choose_btn)
         open_btn = Gtk.Button()
         open_btn.set_icon_name("folder-open-symbolic")
-        open_btn.set_tooltip_text("Open the video folder in the file manager")
+        open_btn.set_tooltip_text(_("Open the video folder in the file manager"))
         open_btn.set_valign(Gtk.Align.CENTER)
         open_btn.connect("clicked", self.on_open_video_dir)
         source_row.add_suffix(open_btn)
@@ -407,23 +433,23 @@ class ControlPanel(Adw.Application):
         box.append(source_row)
         row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         row.set_halign(Gtk.Align.FILL)
-        apply_btn = Gtk.Button(label="Apply selected")
+        apply_btn = Gtk.Button(label=_("Apply selected"))
         apply_btn.add_css_class("suggested-action")
-        apply_btn.set_tooltip_text("Use the selected video as live wallpaper")
+        apply_btn.set_tooltip_text(_("Use the selected video as live wallpaper"))
         apply_btn.connect("clicked", self.on_library_apply)
         self.apply_btn = apply_btn
         add_split = Adw.SplitButton()
-        add_split.set_child(Gtk.Label(label="Add to playlist"))
-        add_split.set_tooltip_text("Add the selected videos to the playlist queue")
+        add_split.set_child(Gtk.Label(label=_("Add to playlist")))
+        add_split.set_tooltip_text(_("Add the selected videos to the playlist queue"))
         add_split.connect("clicked", self.on_library_add)
         add_menu = Gtk.Popover()
         add_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
-        add_selected_btn = Gtk.Button(label="Add selected")
+        add_selected_btn = Gtk.Button(label=_("Add selected"))
         add_selected_btn.add_css_class("flat")
         add_selected_btn.connect("clicked", lambda *_a: (add_menu.popdown(), self.on_library_add()))
-        add_all_btn = Gtk.Button(label="Add all")
+        add_all_btn = Gtk.Button(label=_("Add all"))
         add_all_btn.add_css_class("flat")
-        add_all_btn.set_tooltip_text("Add every video in the library to the playlist queue")
+        add_all_btn.set_tooltip_text(_("Add every video in the library to the playlist queue"))
         add_all_btn.connect("clicked", lambda *_a: (add_menu.popdown(), self.on_library_add_all()))
         add_box.append(add_selected_btn)
         add_box.append(add_all_btn)
@@ -436,22 +462,22 @@ class ControlPanel(Adw.Application):
         lib_spacer.set_hexpand(True)
         row.append(lib_spacer)
         row.append(add_split)
-        play = Gtk.Button(label="Play/Pause")
-        play.set_tooltip_text("Toggle playback")
+        play = Gtk.Button(label=_("Play/Pause"))
+        play.set_tooltip_text(_("Toggle playback"))
         play.connect("clicked", self.on_play_pause)
         row.append(play)
-        quit_btn = Gtk.Button(label="Quit")
-        quit_btn.set_tooltip_text("Close the panel. Wallpaper keeps running")
+        quit_btn = Gtk.Button(label=_("Quit"))
+        quit_btn.set_tooltip_text(_("Close the panel. Wallpaper keeps running"))
         quit_btn.connect("clicked", lambda *_: self.quit())
         row.append(quit_btn)
         more_btn = Gtk.MenuButton()
         more_btn.set_icon_name("view-more-symbolic")
-        more_btn.set_tooltip_text("More library actions")
+        more_btn.set_tooltip_text(_("More library actions"))
         more_menu = Gtk.Popover()
         more_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
-        refresh_btn = Gtk.Button(label="Refresh")
+        refresh_btn = Gtk.Button(label=_("Refresh"))
         refresh_btn.add_css_class("flat")
-        refresh_btn.set_tooltip_text("Rescan the source folder")
+        refresh_btn.set_tooltip_text(_("Rescan the source folder"))
         refresh_btn.connect("clicked", lambda *_a: (more_menu.popdown(), self.on_refresh_library()))
         more_box.append(refresh_btn)
         more_menu.set_child(more_box)
@@ -473,7 +499,9 @@ class ControlPanel(Adw.Application):
         paths = self._lib_selected_paths(self.video_selection, self.video_store)
         n = len(paths)
         self.selection_label.set_text(
-            "" if n == 0 else ("1 video selected" if n == 1 else f"{n} videos selected")
+            ""
+            if n == 0
+            else (_("1 video selected") if n == 1 else _("{} videos selected").format(n))
         )
         self._update_lib_actions(n)
 
@@ -490,8 +518,8 @@ class ControlPanel(Adw.Application):
             return
         video_dir = resolve_video_dir(getattr(self, "config", None) or {})
         if video_dir is None:
-            row.set_title("No folder chosen")
-            row.set_subtitle("Choose the folder scanned for local videos")
+            row.set_title(_("No folder chosen"))
+            row.set_subtitle(_("Choose the folder scanned for local videos"))
         else:
             row.set_title(self._plain(os.path.basename(video_dir) or video_dir))
             subtitle = video_dir
@@ -500,7 +528,7 @@ class ControlPanel(Adw.Application):
             row.set_subtitle(self._plain(subtitle))
 
     def _show_server_missing(self):
-        self._show_error("Background service unreachable.\nStart Apricus to apply wallpapers.")
+        self._show_error(_("Background service unreachable.\nStart Apricus to apply wallpapers."))
 
     def on_library_apply(self, *_args):
         server = self._server()
@@ -565,14 +593,16 @@ class ControlPanel(Adw.Application):
 
     def _show_apply_needs_single(self, count):
         dialog = Adw.AlertDialog(
-            heading="Apply needs a single video",
+            heading=_("Apply needs a single video"),
             body=(
-                f"You selected {count} videos, but Apply sets one wallpaper.\n"
-                "Select just one video to apply it, or add them to the "
-                "playlist to play them all in a loop."
+                _(
+                    "You selected {count} videos, but Apply sets one wallpaper.\n"
+                    "Select just one video to apply it, or add them to the "
+                    "playlist to play them all in a loop."
+                ).format(count=count)
             ),
         )
-        dialog.add_response("ok", "OK")
+        dialog.add_response("ok", _("OK"))
         dialog.set_default_response("ok")
         dialog.connect("response", lambda *_: dialog.close())
         dialog.present(self.window)
@@ -621,7 +651,7 @@ class ControlPanel(Adw.Application):
 
     def on_choose_video_dir(self, *_args):
         dialog = Gtk.FileDialog()
-        dialog.set_title("Choose video folder")
+        dialog.set_title(_("Choose video folder"))
         dialog.select_folder(self.window, None, self._on_video_dir_chosen)
 
     def _on_video_dir_chosen(self, dialog, result):
@@ -675,24 +705,24 @@ class ControlPanel(Adw.Application):
         box.append(scrolled)
         row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         row.set_halign(Gtk.Align.FILL)
-        apply_btn = Gtk.Button(label="Apply playlist")
+        apply_btn = Gtk.Button(label=_("Apply playlist"))
         apply_btn.add_css_class("suggested-action")
-        apply_btn.set_tooltip_text("Apply current order to playback")
+        apply_btn.set_tooltip_text(_("Apply current order to playback"))
         apply_btn.connect("clicked", self.on_playlist_apply)
         row.append(apply_btn)
         spacer = Gtk.Box()
         spacer.set_hexpand(True)
         row.append(spacer)
-        self.shuffle_check = Gtk.ToggleButton(label="Shuffle")
-        self.shuffle_check.set_tooltip_text("Shuffle playlist order randomly")
+        self.shuffle_check = Gtk.ToggleButton(label=_("Shuffle"))
+        self.shuffle_check.set_tooltip_text(_("Shuffle playlist order randomly"))
         self.shuffle_check.connect("toggled", self.on_shuffle_toggled)
-        rm_btn = Gtk.Button(label="Remove selected")
-        rm_btn.set_tooltip_text("Remove the selected video from the playlist")
+        rm_btn = Gtk.Button(label=_("Remove selected"))
+        rm_btn.set_tooltip_text(_("Remove the selected video from the playlist"))
         rm_btn.connect("clicked", self.on_queue_remove)
         self.queue_remove_btn = rm_btn
-        clear_btn = Gtk.Button(label="Clear")
+        clear_btn = Gtk.Button(label=_("Clear"))
         clear_btn.add_css_class("destructive-action")
-        clear_btn.set_tooltip_text("Remove all videos from the playlist")
+        clear_btn.set_tooltip_text(_("Remove all videos from the playlist"))
         clear_btn.connect("clicked", self.on_queue_clear)
         self.queue_clear_btn = clear_btn
         for w in (self.shuffle_check, rm_btn, clear_btn):
@@ -748,7 +778,7 @@ class ControlPanel(Adw.Application):
                 row.append(btn)
             more_btn = Gtk.MenuButton()
             more_btn.set_icon_name("view-more-symbolic")
-            more_btn.set_tooltip_text("More actions")
+            more_btn.set_tooltip_text(_("More actions"))
             more_btn.set_valign(Gtk.Align.CENTER)
             more_menu = Gtk.Popover()
             more_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
@@ -964,7 +994,7 @@ class ControlPanel(Adw.Application):
         if overlay is None:
             return None
         toast = Adw.Toast.new(message)
-        toast.set_button_label("Undo")
+        toast.set_button_label(_("Undo"))
         toast.connect("button-clicked", lambda *_: on_undo())
         overlay.add_toast(toast)
         return toast
@@ -973,14 +1003,16 @@ class ControlPanel(Adw.Application):
         if not self.playlist_paths:
             return
         dialog = Adw.AlertDialog(
-            heading="Clear playlist?",
+            heading=_("Clear playlist?"),
             body=(
-                f"This will remove all {len(self.playlist_paths)} videos "
-                "from the playlist. This action cannot be undone."
+                _(
+                    "This will remove all {n} videos "
+                    "from the playlist. This action cannot be undone."
+                ).format(n=len(self.playlist_paths))
             ),
         )
-        dialog.add_response("cancel", "Cancel")
-        dialog.add_response("clear", "Clear")
+        dialog.add_response("cancel", _("Cancel"))
+        dialog.add_response("clear", _("Clear"))
         dialog.set_response_appearance("clear", Adw.ResponseAppearance.DESTRUCTIVE)
         dialog.set_default_response("cancel")
         dialog.set_close_response("cancel")
@@ -992,7 +1024,7 @@ class ControlPanel(Adw.Application):
         self._reload_queue_store()
         self._refresh_playlist_status()
         self._update_queue_actions()
-        self._toast("Playlist cleared")
+        self._toast(_("Playlist cleared"))
 
     def _on_queue_selection(self, *_args):
         self._update_queue_actions()
@@ -1018,11 +1050,11 @@ class ControlPanel(Adw.Application):
         server = self._server()
         mode = server.mode if server is not None else self.config.get(CONFIG_KEY_MODE)
         if n == 0:
-            text = "Queue empty — add videos from Library"
+            text = _("Queue empty — add videos from Library")
         elif mode == MODE_PLAYLIST:
-            text = f"{n} videos in queue (muted by design)"
+            text = _("{n} videos in queue (muted by design)").format(n=n)
         else:
-            text = f"{n} videos in queue (paused)"
+            text = _("{n} videos in queue (paused)").format(n=n)
         self.playlist_status.set_text(text)
 
     @staticmethod
@@ -1098,16 +1130,16 @@ class ControlPanel(Adw.Application):
         self.np_play_btn = Gtk.Button()
         self.np_play_btn.add_css_class("circular")
         self.np_play_btn.add_css_class("suggested-action")
-        self.np_play_btn.set_tooltip_text("Play / Pause")
+        self.np_play_btn.set_tooltip_text(_("Play / Pause"))
         self.np_play_btn.connect("clicked", self.on_play_pause)
         transport.append(self.np_play_btn)
         self.np_mute_btn = Gtk.ToggleButton()
         self.np_mute_btn.add_css_class("flat")
-        self.np_mute_btn.set_tooltip_text("Mute / Unmute")
+        self.np_mute_btn.set_tooltip_text(_("Mute / Unmute"))
         self.np_mute_btn.connect("toggled", self.on_np_mute_toggled)
         mute_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         self.np_mute_icon = Gtk.Image()
-        self.np_mute_label = Gtk.Label(label="Mute")
+        self.np_mute_label = Gtk.Label(label=_("Mute"))
         mute_box.append(self.np_mute_icon)
         mute_box.append(self.np_mute_label)
         self.np_mute_btn.set_child(mute_box)
@@ -1115,7 +1147,7 @@ class ControlPanel(Adw.Application):
         self.np_volume = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, 0, 100, 1)
         self.np_volume.set_size_request(220, -1)
         self.np_volume.set_valign(Gtk.Align.CENTER)
-        self.np_volume.set_tooltip_text("Volume")
+        self.np_volume.set_tooltip_text(_("Volume"))
         self.np_volume.connect("value-changed", self.on_volume_changed)
         vol_icon = Gtk.Image.new_from_icon_name("audio-volume-high-symbolic")
         vol_icon.set_valign(Gtk.Align.CENTER)
@@ -1126,14 +1158,14 @@ class ControlPanel(Adw.Application):
         transport.append(vol_spacer)
         content.append(transport)
         self.np_details = Adw.PreferencesGroup()
-        self.np_details.set_title("Details")
+        self.np_details.set_title(_("Details"))
         self.np_detail_rows = {}
         self.np_detail_icons = {}
         for key, title, icon_name in (
-            ("line1", "Resolution", "video-display-symbolic"),
-            ("line2", "Duration", "alarm-symbolic"),
-            ("line3", "Format", "text-x-generic-symbolic"),
-            ("line4", "Folder", "folder-symbolic"),
+            ("line1", _("Resolution"), "video-display-symbolic"),
+            ("line2", _("Duration"), "alarm-symbolic"),
+            ("line3", _("Format"), "text-x-generic-symbolic"),
+            ("line4", _("Folder"), "folder-symbolic"),
         ):
             action_row = Adw.ActionRow()
             action_row.set_title(title)
@@ -1144,13 +1176,13 @@ class ControlPanel(Adw.Application):
             self.np_detail_icons[key] = icon
         self.np_folder_btn = Gtk.Button()
         self.np_folder_btn.set_icon_name("folder-open-symbolic")
-        self.np_folder_btn.set_tooltip_text("Open the containing folder")
+        self.np_folder_btn.set_tooltip_text(_("Open the containing folder"))
         self.np_folder_btn.set_valign(Gtk.Align.CENTER)
         self.np_folder_btn.connect("clicked", self.on_np_open_folder)
         self.np_detail_rows["line4"].add_suffix(self.np_folder_btn)
         content.append(self.np_details)
         self.np_queue_group = Adw.PreferencesGroup()
-        self.np_queue_group.set_title("Up next")
+        self.np_queue_group.set_title(_("Up next"))
         self.np_queue_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
         self.np_queue_group.add(self.np_queue_box)
         content.append(self.np_queue_group)
@@ -1158,9 +1190,9 @@ class ControlPanel(Adw.Application):
         box.append(content)
         self.np_empty = Adw.StatusPage()
         self.np_empty.set_icon_name("video-display-symbolic")
-        self.np_empty.set_title("Nothing playing")
-        self.np_empty.set_description("Choose a video from the library to start watching.")
-        open_lib_btn = Gtk.Button(label="Open library")
+        self.np_empty.set_title(_("Nothing playing"))
+        self.np_empty.set_description(_("Choose a video from the library to start watching."))
+        open_lib_btn = Gtk.Button(label=_("Open library"))
         open_lib_btn.add_css_class("suggested-action")
         open_lib_btn.connect("clicked", lambda *_: self._select_section("library"))
         self.np_empty.add_css_class("compact")
@@ -1180,7 +1212,7 @@ class ControlPanel(Adw.Application):
     def _np_equalizer():
         eq = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=2)
         eq.set_valign(Gtk.Align.CENTER)
-        for _ in range(7):
+        for _i in range(7):
             bar = Gtk.Box()
             bar.set_size_request(3, 12)
             bar.add_css_class("np-eq-bar")
@@ -1259,9 +1291,9 @@ class ControlPanel(Adw.Application):
         mute_btn = self.np_mute_btn
         if mute_btn.get_active() != muted:
             mute_btn.set_active(muted)
-        mute_btn.set_tooltip_text("Unmute" if muted else "Mute")
+        mute_btn.set_tooltip_text(_("Unmute") if muted else _("Mute"))
         self.np_mute_icon.set_from_icon_name(self._mute_icon(muted, volume))
-        self.np_mute_label.set_text("Muted" if muted else "Mute")
+        self.np_mute_label.set_text(_("Muted") if muted else _("Mute"))
         if int(self.np_volume.get_value()) != volume:
             self.np_volume.set_value(volume)
 
@@ -1289,8 +1321,8 @@ class ControlPanel(Adw.Application):
         self.np_mute_icon.set_from_icon_name(
             self._mute_icon(state, int(self.np_volume.get_value()))
         )
-        self.np_mute_label.set_text("Muted" if state else "Mute")
-        button.set_tooltip_text("Unmute" if state else "Mute")
+        self.np_mute_label.set_text(_("Muted") if state else _("Mute"))
+        button.set_tooltip_text(_("Unmute") if state else _("Mute"))
 
     def on_np_open_folder(self, *_args):
         current = self._np_current_path or ""
@@ -1380,17 +1412,17 @@ class ControlPanel(Adw.Application):
             group.set_visible(True)
             rows = self.np_detail_rows
             is_file = "://" not in current
-            rows["line1"].set_title("Title")
-            rows["line2"].set_title("Site")
-            rows["line3"].set_title("Link")
-            rows["line4"].set_title("Type")
+            rows["line1"].set_title(_("Title"))
+            rows["line2"].set_title(_("Site"))
+            rows["line3"].set_title(_("Link"))
+            rows["line4"].set_title(_("Type"))
             if is_file:
                 rows["line1"].set_subtitle(os.path.basename(current))
                 try:
                     size = os.path.getsize(current)
                 except OSError:
                     size = None
-                rows["line2"].set_subtitle("Local web page")
+                rows["line2"].set_subtitle(_("Local web page"))
                 rows["line3"].set_subtitle(current)
                 rows["line4"].set_subtitle(
                     f"Web page — {self._format_file_size(size)}" if size is not None else "Web page"
@@ -1399,7 +1431,7 @@ class ControlPanel(Adw.Application):
                 rows["line1"].set_subtitle("…")
                 rows["line2"].set_subtitle(self._display_source(current))
                 rows["line3"].set_subtitle(current)
-                rows["line4"].set_subtitle("Web page")
+                rows["line4"].set_subtitle(_("Web page"))
                 generation = self.np_generation
                 threading.Thread(
                     target=self._fetch_np_web_title, args=(current, generation), daemon=True
@@ -1416,18 +1448,18 @@ class ControlPanel(Adw.Application):
             width, height, duration = None, None, None
         info = {
             "line1": (
-                "Resolution",
+                _("Resolution"),
                 f"{width}×{height}" if width and height else "—",
                 "video-display-symbolic",
             ),
-            "line2": ("Duration", self._fmt_duration(duration), "alarm-symbolic"),
+            "line2": (_("Duration"), self._fmt_duration(duration), "alarm-symbolic"),
             "line3": (
-                "Format",
+                _("Format"),
                 os.path.splitext(path)[1].lstrip(".").upper() or "—",
                 "text-x-generic-symbolic",
             ),
             "line4": (
-                os.path.basename(os.path.dirname(path)) or "Folder",
+                os.path.basename(os.path.dirname(path)) or _("Folder"),
                 os.path.dirname(path),
                 "folder-symbolic",
             ),
@@ -1479,10 +1511,9 @@ class ControlPanel(Adw.Application):
         GLib.idle_add(self._apply_np_details, generation, info, None)
         if thumb_url:
             try:
-                response = requests.get(thumb_url, timeout=15)
-                data = response.content or None
-            except Exception as e:  # noqa: BLE001 - hero simply stays empty
-                logger.debug(f"[GUI4] Stream thumbnail download failed: {e}")
+                data = _capped_get(thumb_url, timeout=15, max_bytes=512 * 1024)
+            except Exception:  # noqa: BLE001 - hero simply stays empty
+                logger.debug("[GUI4] Stream thumbnail download failed")
                 data = None
             if data:
                 GLib.idle_add(self._apply_np_thumb, url, generation, data)
@@ -1511,9 +1542,7 @@ class ControlPanel(Adw.Application):
     def _fetch_np_web_title(self, url, generation):
         title = ""
         try:
-            response = requests.get(url, timeout=10, stream=True)
-            body = b"".join(response.iter_content(65536))[:65536]
-            response.close()
+            body = _capped_get(url, timeout=10, max_bytes=64 * 1024) or b""
             title = self._extract_html_title(body)
         except requests.exceptions.RequestException as e:
             logger.debug(f"[GUI4] Web title fetch failed for {url}: {e}")
@@ -1550,7 +1579,7 @@ class ControlPanel(Adw.Application):
         for pos, path in enumerate(queue[:3]):
             row = Adw.ActionRow()
             row.set_title(self._plain(os.path.basename(path)))
-            row.set_subtitle(f"n. {pos + 1} di {len(queue)}")
+            row.set_subtitle(_("n. {pos} of {total}").format(pos=pos + 1, total=len(queue)))
             thumb = Gtk.Picture()
             thumb.set_size_request(96, 54)
             thumb.set_can_shrink(True)
@@ -1656,7 +1685,7 @@ class ControlPanel(Adw.Application):
         self.stream_hero_sub = refs["sub"]
         box.append(hero)
         self.stream_entry = Gtk.Entry()
-        self.stream_entry.set_placeholder_text("https://… — YouTube, Twitch, live, direct video")
+        self.stream_entry.set_placeholder_text(_("https://… — YouTube, Twitch, live, direct video"))
         self.stream_entry.set_icon_from_icon_name(
             Gtk.EntryIconPosition.PRIMARY, "web-browser-symbolic"
         )
@@ -1671,8 +1700,8 @@ class ControlPanel(Adw.Application):
         self.stream_entry.connect("changed", self._on_stream_entry_changed)
         box.append(self.stream_entry)
         self.stream_type_row = Adw.ActionRow()
-        self.stream_type_row.set_title("Detected")
-        self.stream_type_row.set_subtitle("Paste a link to detect its type")
+        self.stream_type_row.set_title(_("Detected"))
+        self.stream_type_row.set_subtitle(_("Paste a link to detect its type"))
         self.stream_type_icon = Gtk.Image.new_from_icon_name("web-browser-symbolic")
         self.stream_type_row.add_prefix(self.stream_type_icon)
         self.stream_type_spinner = Gtk.Spinner()
@@ -1681,29 +1710,29 @@ class ControlPanel(Adw.Application):
         box.append(self.stream_type_row)
         row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         row.set_halign(Gtk.Align.FILL)
-        apply_btn = Gtk.Button(label="Apply")
+        apply_btn = Gtk.Button(label=_("Apply"))
         apply_btn.add_css_class("suggested-action")
         apply_btn.connect("clicked", self.on_stream_apply)
         row.append(apply_btn)
         self.stream_apply_btn = apply_btn
-        try_btn = Gtk.Button(label="Try 10s")
-        try_btn.set_tooltip_text("Preview for 10 seconds, then pause")
+        try_btn = Gtk.Button(label=_("Try 10s"))
+        try_btn.set_tooltip_text(_("Preview for 10 seconds, then pause"))
         try_btn.connect("clicked", self.on_stream_try)
         row.append(try_btn)
         box.append(row)
         self.saved_group = Adw.PreferencesGroup()
-        self.saved_group.set_title("Saved sources")
+        self.saved_group.set_title(_("Saved sources"))
         self.saved_list = Gtk.ListBox()
         self.saved_list.add_css_class("boxed-list")
         self.saved_list.connect("row-activated", self._on_saved_row_activated)
         self.saved_group.add(self.saved_list)
         box.append(self.saved_group)
         recent_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        recent_label = Gtk.Label(label="Recent")
+        recent_label = Gtk.Label(label=_("Recent"))
         recent_label.set_xalign(0)
         recent_label.set_hexpand(True)
         recent_box.append(recent_label)
-        clear_recent_btn = Gtk.Button(label="Clear")
+        clear_recent_btn = Gtk.Button(label=_("Clear"))
         clear_recent_btn.connect("clicked", self.on_clear_stream_history)
         recent_box.append(clear_recent_btn)
         box.append(recent_box)
@@ -1713,11 +1742,11 @@ class ControlPanel(Adw.Application):
         box.append(self.recent_list)
         self.stream_empty = Adw.StatusPage()
         self.stream_empty.set_icon_name("network-wireless-symbolic")
-        self.stream_empty.set_title("No saved sources yet")
+        self.stream_empty.set_title(_("No saved sources yet"))
         self.stream_empty.set_description(
-            "Paste a YouTube, Twitch or direct video link above. You will find it here."
+            _("Paste a YouTube, Twitch or direct video link above. You will find it here.")
         )
-        paste_btn = Gtk.Button(label="Paste from clipboard")
+        paste_btn = Gtk.Button(label=_("Paste from clipboard"))
         paste_btn.add_css_class("suggested-action")
         paste_btn.connect("clicked", self._on_stream_paste)
         self.stream_empty.set_child(paste_btn)
@@ -1846,10 +1875,21 @@ class ControlPanel(Adw.Application):
         url = f"https://{host}/favicon.ico"
         try:
             response = requests.get(url, timeout=8, stream=True)
-            status = response.status_code
-            content_type = response.headers.get("Content-Type", "")
-            data = b"".join(response.iter_content(65536))[:102400]
-            response.close()
+            try:
+                status = response.status_code
+                content_type = response.headers.get("Content-Type", "")
+                chunks = []
+                total = 0
+                for chunk in response.iter_content(65536):
+                    total += len(chunk)
+                    if total > 100 * 1024:
+                        data = None
+                        break
+                    chunks.append(chunk)
+                else:
+                    data = b"".join(chunks)
+            finally:
+                response.close()
         except requests.exceptions.Timeout:
             return None, "timeout"
         except requests.exceptions.ConnectionError:
@@ -1923,7 +1963,7 @@ class ControlPanel(Adw.Application):
             return
         url = self.stream_entry.get_text().strip()
         if not url:
-            row.set_subtitle("Paste a link to detect its type")
+            row.set_subtitle(_("Paste a link to detect its type"))
             self._update_stream_hero("", "")
             return
         kind = self._classify_stream_url(url)
@@ -1947,11 +1987,11 @@ class ControlPanel(Adw.Application):
         if getattr(self, "stream_hero_title", None) is None:
             return
         if not url or kind in ("invalid",):
-            self.stream_hero_title.set_text("Streaming")
-            self.stream_hero_sub.set_text("Paste a link to stream it as wallpaper")
+            self.stream_hero_title.set_text(_("Streaming"))
+            self.stream_hero_sub.set_text(_("Paste a link to stream it as wallpaper"))
             return
         domain = self._stream_site(url)
-        self.stream_hero_title.set_text(domain or "Streaming")
+        self.stream_hero_title.set_text(domain or _("Streaming"))
         self.stream_hero_sub.set_text(
             {
                 "direct": "Direct video",
@@ -1999,7 +2039,7 @@ class ControlPanel(Adw.Application):
         picture.set_visible(False)
         overlay.add_overlay(picture)
         if entry.get("is_live"):
-            badge = Gtk.Label(label="LIVE")
+            badge = Gtk.Label(label=_("LIVE"))
             badge.add_css_class("stream-live-badge")
             badge.set_valign(Gtk.Align.START)
             badge.set_halign(Gtk.Align.START)
@@ -2011,21 +2051,21 @@ class ControlPanel(Adw.Application):
         star = Gtk.ToggleButton()
         star.add_css_class("flat")
         star.set_icon_name("starred-symbolic" if favorite else "non-starred-symbolic")
-        star.set_tooltip_text("Remove from saved" if favorite else "Save")
+        star.set_tooltip_text(_("Remove from saved") if favorite else _("Save"))
         star.set_active(favorite)
         star.set_valign(Gtk.Align.CENTER)
         star.connect("toggled", self._on_star_toggled, url)
         row.add_suffix(star)
         play = Gtk.Button()
         play.set_icon_name("media-playback-start-symbolic")
-        play.set_tooltip_text("Apply this source now")
+        play.set_tooltip_text(_("Apply this source now"))
         play.set_valign(Gtk.Align.CENTER)
         play.connect("clicked", self._on_saved_play, url)
         row.add_suffix(play)
         if allow_delete:
             trash = Gtk.Button()
             trash.set_icon_name("user-trash-symbolic")
-            trash.set_tooltip_text("Remove from saved (kept in recent)")
+            trash.set_tooltip_text(_("Remove from saved (kept in recent)"))
             trash.set_valign(Gtk.Align.CENTER)
             trash.connect("clicked", self._on_saved_delete, url)
             row.add_suffix(trash)
@@ -2266,7 +2306,7 @@ class ControlPanel(Adw.Application):
         fav_set = set(favorites)
         self._save_stream_data([e for e in history if e["url"] in fav_set], favorites)
         self._reload_stream_lists()
-        self._toast("Stream history cleared")
+        self._toast(_("Stream history cleared"))
 
     def on_stream_try(self, *_args):
         url = self.stream_entry.get_text().strip()
@@ -2274,7 +2314,7 @@ class ControlPanel(Adw.Application):
             return
         kind = self._classify_stream_url(url)
         if kind == "invalid":
-            self._show_error("Not a valid http(s) URL.")
+            self._show_error(_("Not a valid http(s) URL."))
             return
         if kind == "collection":
             self._show_collection_warning(url)
@@ -2290,20 +2330,22 @@ class ControlPanel(Adw.Application):
 
     def _finish_stream_try(self, url, error, kind="page"):
         if error is not None:
-            self._show_error(f"Failed to stream {url}.\nError:\n{error}")
+            self._show_error(
+                _("Failed to stream {url}.\nError:\n{error}").format(url=url, error=error)
+            )
             return False
         previous = (self.config.get(CONFIG_KEY_DATA_SOURCE) or {}).get("Default", "")
         server = self._server()
         if server is not None:
-            server.stream(url)
+            server.stream(url, "all")
         self._record_stream_use(url, site=self._stream_site(url), kind=kind)
         self._reload_stream_lists()
         self._refresh_all()
         if getattr(self, "_try_timeout", None) is not None:
             GLib.source_remove(self._try_timeout)
         self._try_timeout = GLib.timeout_add_seconds(10, self._end_stream_try, previous)
-        toast = Adw.Toast.new("Previewing for 10 seconds")
-        toast.set_button_label("Stop now")
+        toast = Adw.Toast.new(_("Previewing for 10 seconds"))
+        toast.set_button_label(_("Stop now"))
         toast.connect("button-clicked", self._cancel_stream_try, previous)
         overlay = getattr(self, "toasts", None)
         if overlay is not None:
@@ -2318,7 +2360,7 @@ class ControlPanel(Adw.Application):
                 server.pause_playback()
             except GLib.Error:
                 pass
-        self._toast("Preview finished — Apply to keep watching")
+        self._toast(_("Preview finished — Apply to keep watching"))
         return False
 
     def _cancel_stream_try(self, _toast, previous):
@@ -2329,7 +2371,7 @@ class ControlPanel(Adw.Application):
         if server is not None:
             try:
                 if previous:
-                    server.stream(previous)
+                    server.stream(previous, "all")
                 else:
                     server.pause_playback()
             except GLib.Error:
@@ -2519,7 +2561,7 @@ class ControlPanel(Adw.Application):
             return
         kind = self._classify_stream_url(url)
         if kind == "invalid":
-            self._show_error("Not a valid http(s) URL.")
+            self._show_error(_("Not a valid http(s) URL."))
             return
         if kind == "collection":
             self._show_collection_warning(url)
@@ -2529,14 +2571,16 @@ class ControlPanel(Adw.Application):
 
     def _show_collection_warning(self, url):
         dialog = Adw.AlertDialog(
-            heading="Playlist links aren't supported",
+            heading=_("Playlist links aren't supported"),
             body=(
-                "That link points to a playlist or channel. "
-                "Apricus plays single videos — use the video's own link."
+                _(
+                    "That link points to a playlist or channel. "
+                    "Apricus plays single videos — use the video's own link."
+                )
             ),
         )
-        dialog.add_response("cancel", "Cancel")
-        dialog.add_response("use", "Use video anyway")
+        dialog.add_response("cancel", _("Cancel"))
+        dialog.add_response("use", _("Use video anyway"))
         dialog.set_default_response("cancel")
         dialog.set_close_response("cancel")
         dialog.connect(
@@ -2562,7 +2606,9 @@ class ControlPanel(Adw.Application):
         self._set_apply_busy(getattr(self, "stream_apply_btn", None), False)
         if error is not None:
             logger.error(f"[GUI4] Failed to stream {url}. Error:\n{error}")
-            self._show_error(f"Failed to stream {url}.\nError:\n{error}")
+            self._show_error(
+                _("Failed to stream {url}.\nError:\n{error}").format(url=url, error=error)
+            )
             return False
         logger.info(f"[GUI4] Streaming: {url}")
         self._record_stream_use(url, site=self._stream_site(url), kind=kind)
@@ -2692,8 +2738,8 @@ class ControlPanel(Adw.Application):
         self.webpage_entry.connect("changed", self._on_webpage_entry_changed)
         box.append(self.webpage_entry)
         self.web_detect_row = Adw.ActionRow()
-        self.web_detect_row.set_title("Detected")
-        self.web_detect_row.set_subtitle("Paste a link to detect its type")
+        self.web_detect_row.set_title(_("Detected"))
+        self.web_detect_row.set_subtitle(_("Paste a link to detect its type"))
         self.web_detect_icon = Gtk.Image.new_from_icon_name("web-browser-symbolic")
         self.web_detect_row.add_prefix(self.web_detect_icon)
         self.web_detect_spinner = Gtk.Spinner()
@@ -2702,31 +2748,31 @@ class ControlPanel(Adw.Application):
         box.append(self.web_detect_row)
         row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         row.set_halign(Gtk.Align.FILL)
-        apply_btn = Gtk.Button(label="Apply")
+        apply_btn = Gtk.Button(label=_("Apply"))
         apply_btn.add_css_class("suggested-action")
         apply_btn.connect("clicked", self.on_webpage_apply)
-        open_btn = Gtk.Button(label="Open in browser")
-        open_btn.set_tooltip_text("Open the entered address in the browser")
+        open_btn = Gtk.Button(label=_("Open in browser"))
+        open_btn.set_tooltip_text(_("Open the entered address in the browser"))
         open_btn.connect("clicked", self.on_webpage_open_browser)
         row.append(apply_btn)
         row.append(open_btn)
         box.append(row)
         self.webpage_apply_btn = apply_btn
         file_group = Adw.PreferencesGroup()
-        file_group.set_title("Local web page")
+        file_group.set_title(_("Local web page"))
         self.web_file_row = Adw.ActionRow()
-        self.web_file_row.set_title("No page chosen")
-        self.web_file_row.set_subtitle("Choose an HTML web page on this PC")
+        self.web_file_row.set_title(_("No page chosen"))
+        self.web_file_row.set_subtitle(_("Choose an HTML web page on this PC"))
         file_icon = Gtk.Image.new_from_icon_name("x-office-document-symbolic")
         self.web_file_row.add_prefix(file_icon)
-        choose_btn = Gtk.Button(label="Choose…")
-        choose_btn.set_tooltip_text("Choose local HTML web page")
+        choose_btn = Gtk.Button(label=_("Choose…"))
+        choose_btn.set_tooltip_text(_("Choose local HTML web page"))
         choose_btn.set_valign(Gtk.Align.CENTER)
         choose_btn.connect("clicked", self.on_webpage_choose_file)
         self.web_file_row.add_suffix(choose_btn)
         folder_btn = Gtk.Button()
         folder_btn.set_icon_name("folder-open-symbolic")
-        folder_btn.set_tooltip_text("Show the file in the file manager")
+        folder_btn.set_tooltip_text(_("Show the file in the file manager"))
         folder_btn.set_valign(Gtk.Align.CENTER)
         folder_btn.connect("clicked", self.on_webpage_show_in_folder)
         self.web_file_row.add_suffix(folder_btn)
@@ -2736,7 +2782,7 @@ class ControlPanel(Adw.Application):
         drop_html.connect("drop", self._on_webpage_drop)
         file_group.add_controller(drop_html)
         insp_group = Adw.PreferencesGroup()
-        insp_group.set_title("Inspiration")
+        insp_group.set_title(_("Inspiration"))
         insp_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         for name, url, desc in self.WEB_EXAMPLES:
             chip = Gtk.Button()
@@ -2752,7 +2798,7 @@ class ControlPanel(Adw.Application):
         insp_group.add(insp_row)
         box.append(insp_group)
         self.web_details = Adw.PreferencesGroup()
-        self.web_details.set_title("Details")
+        self.web_details.set_title(_("Details"))
         self.web_detail_rows = {}
         for key, title, icon_name in (
             ("title", "Title", "x-office-document-symbolic"),
@@ -2768,24 +2814,24 @@ class ControlPanel(Adw.Application):
             self.web_detail_rows[key] = action_row
         copy_btn = Gtk.Button()
         copy_btn.set_icon_name("edit-copy-symbolic")
-        copy_btn.set_tooltip_text("Copy link")
+        copy_btn.set_tooltip_text(_("Copy link"))
         copy_btn.set_valign(Gtk.Align.CENTER)
         copy_btn.connect("clicked", self.on_webpage_copy_link)
         self.web_detail_rows["address"].add_suffix(copy_btn)
         box.append(self.web_details)
         self.web_saved_group = Adw.PreferencesGroup()
-        self.web_saved_group.set_title("Saved pages")
+        self.web_saved_group.set_title(_("Saved pages"))
         self.web_saved_list = Gtk.ListBox()
         self.web_saved_list.add_css_class("boxed-list")
         self.web_saved_list.connect("row-activated", self._on_web_list_activated)
         self.web_saved_group.add(self.web_saved_list)
         box.append(self.web_saved_group)
         web_recent_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        web_recent_label = Gtk.Label(label="Recent")
+        web_recent_label = Gtk.Label(label=_("Recent"))
         web_recent_label.set_xalign(0)
         web_recent_label.set_hexpand(True)
         web_recent_box.append(web_recent_label)
-        web_clear_btn = Gtk.Button(label="Clear")
+        web_clear_btn = Gtk.Button(label=_("Clear"))
         web_clear_btn.connect("clicked", self.on_clear_web_history)
         web_recent_box.append(web_clear_btn)
         box.append(web_recent_box)
@@ -2795,8 +2841,8 @@ class ControlPanel(Adw.Application):
         box.append(self.web_recent_list)
         self.web_empty = Adw.StatusPage()
         self.web_empty.set_icon_name("web-browser-symbolic")
-        self.web_empty.set_title("No saved pages yet")
-        self.web_empty.set_description("Apply a link or file above. You will find it here.")
+        self.web_empty.set_title(_("No saved pages yet"))
+        self.web_empty.set_description(_("Apply a link or file above. You will find it here."))
         box.append(self.web_empty)
         self._refresh_web_file_row()
         self._refresh_web_details()
@@ -2829,7 +2875,7 @@ class ControlPanel(Adw.Application):
         star = Gtk.ToggleButton()
         star.add_css_class("flat")
         star.set_icon_name("starred-symbolic" if favorite else "non-starred-symbolic")
-        star.set_tooltip_text("Remove from saved" if favorite else "Save")
+        star.set_tooltip_text(_("Remove from saved") if favorite else _("Save"))
         star.set_active(favorite)
         star.set_valign(Gtk.Align.CENTER)
         star.connect("toggled", self._on_web_star_toggled, url)
@@ -2837,21 +2883,21 @@ class ControlPanel(Adw.Application):
         if is_file:
             go = Gtk.Button()
             go.set_icon_name("media-playback-start-symbolic")
-            go.set_tooltip_text("Apply this file now")
+            go.set_tooltip_text(_("Apply this file now"))
             go.set_valign(Gtk.Align.CENTER)
             go.connect("clicked", self._on_web_list_play, url)
             row.add_suffix(go)
         else:
             globe = Gtk.Button()
             globe.set_icon_name("web-browser-symbolic")
-            globe.set_tooltip_text("Open in browser")
+            globe.set_tooltip_text(_("Open in browser"))
             globe.set_valign(Gtk.Align.CENTER)
             globe.connect("clicked", self._on_web_open, url)
             row.add_suffix(globe)
         if allow_delete:
             trash = Gtk.Button()
             trash.set_icon_name("user-trash-symbolic")
-            trash.set_tooltip_text("Remove from recent (kept in saved)")
+            trash.set_tooltip_text(_("Remove from recent (kept in saved)"))
             trash.set_valign(Gtk.Align.CENTER)
             trash.connect("clicked", self._on_web_delete, url)
             row.add_suffix(trash)
@@ -2926,7 +2972,7 @@ class ControlPanel(Adw.Application):
         fav_set = set(favorites)
         self._save_web_data([e for e in history if e["url"] in fav_set], favorites)
         self._reload_web_lists()
-        self._toast("Web history cleared")
+        self._toast(_("Web history cleared"))
 
     def _on_webpage_icon_press(self, entry, position):
         if position == Gtk.EntryIconPosition.SECONDARY:
@@ -2972,10 +3018,19 @@ class ControlPanel(Adw.Application):
         title, ok, detail = "", False, ""
         try:
             response = requests.get(url, timeout=10, stream=True)
-            status = response.status_code
-            content_type = response.headers.get("Content-Type", "")
-            body = b"".join(response.iter_content(65536))[:65536]
-            response.close()
+            try:
+                status = response.status_code
+                content_type = response.headers.get("Content-Type", "")
+                chunks = []
+                total = 0
+                for chunk in response.iter_content(65536):
+                    total += len(chunk)
+                    if total > 64 * 1024:
+                        break
+                    chunks.append(chunk)
+                body = b"".join(chunks)
+            finally:
+                response.close()
             if status >= 400:
                 detail = f"Error code: {status}"
             else:
@@ -3008,17 +3063,17 @@ class ControlPanel(Adw.Application):
         elif is_file:
             self.web_hero_title.set_text(os.path.basename(url))
         else:
-            self.web_hero_title.set_text("Web Page")
+            self.web_hero_title.set_text(_("Web Page"))
         if url:
             self.web_hero_sub.set_text(url)
         else:
-            self.web_hero_sub.set_text("Type an address above to load a preview")
+            self.web_hero_sub.set_text(_("Type an address above to load a preview"))
         self.web_hero_sub.set_tooltip_text(url)
 
     def _on_web_example(self, _button, url):
         self.webpage_entry.set_text(url)
         self._on_webpage_entry_changed(self.webpage_entry)
-        self._toast("Example loaded")
+        self._toast(_("Example loaded"))
 
     def _on_webpage_drop(self, _target, value, _x, _y):
         path = None
@@ -3084,7 +3139,7 @@ class ControlPanel(Adw.Application):
             return
         clipboard = Gdk.Display.get_default().get_clipboard()
         clipboard.set(url)
-        self._toast("Link copied")
+        self._toast(_("Link copied"))
 
     def _refresh_web_file_row(self):
         row = getattr(self, "web_file_row", None)
@@ -3100,8 +3155,8 @@ class ControlPanel(Adw.Application):
             and os.path.isfile(current)
         )
         if not is_web_file:
-            row.set_title("No page chosen")
-            row.set_subtitle("Choose an HTML web page on this PC")
+            row.set_title(_("No page chosen"))
+            row.set_subtitle(_("Choose an HTML web page on this PC"))
             return
         try:
             size = os.path.getsize(current)
@@ -3135,25 +3190,27 @@ class ControlPanel(Adw.Application):
                 size = None
             rows["title"].set_subtitle(os.path.basename(current))
             rows["address"].set_subtitle(current)
-            rows["source"].set_subtitle(f"Local web page — {self._format_file_size(size)}")
+            rows["source"].set_subtitle(
+                _("Local web page — {size}").format(size=self._format_file_size(size))
+            )
         else:
             rows["title"].set_subtitle("…")
             rows["address"].set_subtitle(current)
-            rows["source"].set_subtitle(f"Remote — {self._web_domain(current)}")
+            rows["source"].set_subtitle(
+                _("Remote — {domain}").format(domain=self._web_domain(current))
+            )
             self._web_generation += 1
             generation = self._web_generation
             threading.Thread(
                 target=self._fetch_web_title, args=(current, generation), daemon=True
             ).start()
         active = (self.config.get(CONFIG_KEY_DATA_SOURCE) or {}).get("Default", "") == current
-        rows["status"].set_subtitle("Current wallpaper" if active else "Not applied")
+        rows["status"].set_subtitle(_("Current wallpaper") if active else _("Not applied"))
 
     def _fetch_web_title(self, url, generation):
         title = ""
         try:
-            response = requests.get(url, timeout=10, stream=True)
-            body = b"".join(response.iter_content(65536))[:65536]
-            response.close()
+            body = _capped_get(url, timeout=10, max_bytes=64 * 1024) or b""
             title = self._extract_html_title(body)
         except requests.exceptions.RequestException as e:
             logger.debug(f"[GUI4] Title fetch failed for {url}: {e}")
@@ -3195,7 +3252,9 @@ class ControlPanel(Adw.Application):
         self._set_apply_busy(getattr(self, "webpage_apply_btn", None), False)
         if error is not None:
             logger.error(f"[GUI4] Failed to access {url}. Error:\n{error}")
-            self._show_error(f"Failed to access {url}.\nError:\n{error}")
+            self._show_error(
+                _("Failed to access {url}.\nError:\n{error}").format(url=url, error=error)
+            )
             return False
         self._record_web_use(url)
         self._reload_web_lists()
@@ -3243,7 +3302,7 @@ class ControlPanel(Adw.Application):
 
     def on_webpage_choose_file(self, *_args):
         dialog = Gtk.FileDialog()
-        dialog.set_title("Choose a local HTML web page")
+        dialog.set_title(_("Choose a local HTML web page"))
         html_filter = Gtk.FileFilter()
         html_filter.set_name("HTML files")
         html_filter.add_pattern("*.html")
@@ -3271,8 +3330,8 @@ class ControlPanel(Adw.Application):
         self._show_webpage_monitor_chooser(source)
 
     def _show_error(self, message):
-        dialog = Adw.AlertDialog(heading="Error", body=message)
-        dialog.add_response("ok", "OK")
+        dialog = Adw.AlertDialog(heading=_("Error"), body=message)
+        dialog.add_response("ok", _("OK"))
         dialog.set_default_response("ok")
         dialog.connect("response", lambda *_: dialog.close())
         dialog.present(self.window)
@@ -3297,7 +3356,7 @@ class ControlPanel(Adw.Application):
         box.set_margin_end(24)
         config = getattr(self, "config", None) or {}
         behaviour = Adw.PreferencesGroup()
-        behaviour.set_title("Behaviour")
+        behaviour.set_title(_("Behaviour"))
         self.static_row, self.static_switch = self._settings_switch_row(
             behaviour,
             "Static wallpaper",
@@ -3306,7 +3365,7 @@ class ControlPanel(Adw.Application):
             sensitive=is_gnome(),
         )
         if not is_gnome():
-            self.static_row.set_subtitle("Only on GNOME")
+            self.static_row.set_subtitle(_("Only on GNOME"))
         self.static_switch.connect("state-set", self._on_settings_flag, CONFIG_KEY_STATIC_WALLPAPER)
         wayland = is_wayland()
         self.pause_max_row, self.pause_max_switch = self._settings_switch_row(
@@ -3317,7 +3376,7 @@ class ControlPanel(Adw.Application):
             sensitive=not wayland,
         )
         if wayland:
-            self.pause_max_row.set_subtitle("Requires X11")
+            self.pause_max_row.set_subtitle(_("Requires X11"))
         self.pause_max_switch.connect(
             "state-set", self._on_settings_flag, CONFIG_KEY_PAUSE_WHEN_MAXIMIZED
         )
@@ -3329,13 +3388,13 @@ class ControlPanel(Adw.Application):
             sensitive=not wayland,
         )
         if wayland:
-            self.mute_max_row.set_subtitle("Requires X11")
+            self.mute_max_row.set_subtitle(_("Requires X11"))
         self.mute_max_switch.connect(
             "state-set", self._on_settings_flag, CONFIG_KEY_MUTE_WHEN_MAXIMIZED
         )
         box.append(behaviour)
         startup = Adw.PreferencesGroup()
-        startup.set_title("Startup")
+        startup.set_title(_("Startup"))
         self.autostart_row, self.autostart_switch = self._settings_switch_row(
             startup,
             "Start wallpaper at login",
@@ -3346,30 +3405,32 @@ class ControlPanel(Adw.Application):
         self.autostart_switch.connect("state-set", self._on_autostart_toggled)
         box.append(startup)
         system = Adw.PreferencesGroup()
-        system.set_title("System")
+        system.set_title(_("System"))
         config_row = Adw.ActionRow()
-        config_row.set_title("Open configuration")
+        config_row.set_title(_("Open configuration"))
         config_row.set_subtitle(self._short_config_path())
-        config_btn = Gtk.Button(label="Open")
+        config_btn = Gtk.Button(label=_("Open"))
         config_btn.set_valign(Gtk.Align.CENTER)
         config_btn.connect("clicked", self._on_open_config)
         config_row.add_suffix(config_btn)
         system.add(config_row)
         help_row = Adw.ActionRow()
-        help_row.set_title("How to select videos")
-        help_row.set_subtitle("Selection shortcuts for the library")
-        help_btn = Gtk.Button(label="Show")
+        help_row.set_title(_("How to select videos"))
+        help_row.set_subtitle(_("Selection shortcuts for the library"))
+        help_btn = Gtk.Button(label=_("Show"))
         help_btn.set_valign(Gtk.Align.CENTER)
         help_btn.connect("clicked", self._on_selection_help)
         help_row.add_suffix(help_btn)
         system.add(help_row)
         box.append(system)
         info = Adw.PreferencesGroup()
-        info.set_title("Info")
+        info.set_title(_("Info"))
         about_row = Adw.ActionRow()
-        about_row.set_title("About Apricus")
-        about_row.set_subtitle(f"Version {self.version} · GPL-3.0-or-later")
-        about_btn = Gtk.Button(label="Open")
+        about_row.set_title(_("About Apricus"))
+        about_row.set_subtitle(
+            _("Version {version} · GPL-3.0-or-later").format(version=self.version)
+        )
+        about_btn = Gtk.Button(label=_("Open"))
         about_btn.set_valign(Gtk.Align.CENTER)
         about_btn.connect("clicked", self._show_about)
         about_row.add_suffix(about_btn)
@@ -3409,7 +3470,7 @@ class ControlPanel(Adw.Application):
         except Exception as e:  # noqa: BLE001 - report, then roll back
             logger.warning(f"[GUI4] Autostart change failed: {e}")
             switch.set_active(not want)
-            self._show_error("Could not change the startup setting.")
+            self._show_error(_("Could not change the startup setting."))
             return False
         finally:
             self._autostart_busy = False
@@ -3420,10 +3481,10 @@ class ControlPanel(Adw.Application):
                 switch.set_active(actual)
             finally:
                 self._autostart_busy = False
-            self._show_error("Could not change the startup setting.")
+            self._show_error(_("Could not change the startup setting."))
             return False
         self._update_autostart_subtitle(actual)
-        self._toast("Startup enabled" if actual else "Startup disabled")
+        self._toast(_("Startup enabled") if actual else _("Startup disabled"))
         return False
 
     _SETTINGS_FLAG_ATTRS = {
@@ -3452,18 +3513,20 @@ class ControlPanel(Adw.Application):
             Gio.AppInfo.launch_default_for_uri(GLib.filename_to_uri(CONFIG_PATH))
         except GLib.Error as e:
             logger.warning(f"[GUI4] Could not open config: {e.message}")
-            self._show_error("Could not open the configuration file.")
+            self._show_error(_("Could not open the configuration file."))
 
     def _on_selection_help(self, *_args):
         dialog = Adw.AlertDialog(
-            heading="How to select videos",
+            heading=_("How to select videos"),
             body=(
-                "Click to select a video.\n"
-                "Ctrl+click or Shift+click selects more than one.\n"
-                "Apply lets you choose the monitor."
+                _(
+                    "Click to select a video.\n"
+                    "Ctrl+click or Shift+click selects more than one.\n"
+                    "Apply lets you choose the monitor."
+                )
             ),
         )
-        dialog.add_response("ok", "OK")
+        dialog.add_response("ok", _("OK"))
         dialog.set_default_response("ok")
         dialog.connect("response", lambda *_: dialog.close())
         dialog.present(self.window)
