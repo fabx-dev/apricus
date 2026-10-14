@@ -1,5 +1,5 @@
 project('apricus',
-          version: '2.0.0-rc1',
+          version: '2.0.0-rc2',
           license: ['GPL-3.0'],
     meson_version: '>= 0.59.0',
   default_options: [ 'warning_level=2',

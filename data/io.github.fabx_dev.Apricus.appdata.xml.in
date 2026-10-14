@@ -26,6 +26,17 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="2.0.0-rc2" date="2026-10-15" type="development">
+      <description>
+        <ul>
+          <li>Streaming over HTTPS works in the Flatpak (TLS fast-open fallback in the VLC build)</li>
+          <li>Now Playing follows the playlist queue and play/pause works in playlist mode</li>
+          <li>Non-public stream and web hosts are refused before any contact</li>
+          <li>Player reports playback failures instead of staying silently stuck</li>
+          <li>Italian translation of the GTK4 panel complete</li>
+        </ul>
+      </description>
+    </release>
     <release version="2.0.0-rc1" date="2026-10-14" type="development">
       <description>
         <ul>
