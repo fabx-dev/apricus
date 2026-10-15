@@ -26,6 +26,13 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="2.0.0-rc3" date="2026-10-15" type="development">
+      <description>
+        <ul>
+          <li>CI-green test suite on the tagged commit (portable test stubs)</li>
+        </ul>
+      </description>
+    </release>
     <release version="2.0.0-rc2" date="2026-10-15" type="development">
       <description>
         <ul>

@@ -14,7 +14,7 @@ by Jeff Shee (GPL-3.0, same license). It picks up where Hidamari left off:
 **fast login startup, a robust player, per-monitor correctness, and a cleaner
 path to Wayland and multi-desktop support**.
 
-> Status: **2.0.0 RC2** — release candidate on branch `gtk4-migration`.
+> Status: **2.0.0 RC3** — release candidate on branch `gtk4-migration`.
 > This is a test version: please report issues before the stable 2.0.0.
 > It upgrades Apricus 1.0 directly (same app ID, config and data preserved).
 
@@ -110,6 +110,10 @@ selects the starting section). The classic GTK3 panel remains the default.
 **Removed vs upstream**
 - Static-wallpaper blur: it only added startup cost for a wallpaper that sits
   underneath the video — frames are now saved sharp and Pillow is gone
+
+## New in 2.0.0 RC3
+
+- Same RC2 content with a green CI on the tagged commit (CI-only test fixes)
 
 ## New in 2.0.0 RC2
 
