@@ -66,14 +66,14 @@ Note 2: Please don't worry about the `gnome-desktop` package; it's just a librar
 
 - Ubuntu:
 ```bash
-sudo apt install dconf-cli ffmpeg gettext gir1.2-appindicator3-0.1 gir1.2-webkit2-4.1 gir1.2-wnck-3.0 libappindicator3-1 libgnome-desktop-4-2t64 libwebkit2gtk-4.1-0 libwnck-3-0 mesa-utils vdpauinfo vlc xdg-user-dirs
+sudo apt install dconf-cli ffmpeg gettext gir1.2-adw-1 gir1.2-appindicator3-0.1 gir1.2-gtk-4.0 gir1.2-webkit2-4.1 gir1.2-wnck-3.0 libappindicator3-1 libgnome-desktop-4-2t64 libwebkit2gtk-4.1-0 libwnck-3-0 mesa-utils vdpauinfo vlc xdg-user-dirs
 ```
-(Ubuntu 26.04 package names; on older releases `libgnome-desktop` may be
+(Ubuntu 24.04/26.04 package names; on older releases `libgnome-desktop` may be
 `libgnome-desktop-4-1` and `gir1.2-*` packages are pulled in as dependencies.)
 
 - Fedora:
 ```bash
-sudo dnf install dconf ffmpeg-free glx-utils gnome-desktop4 libappindicator-gtk3 libwnck3 vdpauinfo vlc webkit2gtk4.1 xdg-user-dirs
+sudo dnf install dconf ffmpeg-free glx-utils gnome-desktop4 gtk4 libadwaita libappindicator-gtk3 libwnck3 vdpauinfo vlc webkit2gtk4.1 xdg-user-dirs
 ```
 (Unverified on Fedora — names may need adjusting; `vlc`/`ffmpeg` are required
 because `python-vlc` ships only bindings and frame extraction needs `ffmpeg`.)
@@ -122,8 +122,6 @@ git submodule update --init --recursive
 ```
 ### Build and Run
 With the extension installed, press <kbd>F1</kbd> (command palette), search for "flatpak", and run the desired action.
-
-![](vscode-flatpak.png)
 
 Alternatively, build and install it from the command line (run from the repository root):
 ```bash

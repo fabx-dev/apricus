@@ -1,6 +1,5 @@
 <?xml version='1.0' encoding='utf-8'?>
 <component type="desktop-application">
-  <!--Created with jdAppStreamEdit 9.2-->
   <id>io.github.fabx_dev.Apricus</id>
   <name>Apricus</name>
   <summary>Live wallpaper for Linux</summary>
@@ -9,7 +8,7 @@
   </developer>
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>GPL-3.0-or-later</project_license>
-  
+
   <description>
     <p>Live wallpaper for Linux — local videos, looping playlists, live streams and interactive web pages. Apricus (lat.) — sunny, warmed by the sun.</p>
     <p>Features a native GTK4 + Libadwaita control center, gapless in-place video switching, visual playlists with drag-and-drop and undo, a live Now Playing dashboard, streaming and web hubs with favorites and 10-second previews, and ~1.4s login startup.</p>
@@ -43,111 +42,19 @@
     <release version="1.0" date="2026-10-12" type="stable">
       <description>
         <ul>
-          <li>First Apricus release (community fork of Hidamari 3.7)</li>
+          <li>First Apricus release (independent evolution of Hidamari)</li>
           <li>Muted looping playlists with dedicated panel tab</li>
           <li>In-place video switching: no respawn gap, painted first frame</li>
-          <li>Login-to-first-frame from ~1.7s to ~1.4s (static cache, ffprobe sidecar, fast mode)</li>
+          <li>Login-to-first-frame in ~1.4s (static cache, ffprobe sidecar, fast mode)</li>
           <li>User systemd autostart unit and configurable video folder</li>
           <li>Stable per-monitor keys, playlist paused-state, full rebrand</li>
           <li>Interface in English, Italian, German, French, Spanish and Japanese</li>
         </ul>
       </description>
     </release>
-    <release version="3.7" date="2026-07-09" type="stable">
-      <description>
-        <ul>
-          <li>Refactor and modernize the codebase for easier maintenance</li>
-          <li>Update dependencies and bump the GNOME runtime to 50</li>
-          <li>Reduce CPU usage during video playback</li>
-          <li>Fix video thumbnails not showing in the Flatpak version</li>
-          <li>Fix webpage wallpaper showing a blank screen on NVIDIA graphics</li>
-          <li>Add Japanese translation</li>
-        </ul>
-      </description>
-    </release>
-    <release version="3.6" date="2025-01-03" type="stable">
-      <description>
-        <ul>
-          <li>Add multi monitor feature for video (@xaprier)</li>
-        </ul>
-      </description>
-    </release>
-    <release version="3.5" date="2024-06-30" type="stable">
-      <description>
-        <ul>
-          <li>Update dependencies for Flatpak</li>
-        </ul>
-      </description>
-    </release>
-    <release version="3.4" date="2023-08-20" type="stable">
-      <description>
-        <ul>
-          <li>Fix bug related to environment variable XDG_CURRENT_DESKTOP</li>
-          <li>Fix player process leak (not terminated after playback stopped)</li>
-          <li>Fix video playback block screensaver</li>
-        </ul>
-      </description>
-    </release>
-    <release version="3.3" date="2023-04-01" type="stable">
-      <description>
-        <ul>
-          <li>Fix crash in streaming mode</li>
-          <li>Fix incorrect sound fading behavior</li>
-          <li>Update dependecies</li>
-        </ul>
-      </description>
-    </release>
-    <release version="3.2" date="2022-11-13" type="stable">
-      <description>
-        <ul>
-          <li>Fixed for local video files which containing quotes in filename</li>
-          <li>Avoid shell injection vulnerability</li>
-          <li>Switched python multiprocessing method to forkserver for performance</li>
-          <li>Added titles to Hidamari's processes for easier debugging</li>
-        </ul>
-      </description>
-    </release>
-    <release version="3.1" date="2022-11-05" type="stable">
-      <description>
-        <ul>
-          <li>Added desktop icon workaround for ZorinOS</li>
-          <li>Fixed center-crop for widescreen</li>
-          <li>Allow screensaver (screen blank) if playback is paused</li>
-          <li>Minor tweak</li>
-        </ul>
-      </description>
-    </release>
-    <release version="3.0-beta4" date="2022-09-23" type="stable">
-      <description>
-        <ul>
-          <li>Fixed autostart issue</li>
-          <li>Fixed a crash for non-GNOME distros</li>
-        </ul>
-      </description>
-    </release>
-    <release version="3.0-beta3" date="2022-09-06" type="stable">
-      <description>
-        <p>Fixed bug for non-GNOME distros. Also some minor improvements in logging messages.</p>
-      </description>
-    </release>
-    <release version="3.0-beta2" date="2022-09-03" type="stable">
-      <description>
-        <p>UI improvements! ✨</p>
-      </description>
-    </release>
-    <release version="3.0-beta1" date="2022-08-31" type="stable">
-      <description>
-        <p>Hi! Hidamari v3</p>
-        <ul>
-          <li>First Flatpak build 📦</li>
-          <li>Bug fixes and performance improvements 😎</li>
-        </ul>
-      </description>
-    </release>
   </releases>
   <url type="homepage">https://github.com/fabx-dev/apricus</url>
   <url type="bugtracker">https://github.com/fabx-dev/apricus/issues</url>
-  
   <categories>
     <category>GTK</category>
     <category>Utility</category>
@@ -158,9 +65,7 @@
   </recommends>
   <content_rating type="oars-1.1"/>
   <launchable type="desktop-id">io.github.fabx_dev.Apricus.desktop</launchable>
-  <keywords>
-    <keyword>Live Wallpaper</keyword>
-    <keyword>Video Wallpaper</keyword>
-    <keyword>Wallpaper</keyword>
-  </keywords>
+  <provides>
+    <binary>apricus</binary>
+  </provides>
 </component>

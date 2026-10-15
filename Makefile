@@ -44,7 +44,7 @@ pot: $(BUILDDIR) ## Regenerate po/apricus.pot (with a filled-in header)
 	meson compile -C $(BUILDDIR) apricus-pot
 	sed -i \
 		-e "s/SOME DESCRIPTIVE TITLE\./Apricus - Live wallpaper for Linux/" \
-		-e "s/Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER/Copyright (C) 2022 Jeff Shee (jeffshee8969@gmail.com)/" \
+		-e "s/Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER/Copyright (C) 2026 fabx-dev/" \
 		po/apricus.pot
 
 update-po: $(BUILDDIR) ## Merge the template into the per-language .po files

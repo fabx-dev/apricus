@@ -1,3 +1,4 @@
+# Flatpak shared build modules used by pkgs/flatpak/io.github.fabx_dev.Apricus.json
 [submodule "shared-modules"]
 	path = pkgs/flatpak/shared-modules
 	url = https://github.com/flathub/shared-modules.git

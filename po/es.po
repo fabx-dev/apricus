@@ -1,15 +1,14 @@
-# SOME DESCRIPTIVE TITLE.
-# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# Spanish translation for Apricus.
+# Copyright (C) 2026 fabx-dev
 # This file is distributed under the same license as the apricus package.
-# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
 #
 msgid ""
 msgstr ""
-"Project-Id-Version: apricus\n"
-"Report-Msgid-Bugs-To: \n"
+"Project-Id-Version: apricus 2.0.0\n"
+"Report-Msgid-Bugs-To: https://github.com/fabx-dev/apricus/issues\n"
 "POT-Creation-Date: 2026-10-15 23:44+0200\n"
-"PO-Revision-Date: 2026-10-15 22:00+0200\n"
-"Last-Translator: Fabrizio <fabx-dev>\n"
+"PO-Revision-Date: 2026-10-15 23:55+0200\n"
+"Last-Translator: fabx-dev <https://github.com/fabx-dev>\n"
 "Language-Team: Spanish\n"
 "Language: es\n"
 "MIME-Version: 1.0\n"

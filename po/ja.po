@@ -1,14 +1,14 @@
-# Japanese translation for Hidamari.
-# Copyright (C) 2022 Jeff Shee (jeffshee8969@gmail.com)
-# This file is distributed under the same license as the hidamari package.
+# Japanese translation for Apricus.
+# Copyright (C) 2026 fabx-dev
+# This file is distributed under the same license as the apricus package.
 #
 msgid ""
 msgstr ""
-"Project-Id-Version: apricus\n"
-"Report-Msgid-Bugs-To: \n"
+"Project-Id-Version: apricus 2.0.0\n"
+"Report-Msgid-Bugs-To: https://github.com/fabx-dev/apricus/issues\n"
 "POT-Creation-Date: 2026-10-15 23:44+0200\n"
-"PO-Revision-Date: 2026-07-10 01:30+0900\n"
-"Last-Translator: Jeff Shee <jeffshee8969@gmail.com>\n"
+"PO-Revision-Date: 2026-10-15 23:55+0200\n"
+"Last-Translator: fabx-dev <https://github.com/fabx-dev>\n"
 "Language-Team: Japanese\n"
 "Language: ja\n"
 "MIME-Version: 1.0\n"
