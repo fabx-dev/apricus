@@ -251,12 +251,10 @@ def test_server_import_leaves_gtk_namespaces_free(tmp_path):
 
 
 def test_show_gui_selects_toolkit_without_spawning(monkeypatch):
-    """show_gui must pick the GTK4 trampoline (spawn context) under
-    APRICUS_GTK4=1 and the legacy one (forkserver path) otherwise —
-    without starting any process."""
-    import os
-
+    """show_gui must always launch the GTK4 trampoline via the 'spawn'
+    multiprocessing context — without starting any real process."""
     seen = []
+    methods = []
 
     class _FakeProcess:
         def __init__(self, name=None, target=None, args=()):
@@ -271,24 +269,20 @@ def test_show_gui_selects_toolkit_without_spawning(monkeypatch):
     class _FakeCtx:
         Process = _FakeProcess
 
+    def _get_ctx(method):
+        methods.append(method)
+        return _FakeCtx()
+
     monkeypatch.setattr(srv, "Process", _FakeProcess)
-    monkeypatch.setattr(srv.mp, "get_context", lambda method: _FakeCtx())
+    monkeypatch.setattr(srv.mp, "get_context", _get_ctx)
     s = srv.ApricusServer.__new__(srv.ApricusServer)
     s.version = "test"
     s.pkgdatadir = ""
     s.localedir = ""
     s.gui_process = None
-    try:
-        os.environ["APRICUS_GTK4"] = "1"
-        s.show_gui()
-        assert seen and seen[-1][1] is srv._gui_gtk4_target, seen
-        del os.environ["APRICUS_GTK4"]
-        s.gui_process = None
-        s.show_gui()
-        assert seen and seen[-1][1] is srv._gui_legacy_target, seen
-    finally:
-        if "APRICUS_GTK4" in os.environ:
-            del os.environ["APRICUS_GTK4"]
+    s.show_gui()
+    assert methods == ["spawn"], methods
+    assert seen and seen[-1][1] is srv._gui_gtk4_target, seen
 
 
 def test_gui_trampolines_import_only_inside_child():

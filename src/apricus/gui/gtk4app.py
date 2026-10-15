@@ -1,10 +1,10 @@
 # Copyright (C) 2026 fabx-dev
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""GTK4 + Libadwaita control panel (migration target).
+"""GTK4 + Libadwaita control panel.
 
-Talks to the UNCHANGED ApricusServer over the existing D-Bus API: no
-backend or protocol changes. Started with APRICUS_GTK4=1 (see server).
+Talks to ApricusServer over the D-Bus API. Started by the server in a
+fresh spawned process.
 
 Only GTK4-safe modules are imported here: commons, utils (ConfigUtil,
 no Gtk at top level), mediacache, monitor (major-version agnostic: it

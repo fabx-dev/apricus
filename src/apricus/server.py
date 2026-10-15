@@ -34,18 +34,12 @@ from apricus.commons import (
 from apricus.monitor import Monitors
 from apricus.utils import ConfigUtil, EndSessionHandler, _authorize, get_video_paths
 
-# NOTE: gui.control, menu and the player mains pin Gtk 3 namespaces at
-# import time (gi forbids two Gtk majors in one process). They must never
-# be imported at server top-level: the forkserver image inherits the
-# parent's loaded namespaces, so any Gtk 3 import here would break GTK4
-# children even though show_gui() imports gtk4app lazily. Each target
-# below imports its real main *inside* the child process instead.
-
-
-def _gui_legacy_target(version, pkgdatadir, localedir):
-    from apricus.gui.control import main as gui_main
-
-    gui_main(version, pkgdatadir, localedir)
+# NOTE: menu and the player mains pin Gtk 3 namespaces at import time
+# (gi forbids two Gtk majors in one process). They must never be imported
+# at server top-level: the forkserver image inherits the parent's loaded
+# namespaces, so any Gtk 3 import here would break GTK4 children even
+# though show_gui() imports gtk4app lazily. Each target below imports its
+# real main *inside* the child process instead.
 
 
 def _gui_gtk4_target(version, pkgdatadir, localedir):
@@ -410,22 +404,14 @@ class ApricusServer:
         if self.gui_process and self.gui_process.is_alive():
             logger.debug("[Server] GUI already running")
             return
-        # GTK4 migration: opt-in via env until the new panel is complete.
-        # Both targets import their toolkit *inside* the child process;
-        # the server image itself stays Gtk-free (see module note above).
-        # The GTK4 panel additionally uses the "spawn" start method (fresh
-        # interpreter): the forkserver image may legitimately hold Gdk 3.0
-        # by the time the GUI starts (player/systray are Gtk3), and gi
-        # forbids a second major in a forked child.
-        if os.environ.get("APRICUS_GTK4") == "1":
-            gui_ctx = mp.get_context("spawn")
-            gui_target = _gui_gtk4_target
-        else:
-            gui_ctx = mp.get_context(None)
-            gui_target = _gui_legacy_target
+        # The GTK4 panel uses the "spawn" start method (fresh interpreter):
+        # the forkserver image may legitimately hold Gdk 3.0 by the time the
+        # GUI starts (player/systray are Gtk3), and gi forbids a second major
+        # in a forked child.
+        gui_ctx = mp.get_context("spawn")
         self.gui_process = gui_ctx.Process(
             name="apricus-gui",
-            target=gui_target,
+            target=_gui_gtk4_target,
             args=(
                 self.version,
                 self.pkgdatadir,

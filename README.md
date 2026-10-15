@@ -61,8 +61,8 @@ are in progress and fall back to English where untranslated.
 loaded lazily (max 2 concurrent downloads), with a monogram fallback when
 no image is available. The LIVE badge appears only for confirmed live
 streams.
-<sup>12</sup> Set `APRICUS_GTK4=1` to open the new panel (`APRICUS_GTK4_TAB`
-selects the starting section). The classic GTK3 panel remains the default.
+<sup>12</sup> The GTK4 + Libadwaita control panel is the default GUI
+(`APRICUS_GTK4_TAB` selects the starting section).
 
 ## What changed vs upstream
 
@@ -113,7 +113,9 @@ selects the starting section). The classic GTK3 panel remains the default.
 
 ## New in 2.0.0 RC3
 
-- Same RC2 content with a green CI on the tagged commit (CI-only test fixes)
+- GTK4 + Libadwaita control panel enabled by default (legacy GTK3 launch path removed)
+- Updated application icon (hicolor PNGs and scalable SVG)
+- CI-green test suite on the tagged commit (portable test stubs)
 
 ## New in 2.0.0 RC2
 

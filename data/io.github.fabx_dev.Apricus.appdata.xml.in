@@ -29,6 +29,8 @@
     <release version="2.0.0-rc3" date="2026-10-15" type="development">
       <description>
         <ul>
+          <li>GTK4 + Libadwaita control panel enabled by default</li>
+          <li>Updated application icon (hicolor PNGs and scalable SVG)</li>
           <li>CI-green test suite on the tagged commit (portable test stubs)</li>
         </ul>
       </description>
