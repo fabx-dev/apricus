@@ -253,7 +253,7 @@ def monitor_menu_items_list_all_plus_monitors():
     obj, _ = _panel(_base_config(), [])
     obj._monitor_choices = lambda: [("HDMI-1", "Acme 24"), ("DP-1", "Acme 27")]
     assert obj._monitor_menu_items("/x.mp4") == [
-        ("Set for All", ""),
+        ("Set for all monitors", ""),
         ("Set for Acme 24", "HDMI-1"),
         ("Set for Acme 27", "DP-1"),
     ]

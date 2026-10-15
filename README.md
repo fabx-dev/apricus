@@ -62,7 +62,7 @@ The legacy 3-tab GTK3 window has been replaced by a native **GTK4 + Libadwaita**
 | **Multi-Monitor** | Identical monitor models overwrote each other | ✅ **Unique `Model#i` keys** + interactive monitor chooser on apply |
 | **Error Handling** | Silent black/frozen wallpaper on stream failure | ✅ **D-Bus `playback_error` reporting** with top-level **Retry** banner in the GUI |
 | **Network Security** | Unguarded fetches, no SSRF or redirect validation | ✅ **Hop-by-hop SSRF protection** (`fetch_public`), incremental byte caps, UID checks & atomic `.bak` config saves |
-| **Translations** | Partial GTK3 translations | ✅ **100% translated (168 strings)** in EN, IT, DE, FR, ES and JA |
+| **Translations** | Partial GTK3 translations | ✅ **100% translated (170 strings)** in EN, IT, DE, FR, ES and JA |
 
 ---
 
@@ -89,7 +89,7 @@ The legacy 3-tab GTK3 window has been replaced by a native **GTK4 + Libadwaita**
 Ready-made Flatpak bundles are attached to each [GitHub Release](https://github.com/fabx-dev/apricus/releases):
 
 ```bash
-flatpak install --user apricus-2.0.0.flatpak
+flatpak install --user apricus-2.0.1.flatpak apricus-locale.flatpak
 ```
 
 Or build and install locally from source (pulls runtime/SDK from Flathub):

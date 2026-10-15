@@ -25,6 +25,15 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="2.0.1" date="2026-10-16" type="stable">
+      <description>
+        <ul>
+          <li>Instant monitor chooser on Streaming and Web Page Apply buttons with left-aligned menu items</li>
+          <li>Translated monitor chooser entries ("Set for all monitors") across all 6 supported languages</li>
+          <li>Performance optimizations: in-memory texture and metadata caches, D-Bus bus reuse, flicker-free Now Playing refresh</li>
+        </ul>
+      </description>
+    </release>
     <release version="2.0.0" date="2026-10-15" type="stable">
       <description>
         <ul>

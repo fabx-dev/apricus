@@ -378,7 +378,11 @@ class ControlPanel(Adw.Application):
 
     def _server(self):
         try:
-            return SessionBus().get(DBUS_NAME_SERVER)
+            bus = getattr(self, "_session_bus", None)
+            if bus is None:
+                bus = SessionBus()
+                self._session_bus = bus
+            return bus.get(DBUS_NAME_SERVER)
         except GLib.Error:
             logger.error("[GUI4] Couldn't connect to server")
             return None
@@ -554,28 +558,40 @@ class ControlPanel(Adw.Application):
         return [(key, mon.name or key) for key, mon in monitors.items()]
 
     def _monitor_menu_items(self, _path):
-        """Pure label list for the chooser: [("Set for All", "")] + monitors."""
-        return [("Set for All", "")] + [
-            (f"Set for {label}", key) for key, label in self._monitor_choices()
+        """Pure label list for the chooser: [("Set for all monitors", "")] + monitors."""
+        return [(_("Set for all monitors"), "")] + [
+            (_("Set for {monitor}").format(monitor=label), key)
+            for key, label in self._monitor_choices()
         ]
 
-    def _show_monitor_chooser(self, path):
-        if not self._monitor_choices():
-            self._apply_video_to_monitor(path, "")
-            return
+    def _popup_monitor_chooser(self, anchor, path, on_pick):
         popover = Gtk.Popover()
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
         for label, key in self._monitor_menu_items(path):
             btn = Gtk.Button(label=label)
             btn.add_css_class("flat")
+            btn.set_halign(Gtk.Align.FILL)
+            child = btn.get_child()
+            if hasattr(child, "set_xalign"):
+                child.set_xalign(0.0)
             btn.connect(
                 "clicked",
-                lambda *_a, k=key: (popover.popdown(), self._apply_video_to_monitor(path, k)),
+                lambda *_a, k=key: (popover.popdown(), on_pick(k)),
             )
             box.append(btn)
         popover.set_child(box)
-        popover.set_parent(self.apply_btn)
+        popover.set_parent(anchor)
         popover.popup()
+
+    def _show_monitor_chooser(self, path):
+        if not self._monitor_choices():
+            self._apply_video_to_monitor(path, "")
+            return
+        self._popup_monitor_chooser(
+            self.apply_btn,
+            path,
+            lambda k: self._apply_video_to_monitor(path, k),
+        )
 
     def _apply_video_to_monitor(self, path, monitor):
         server = self._server()
@@ -677,6 +693,7 @@ class ControlPanel(Adw.Application):
             logger.warning(f"[GUI4] Could not open video folder: {e.message}")
 
     def on_refresh_library(self, *_args):
+        self._lib_paths_shown = None
         self._refresh_all()
 
     def _playlist_page(self):
@@ -897,6 +914,12 @@ class ControlPanel(Adw.Application):
     def _reload_queue_store(self):
         from apricus.gui.gtk4lib import VideoItem
 
+        sig = tuple(self.playlist_paths)
+        if sig == getattr(
+            self, "_queue_paths_shown", None
+        ) and self.queue_store.get_n_items() == len(sig):
+            return
+        self._queue_paths_shown = sig
         items = [VideoItem(p) for p in self.playlist_paths]
         self.queue_store.splice(0, self.queue_store.get_n_items(), items)
 
@@ -1397,6 +1420,10 @@ class ControlPanel(Adw.Application):
         group = getattr(self, "np_details", None)
         if group is None:
             return
+        signature = (mode, current)
+        if signature == getattr(self, "_np_details_shown", None):
+            return
+        self._np_details_shown = signature
         if mode == MODE_VIDEO and current and os.path.isfile(current):
             group.set_visible(True)
             for row in self.np_detail_rows.values():
@@ -1480,8 +1507,13 @@ class ControlPanel(Adw.Application):
         }
         thumb_url = None
         try:
-            with yt_dlp.YoutubeDL(base_options(quiet=True)) as ydl:
-                meta = ydl.extract_info(url, download=False) or {}
+            cached = getattr(self, "_stream_meta_cache", None)
+            if cached and cached[0] == url and (time.time() - cached[1]) < 120:
+                meta = cached[2]
+            else:
+                with yt_dlp.YoutubeDL(base_options(quiet=True)) as ydl:
+                    meta = ydl.extract_info(url, download=False) or {}
+                self._stream_meta_cache = (url, time.time(), meta)
             title = meta.get("title")
             if title:
                 info["line1"] = ("Title", title, "applications-multimedia-symbolic")
@@ -2531,9 +2563,14 @@ class ControlPanel(Adw.Application):
             return "URL not supported."
         if not public_http_url(url):
             return "Local network addresses are not supported."
+        cached = getattr(self, "_stream_meta_cache", None)
+        if cached and cached[0] == url and (time.time() - cached[1]) < 120:
+            return None
         try:
             with yt_dlp.YoutubeDL(base_options()) as ydl:
-                ydl.extract_info(url, download=False)
+                meta = ydl.extract_info(url, download=False) or {}
+            if meta.get("formats"):
+                self._stream_meta_cache = (url, time.time(), meta)
         except Exception as e:  # noqa: BLE001 - any backend failure is a bad URL
             return self._classify_stream_error(str(e))
         return None
@@ -2594,8 +2631,18 @@ class ControlPanel(Adw.Application):
         if kind == "collection":
             self._show_collection_warning(url)
             return
+        self._show_stream_monitor_chooser(url)
+
+    def _start_stream_for_monitor(self, url, monitor):
+        kind = self._classify_stream_url(url)
+        if kind in ("invalid", "collection"):
+            kind = "page"
         self._set_apply_busy(getattr(self, "stream_apply_btn", None), True)
-        threading.Thread(target=self._validate_and_stream, args=(url, kind), daemon=True).start()
+        threading.Thread(
+            target=self._validate_and_stream,
+            args=(url, kind, monitor),
+            daemon=True,
+        ).start()
 
     def _show_collection_warning(self, url):
         dialog = Adw.AlertDialog(
@@ -2613,24 +2660,18 @@ class ControlPanel(Adw.Application):
         dialog.set_close_response("cancel")
         dialog.connect(
             "response",
-            lambda _d, r: (
-                threading.Thread(
-                    target=self._validate_and_stream, args=(url, "page"), daemon=True
-                ).start()
-                if r == "use"
-                else None
-            ),
+            lambda _d, r: self._show_stream_monitor_chooser(url) if r == "use" else None,
         )
         dialog.present(self.window)
 
-    def _validate_and_stream(self, url, kind="page"):
+    def _validate_and_stream(self, url, kind="page", monitor=None):
         if kind == "direct" and self._check_direct_url(url) is None:
             error = None
         else:
             error = self._check_stream_url(url)
-        GLib.idle_add(self._finish_stream_apply, url, error, kind)
+        GLib.idle_add(self._finish_stream_apply, url, error, kind, monitor)
 
-    def _finish_stream_apply(self, url, error, kind="page"):
+    def _finish_stream_apply(self, url, error, kind="page", monitor=None):
         self._set_apply_busy(getattr(self, "stream_apply_btn", None), False)
         if error is not None:
             logger.error(f"[GUI4] Failed to stream {url}. Error:\n{error}")
@@ -2641,26 +2682,21 @@ class ControlPanel(Adw.Application):
         logger.info(f"[GUI4] Streaming: {url}")
         self._record_stream_use(url, site=self._stream_site(url), kind=kind)
         self._reload_stream_lists()
-        self._show_stream_monitor_chooser(url)
+        if monitor is None:
+            self._show_stream_monitor_chooser(url)
+        else:
+            self._apply_stream_to_monitor(url, monitor)
         return False
 
     def _show_stream_monitor_chooser(self, url):
         if not self._monitor_choices():
-            self._apply_stream_to_monitor(url, "")
+            self._start_stream_for_monitor(url, "")
             return
-        popover = Gtk.Popover()
-        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
-        for label, key in self._monitor_menu_items(url):
-            btn = Gtk.Button(label=label)
-            btn.add_css_class("flat")
-            btn.connect(
-                "clicked",
-                lambda *_a, k=key: (popover.popdown(), self._apply_stream_to_monitor(url, k)),
-            )
-            box.append(btn)
-        popover.set_child(box)
-        popover.set_parent(self.stream_apply_btn)
-        popover.popup()
+        self._popup_monitor_chooser(
+            self.stream_apply_btn,
+            url,
+            lambda k: self._start_stream_for_monitor(url, k),
+        )
 
     def _apply_stream_to_monitor(self, url, monitor):
         self.config = ConfigUtil().load()
@@ -3063,8 +3099,11 @@ class ControlPanel(Adw.Application):
         if generation != getattr(self, "_web_generation", generation):
             return False
         if ok:
+            self._verified_web_url = url
             self._set_web_detect("object-select-symbolic", detail, False)
         else:
+            if getattr(self, "_verified_web_url", None) == url:
+                self._verified_web_url = None
             self._set_web_detect("dialog-error-symbolic", detail, False)
         self._update_web_hero(url, title)
         return False
@@ -3280,17 +3319,32 @@ class ControlPanel(Adw.Application):
         return "Too many redirects."
 
     def on_webpage_apply(self, *_args):
+        from apricus.utils import valid_http_url
+
         url = self.webpage_entry.get_text().strip()
         if not url:
             return
+        if not valid_http_url(url):
+            self._show_error(_("Not a valid http(s) URL."))
+            return
+        self._show_webpage_monitor_chooser(url)
+
+    def _start_webpage_for_monitor(self, source, monitor):
+        if "://" not in source or getattr(self, "_verified_web_url", None) == source:
+            self._record_web_use(source)
+            self._reload_web_lists()
+            self._apply_webpage_to_monitor(source, monitor)
+            return
         self._set_apply_busy(getattr(self, "webpage_apply_btn", None), True)
-        threading.Thread(target=self._validate_and_webpage, args=(url,), daemon=True).start()
+        threading.Thread(
+            target=self._validate_and_webpage, args=(source, monitor), daemon=True
+        ).start()
 
-    def _validate_and_webpage(self, url):
+    def _validate_and_webpage(self, url, monitor=None):
         error = self._check_web_url(url)
-        GLib.idle_add(self._finish_webpage_apply, url, error)
+        GLib.idle_add(self._finish_webpage_apply, url, error, monitor)
 
-    def _finish_webpage_apply(self, url, error):
+    def _finish_webpage_apply(self, url, error, monitor=None):
         self._set_apply_busy(getattr(self, "webpage_apply_btn", None), False)
         if error is not None:
             logger.error(f"[GUI4] Failed to access {url}. Error:\n{error}")
@@ -3298,32 +3352,25 @@ class ControlPanel(Adw.Application):
                 _("Failed to access {url}.\nError:\n{error}").format(url=url, error=error)
             )
             return False
+        self._verified_web_url = url
         self._record_web_use(url)
         self._reload_web_lists()
-        self._show_webpage_monitor_chooser(url)
+        if monitor is None:
+            self._show_webpage_monitor_chooser(url)
+        else:
+            self._apply_webpage_to_monitor(url, monitor)
         return False
 
     def _show_webpage_monitor_chooser(self, source):
         if not self._monitor_choices():
-            self._apply_webpage_to_monitor(source, "")
+            self._start_webpage_for_monitor(source, "")
             return
-        popover = Gtk.Popover()
-        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
-        for label, key in self._monitor_menu_items(source):
-            btn = Gtk.Button(label=label)
-            btn.add_css_class("flat")
-            btn.connect(
-                "clicked",
-                lambda *_a, k=key: (
-                    popover.popdown(),
-                    self._apply_webpage_to_monitor(source, k),
-                ),
-            )
-            box.append(btn)
-        popover.set_child(box)
         anchor = getattr(self, "webpage_apply_btn", None) or self.window
-        popover.set_parent(anchor)
-        popover.popup()
+        self._popup_monitor_chooser(
+            anchor,
+            source,
+            lambda k: self._start_webpage_for_monitor(source, k),
+        )
 
     def _apply_webpage_to_monitor(self, source, monitor):
         logger.info(f"[GUI4] Webpage: {source} For Monitor {monitor or 'all'}")
@@ -3625,7 +3672,15 @@ class ControlPanel(Adw.Application):
     def _reload_library_store(self):
         from apricus.gui.gtk4lib import VideoItem
 
-        items = [VideoItem(p) for p in get_video_paths(resolve_video_dir(self.config))]
+        paths = get_video_paths(resolve_video_dir(self.config))
+        sig = tuple(paths)
+        if sig == getattr(self, "_lib_paths_shown", None) and self.video_store.get_n_items() == len(
+            sig
+        ):
+            self._on_lib_selection()
+            return
+        self._lib_paths_shown = sig
+        items = [VideoItem(p) for p in paths]
         self.video_store.splice(0, self.video_store.get_n_items(), items)
         self._on_lib_selection()
 

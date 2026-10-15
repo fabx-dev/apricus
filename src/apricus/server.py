@@ -531,10 +531,15 @@ class ApricusServer:
         return ""
 
 
+_bus_singleton = None
+
+
 def get_instance(dbus_name):
-    bus = SessionBus()
+    global _bus_singleton
+    if _bus_singleton is None:
+        _bus_singleton = SessionBus()
     try:
-        instance = bus.get(dbus_name)
+        instance = _bus_singleton.get(dbus_name)
     except GLib.Error:
         return None
     return instance

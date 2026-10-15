@@ -22,16 +22,26 @@ logger = logging.getLogger(LOGGER_NAME)
 CACHE_FILENAME = "video-info.json"
 FFPROBE_TIMEOUT = 20
 
+_mem_cache = {"path": None, "mtime_ns": None, "data": None}
+
 
 def _cache_file():
     return os.path.join(commons.CONFIG_DIR, CACHE_FILENAME)
 
 
 def _load():
+    path = _cache_file()
     try:
-        with open(_cache_file(), encoding="utf-8") as f:
+        st = os.stat(path)
+        if _mem_cache["path"] == path and _mem_cache["mtime_ns"] == st.st_mtime_ns:
+            return _mem_cache["data"]
+        with open(path, encoding="utf-8") as f:
             data = json.load(f)
-            return data if isinstance(data, dict) else {}
+            res = data if isinstance(data, dict) else {}
+            _mem_cache["path"] = path
+            _mem_cache["mtime_ns"] = st.st_mtime_ns
+            _mem_cache["data"] = res
+            return res
     except (OSError, ValueError):
         return {}
 
@@ -39,10 +49,18 @@ def _load():
 def _save(cache):
     try:
         os.makedirs(commons.CONFIG_DIR, exist_ok=True)
-        tmp = _cache_file() + ".tmp"
+        path = _cache_file()
+        tmp = path + ".tmp"
         with open(tmp, "w", encoding="utf-8") as f:
             json.dump(cache, f)
-        os.replace(tmp, _cache_file())
+        os.replace(tmp, path)
+        try:
+            st = os.stat(path)
+            _mem_cache["path"] = path
+            _mem_cache["mtime_ns"] = st.st_mtime_ns
+            _mem_cache["data"] = cache
+        except OSError:
+            _mem_cache["mtime_ns"] = None
     except OSError as e:
         logger.warning(f"[MediaCache] save failed: {e}")
 

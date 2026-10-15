@@ -23,6 +23,18 @@ from apricus.commons import LOGGER_NAME
 logger = logging.getLogger(LOGGER_NAME)
 
 _pool = ThreadPoolExecutor(max_workers=4, thread_name_prefix="gtk4thumb")
+_texture_cache = {}
+_TEXTURE_CACHE_MAX = 128
+
+
+def _cache_put(key, texture):
+    if texture is None:
+        return
+    if key in _texture_cache:
+        _texture_cache.pop(key, None)
+    elif len(_texture_cache) >= _TEXTURE_CACHE_MAX:
+        _texture_cache.pop(next(iter(_texture_cache)), None)
+    _texture_cache[key] = texture
 
 
 class VideoItem(GObject.Object):
@@ -34,7 +46,7 @@ class VideoItem(GObject.Object):
         super().__init__()
         self.path = path
         self.name = os.path.basename(path)
-        self.texture = None
+        self.texture = _texture_cache.get((path, 192))
 
 
 def _load_pixbuf(video_path, width=192):
@@ -94,6 +106,7 @@ def _factory_bind(_factory, item):
                 return False
             if pixbuf is not None:
                 texture = Gdk.Texture.new_for_pixbuf(pixbuf)
+                _cache_put((path, 192), texture)
                 video.texture = texture
                 list_item._picture.set_paintable(texture)
             return False
@@ -122,8 +135,14 @@ def load_texture_async(video, callback, width=192):
         callback(texture)
         return False
 
-    if video.texture is not None:
+    if video.texture is not None and width == 192:
         GLib.idle_add(_emit, video.texture)
+        return
+    cached = _texture_cache.get((video.path, width))
+    if cached is not None:
+        if width == 192:
+            video.texture = cached
+        GLib.idle_add(_emit, cached)
         return
 
     def _done(future):
@@ -136,7 +155,9 @@ def load_texture_async(video, callback, width=192):
             texture = None
             if pixbuf is not None:
                 texture = Gdk.Texture.new_for_pixbuf(pixbuf)
-                video.texture = texture
+                _cache_put((video.path, width), texture)
+                if width == 192:
+                    video.texture = texture
             callback(texture)
             return False
 
