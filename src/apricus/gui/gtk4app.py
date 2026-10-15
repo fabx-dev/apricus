@@ -139,7 +139,9 @@ class ControlPanel(Adw.Application):
 
     def do_activate(self):
         if self.window is None:
+            Gtk.Window.set_default_icon_name(PROJECT)
             self.window = Adw.ApplicationWindow(application=self)
+            self.window.set_icon_name(PROJECT)
             self.window.set_title("Apricus")
             self.window.set_default_size(900, 600)
             self.stack = Adw.ViewStack()
