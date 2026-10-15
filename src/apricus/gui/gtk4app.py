@@ -135,7 +135,7 @@ class ControlPanel(Adw.Application):
         if pool is not None:
             pool.shutdown(wait=False, cancel_futures=True)
             self._stream_thumb_pool = None
-        super().do_shutdown()
+        Gio.Application.do_shutdown(self)
 
     def do_activate(self):
         if self.window is None:
@@ -173,6 +173,11 @@ class ControlPanel(Adw.Application):
             self.server_banner.set_button_label(_("Retry"))
             self.server_banner.connect("button-clicked", lambda *_: self._refresh_all())
             toolbar.add_top_bar(self.server_banner)
+            self.playback_banner = Adw.Banner()
+            self.playback_banner.set_title(_("Playback failed"))
+            self.playback_banner.set_button_label(_("Retry"))
+            self.playback_banner.connect("button-clicked", self._on_retry_playback)
+            toolbar.add_top_bar(self.playback_banner)
             toolbar.set_content(self.toasts)
             self.window.set_content(toolbar)
             self._load_css()
@@ -200,7 +205,7 @@ class ControlPanel(Adw.Application):
         for name, title, icon_name in self.SECTIONS:
             row = Adw.ActionRow()
             row.set_name(name)
-            row.set_title(title)
+            row.set_title(_(title))
             icon = Gtk.Image.new_from_icon_name(icon_name)
             row.add_prefix(icon)
             self.sidebar_rows[name] = row
@@ -1227,12 +1232,12 @@ class ControlPanel(Adw.Application):
     @staticmethod
     def _np_badge(mode, paused):
         if mode == MODE_PLAYLIST:
-            return "Playlist in loop"
+            return _("Playlist in loop")
         if mode == MODE_WEBPAGE:
-            return "Web page"
+            return _("Web page")
         if mode in (MODE_VIDEO, MODE_STREAM):
-            return "Paused" if paused else "Playing"
-        return "Static"
+            return _("Paused") if paused else _("Playing")
+        return _("Static")
 
     def _refresh_now_playing(self):
         server = self._server()
@@ -1607,8 +1612,24 @@ class ControlPanel(Adw.Application):
                 load_texture_async(video, _paint)
 
     @staticmethod
+    def _register_i18n_constants():
+        return (
+            _("Single video"),
+            _("Streaming"),
+            _("Web page"),
+            _("Playlist (muted)"),
+            _("Static wallpaper"),
+            _("Library"),
+            _("Playlist"),
+            _("Now Playing"),
+            _("Web Page"),
+            _("Settings"),
+            _("Playback failed before the first frame was shown"),
+        )
+
+    @staticmethod
     def _mode_text(mode):
-        return ControlPanel.MODE_LABELS.get(mode, ControlPanel.MODE_LABELS[MODE_NULL])
+        return _(ControlPanel.MODE_LABELS.get(mode, ControlPanel.MODE_LABELS[MODE_NULL]))
 
     @staticmethod
     def _mode_icon(mode):
@@ -1684,8 +1705,8 @@ class ControlPanel(Adw.Application):
         box.set_margin_end(24)
         hero, refs = self._build_hero(
             "network-wireless-symbolic",
-            "Streaming",
-            "Paste a link to stream it as wallpaper",
+            _("Streaming"),
+            _("Paste a link to stream it as wallpaper"),
         )
         self.stream_hero_icon = refs["icon"]
         self.stream_hero_title = refs["title"]
@@ -1700,7 +1721,7 @@ class ControlPanel(Adw.Application):
             Gtk.EntryIconPosition.SECONDARY, "edit-paste-symbolic"
         )
         self.stream_entry.set_icon_tooltip_text(
-            Gtk.EntryIconPosition.SECONDARY, "Paste from clipboard"
+            Gtk.EntryIconPosition.SECONDARY, _("Paste from clipboard")
         )
         self.stream_entry.connect("activate", self.on_stream_apply)
         self.stream_entry.connect("icon-press", self._on_stream_icon_press)
@@ -2708,8 +2729,8 @@ class ControlPanel(Adw.Application):
         self._web_generation = 0
         hero, refs = self._build_hero(
             "web-browser-symbolic",
-            "Web Page",
-            "Display a website or HTML file as wallpaper",
+            _("Web Page"),
+            _("Display a website or HTML file as wallpaper"),
         )
         self.web_hero_icon = refs["icon"]
         self.web_hero_title = refs["title"]
@@ -2724,7 +2745,7 @@ class ControlPanel(Adw.Application):
             Gtk.EntryIconPosition.SECONDARY, "edit-paste-symbolic"
         )
         self.webpage_entry.set_icon_tooltip_text(
-            Gtk.EntryIconPosition.SECONDARY, "Paste from clipboard"
+            Gtk.EntryIconPosition.SECONDARY, _("Paste from clipboard")
         )
         self.webpage_entry.connect("activate", self.on_webpage_apply)
         self.webpage_entry.connect("icon-press", self._on_webpage_icon_press)
@@ -3354,8 +3375,8 @@ class ControlPanel(Adw.Application):
         behaviour.set_title(_("Behaviour"))
         self.static_row, self.static_switch = self._settings_switch_row(
             behaviour,
-            "Static wallpaper",
-            "Keep the last video frame as wallpaper",
+            _("Static wallpaper"),
+            _("Keep the last video frame as wallpaper"),
             bool(config.get(CONFIG_KEY_STATIC_WALLPAPER, True)),
             sensitive=is_gnome(),
         )
@@ -3365,8 +3386,8 @@ class ControlPanel(Adw.Application):
         wayland = is_wayland()
         self.pause_max_row, self.pause_max_switch = self._settings_switch_row(
             behaviour,
-            "Pause when maximized",
-            "Pause playback when a window is maximized",
+            _("Pause when maximized"),
+            _("Pause playback when a window is maximized"),
             bool(config.get(CONFIG_KEY_PAUSE_WHEN_MAXIMIZED, True)),
             sensitive=not wayland,
         )
@@ -3377,8 +3398,8 @@ class ControlPanel(Adw.Application):
         )
         self.mute_max_row, self.mute_max_switch = self._settings_switch_row(
             behaviour,
-            "Mute when maximized",
-            "Mute audio when a window is maximized",
+            _("Mute when maximized"),
+            _("Mute audio when a window is maximized"),
             bool(config.get(CONFIG_KEY_MUTE_WHEN_MAXIMIZED, False)),
             sensitive=not wayland,
         )
@@ -3392,8 +3413,8 @@ class ControlPanel(Adw.Application):
         startup.set_title(_("Startup"))
         self.autostart_row, self.autostart_switch = self._settings_switch_row(
             startup,
-            "Start wallpaper at login",
-            "Start only the wallpaper service at login",
+            _("Start wallpaper at login"),
+            _("Start only the wallpaper service at login"),
             self._autostart_enabled(),
         )
         self._update_autostart_subtitle(self.autostart_switch.get_active())
@@ -3450,9 +3471,9 @@ class ControlPanel(Adw.Application):
         if row is None:
             return
         row.set_subtitle(
-            "Wallpaper service starts at login"
+            _("Wallpaper service starts at login")
             if enabled
-            else "Starts only the wallpaper service at login"
+            else _("Starts only the wallpaper service at login")
         )
 
     def _on_autostart_toggled(self, switch, *args):
@@ -3548,7 +3569,32 @@ class ControlPanel(Adw.Application):
         banner = getattr(self, "server_banner", None)
         if banner is not None:
             banner.set_revealed(server is None)
+        p_err = self._playback_error(server)
+        p_banner = getattr(self, "playback_banner", None)
+        if p_banner is not None:
+            if p_err:
+                p_banner.set_title(_(p_err))
+            p_banner.set_revealed(bool(p_err and server is not None))
         self._refresh_sidebar_status(server, mode)
+
+    @staticmethod
+    def _playback_error(server):
+        if server is None:
+            return None
+        try:
+            err = getattr(server, "playback_error", "") or ""
+        except Exception:  # noqa: BLE001 - D-Bus failure must not break refresh
+            return None
+        return err or None
+
+    def _on_retry_playback(self, *_args):
+        server = self._server()
+        if server is not None:
+            try:
+                server.reload()
+            except GLib.Error:
+                pass
+        self._refresh_all()
 
     def _reload_library_store(self):
         from apricus.gui.gtk4lib import VideoItem

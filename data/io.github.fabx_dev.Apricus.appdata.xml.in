@@ -11,8 +11,8 @@
   <project_license>GPL-3.0-or-later</project_license>
   
   <description>
-    <p>Live wallpaper for Linux. Apricus (lat.) — sunny, exposed to the sun.</p>
-    <p>Community fork of Hidamari by Jeff Shee, with real Wayland support, fast login startup and multi-desktop support on the roadmap.</p>
+    <p>Live wallpaper for Linux — local videos, looping playlists, live streams and interactive web pages. Apricus (lat.) — sunny, warmed by the sun.</p>
+    <p>Features a native GTK4 + Libadwaita control center, gapless in-place video switching, visual playlists with drag-and-drop and undo, a live Now Playing dashboard, streaming and web hubs with favorites and 10-second previews, and ~1.4s login startup.</p>
   </description>
   <screenshots>
     <screenshot type="default">
@@ -26,34 +26,17 @@
     </screenshot>
   </screenshots>
   <releases>
-    <release version="2.0.0-rc3" date="2026-10-15" type="development">
+    <release version="2.0.0" date="2026-10-15" type="stable">
       <description>
         <ul>
-          <li>GTK4 + Libadwaita control panel enabled by default</li>
-          <li>Updated application icon (hicolor PNGs and scalable SVG)</li>
-          <li>CI-green test suite on the tagged commit (portable test stubs)</li>
-        </ul>
-      </description>
-    </release>
-    <release version="2.0.0-rc2" date="2026-10-15" type="development">
-      <description>
-        <ul>
-          <li>Streaming over HTTPS works in the Flatpak (TLS fast-open fallback in the VLC build)</li>
-          <li>Now Playing follows the playlist queue and play/pause works in playlist mode</li>
-          <li>Non-public stream and web hosts are refused before any contact</li>
-          <li>Player reports playback failures instead of staying silently stuck</li>
-          <li>Italian translation of the GTK4 panel complete</li>
-        </ul>
-      </description>
-    </release>
-    <release version="2.0.0-rc1" date="2026-10-14" type="development">
-      <description>
-        <ul>
-          <li>Release candidate: new GTK4 panel (Library, Playlist, Now Playing, Streaming, Web Page, Settings)</li>
-          <li>Streaming rows with thumbnails (cached, lazy, max 2 concurrent) and LIVE badge</li>
-          <li>Shared yt-dlp options with bundled Deno runtime in the Flatpak</li>
-          <li>Static wallpaper pinned under streams (thumbnail or extracted frame)</li>
-          <li>Direct upgrade of the 1.0 install: same app ID, config and data preserved</li>
+          <li>New GTK4 + Libadwaita control center (Library, Playlist, Now Playing, Streaming, Web Page, Settings)</li>
+          <li>Visual playlist rows with thumbnails, drag-and-drop reorder, shuffle and undo</li>
+          <li>Now Playing dashboard with 16:9 hero preview, transport controls, media metadata and Up next queue</li>
+          <li>Streaming hub with saved favorites, recent history, lazy thumbnail cache, LIVE badge and 10-second live preview</li>
+          <li>Bundled Deno 2.9 runtime and libVLC TLS Fast Open fallback in the Flatpak for reliable HTTPS streaming</li>
+          <li>Web Page hub with reachability and title detector, Inspiration presets, favorites and history</li>
+          <li>Real-time playback failure banner with Retry action and hop-by-hop SSRF protection</li>
+          <li>New application icon and 100% complete translations in English, Italian, German, French, Spanish and Japanese</li>
         </ul>
       </description>
     </release>

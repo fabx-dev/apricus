@@ -203,7 +203,7 @@ def test_gui_callsites_pass_monitor_to_dbus():
     import pathlib
 
     bad = []
-    for name in ("src/apricus/gui/control.py", "src/apricus/gui/gtk4app.py"):
+    for name in ("src/apricus/gui/gtk4app.py",):
         tree = ast.parse(pathlib.Path(name).read_text())
         for node in ast.walk(tree):
             if (
@@ -301,6 +301,23 @@ def test_gui_trampolines_import_only_inside_child():
     assert not banned, f"GTK3 modules at server top-level: {banned}"
     banned = [m for m in top_imports if "player" in m]
     assert not banned, f"player modules at server top-level: {banned}"
+
+
+def test_server_playback_error_proxies_player_last_error(monkeypatch):
+    """ApricusServer.playback_error returns player's last_error string (or '')."""
+
+    class _FakePlayer:
+        mode = srv.MODE_STREAM
+        last_error = "Playback failed before the first frame was shown"
+
+    monkeypatch.setattr(srv, "get_instance", lambda _name: _FakePlayer())
+    s = srv.ApricusServer.__new__(srv.ApricusServer)
+    assert s.playback_error == "Playback failed before the first frame was shown"
+
+    _FakePlayer.last_error = ""
+    assert s.playback_error == ""
+    monkeypatch.setattr(srv, "get_instance", lambda _name: None)
+    assert s.playback_error == ""
 
 
 def test_pause_flag_roundtrips_in_playlist_mode():

@@ -106,22 +106,22 @@ def test_get_formats_rejects_non_public_hosts_without_network(monkeypatch):
             yt_utils.get_formats(bad)
 
 
-def test_legacy_callsite_uses_shared_options():
-    """control.py (GTK3 legacy) must use base_options(), verified by AST
-    so the suite never imports Gtk 3.0 in-process."""
+def test_gtk4_callsite_uses_shared_options():
+    """gtk4app.py must use base_options() for all YoutubeDL calls, verified
+    by AST without importing Gtk in-process."""
     import ast
     import pathlib
 
-    tree = ast.parse(pathlib.Path("src/apricus/gui/control.py").read_text())
+    tree = ast.parse(pathlib.Path("src/apricus/gui/gtk4app.py").read_text())
     found = [
         node
         for node in ast.walk(tree)
         if isinstance(node, ast.Call) and getattr(node.func, "attr", "") == "YoutubeDL"
     ]
-    assert found, "legacy YoutubeDL call-site disappeared?"
+    assert found, "YoutubeDL call-site disappeared?"
     for call in found:
         src = ast.dump(call)
-        assert "base_options" in src, f"legacy call-site bypasses base_options: {src[:120]}"
+        assert "base_options" in src, f"call-site bypasses base_options: {src[:120]}"
 
 
 ERROR_CASES = [

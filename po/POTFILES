@@ -1,5 +1,3 @@
-src/apricus/gui/control.py
 src/apricus/gui/gtk4app.py
 src/apricus/gui/gtk4lib.py
 src/apricus/menu.py
-src/apricus/assets/control.ui

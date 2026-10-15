@@ -1,10 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <gresources>
   <gresource prefix="/io/github/fabx_dev/Apricus/icons/scalable/actions/">
-    <file alias="dice3-symbolic.svg">assets/icons/dice3-symbolic.svg</file>
     <file alias="playback-symbolic.svg">assets/icons/playback-symbolic.svg</file>
-  </gresource>
-  <gresource prefix="/io/github/fabx_dev/Apricus">
-    <file alias="control.ui" preprocess="xml-stripblanks">assets/control.ui</file>
   </gresource>
 </gresources>

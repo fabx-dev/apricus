@@ -105,6 +105,7 @@ class ApricusServer:
         <property name="is_static_wallpaper" type="b" access="readwrite"/>
         <property name="is_pause_when_maximized" type="b" access="readwrite"/>
         <property name="is_mute_when_maximized" type="b" access="readwrite"/>
+        <property name="playback_error" type="s" access="read"/>
     </interface>
     </node>
     """
@@ -518,6 +519,16 @@ class ApricusServer:
         player = get_instance(DBUS_NAME_PLAYER)
         if player is not None:
             player.reload_config()
+
+    @property
+    def playback_error(self):
+        player = get_instance(DBUS_NAME_PLAYER)
+        if player is not None and player.mode in [MODE_VIDEO, MODE_STREAM, MODE_PLAYLIST]:
+            try:
+                return player.last_error or ""
+            except GLib.Error:
+                return ""
+        return ""
 
 
 def get_instance(dbus_name):

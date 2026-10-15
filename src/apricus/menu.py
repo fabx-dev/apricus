@@ -71,12 +71,6 @@ def on_item_reload():
         server.reload()
 
 
-def on_item_lucky():
-    server = connect()
-    if server:
-        server.feeling_lucky()
-
-
 def on_item_quit():
     server = connect()
     if server:
@@ -104,17 +98,14 @@ def build_menu(mode):
     item_reload = Gtk.MenuItem(label=_("Reload"))
     item_reload.connect("activate", lambda *_: start_action(on_item_reload))
     #
-    item_lucky = Gtk.MenuItem(label=_("I'm Feeling Lucky"))
-    item_lucky.connect("activate", lambda *_: start_action(on_item_lucky))
-    #
     item_quit = Gtk.MenuItem(label=_("Quit Apricus"))
     item_quit.connect("activate", lambda *_: start_action(on_item_quit))
     #
     # Filter out unsupported action in current mode
     if mode == MODE_WEBPAGE:
-        item_list = [item_show, item_mute, item_reload, item_lucky, item_quit]
+        item_list = [item_show, item_mute, item_reload, item_quit]
     else:
-        item_list = [item_show, item_mute, item_pause, item_reload, item_lucky, item_quit]
+        item_list = [item_show, item_mute, item_pause, item_reload, item_quit]
     for item in item_list:
         menu.append(item)
     menu.show_all()

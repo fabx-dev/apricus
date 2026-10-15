@@ -407,6 +407,7 @@ class VideoPlayer(BasePlayer):
         <property name="is_mute" type="b" access="readwrite"/>
         <property name="is_playing" type="b" access="read"/>
         <property name="is_paused_by_user" type="b" access="readwrite"/>
+        <property name="last_error" type="s" access="read"/>
         <method name='preview_static'>
             <arg type='s' name='video_path' direction='in'/>
         </method>
@@ -782,6 +783,10 @@ class VideoPlayer(BasePlayer):
             if err is not None:
                 return err
         return None
+
+    @property
+    def last_error(self):
+        return self.playback_error() or ""
 
     def pause_playback(self):
         for _monitor, window in self.windows.items():
