@@ -3,6 +3,7 @@
 
 """Tests for ApricusServer.feeling_lucky (no display required)."""
 
+import pathlib
 from unittest.mock import patch
 
 from apricus import server as srv
@@ -242,7 +243,7 @@ def test_server_import_leaves_gtk_namespaces_free(tmp_path):
         [sys.executable, "-c", code],
         capture_output=True,
         text=True,
-        cwd="/home/fabrizio/apricus/apricus",
+        cwd=str(pathlib.Path(__file__).resolve().parent.parent),
         env={**dict(__import__("os").environ), "PYTHONPATH": "src"},
         timeout=120,
     )

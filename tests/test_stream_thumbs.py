@@ -181,7 +181,9 @@ def test_decode_size_rejects():
     assert decode_size(b"") is None
     assert decode_size(b"\x00\x01\x02\x03" * 16) is None
     truncated = _png(64, 32)
-    assert decode_size(truncated[: len(truncated) // 2]) is None
+    # A bare PNG signature with no IHDR can never yield dimensions, on any
+    # loader version (half-file still decodes on lenient loaders).
+    assert decode_size(truncated[:8]) is None
 
 
 def test_decode_size_rejects_oversize_width():

@@ -170,7 +170,16 @@ def test_extract_remote_frame_uses_forced_8bit_cmd(monkeypatch, tmp_path):
 
 
 def _window_stub(**attrs):
-    from apricus.player.video_player import PlayerWindow
+    """Plain namespace exercising the real PlayerWindow methods.
+
+    Deliberately NOT a Gtk instance: unbound method calls only need the
+    attributes they touch, and Gtk instantiation (or object.__setattr__
+    tricks on uninitialized widgets) behaves differently across
+    PyGObject/Python versions (broke CI while passing locally).
+    """
+    import types
+
+    from apricus.player.video_player import PlayerWindow  # noqa: F401  (binding check)
 
     class _Cover:
         def __init__(self):
@@ -179,12 +188,13 @@ def _window_stub(**attrs):
         def hide(self):
             self.hidden = True
 
-    obj = PlayerWindow.__new__(PlayerWindow)
-    obj.name = "test-window"
-    obj._mode = "MODE_STREAM"
-    obj._play_error = None
-    obj._first_frame_reported = False
-    object.__setattr__(obj, "_PlayerWindow__cover_image", _Cover())
+    obj = types.SimpleNamespace(
+        name="test-window",
+        _mode="MODE_STREAM",
+        _play_error=None,
+        _first_frame_reported=False,
+        _PlayerWindow__cover_image=_Cover(),
+    )
     for key, value in attrs.items():
         setattr(obj, key, value)
     return obj
@@ -203,43 +213,51 @@ class _FakeVlcPlayer:
 
 
 def test_playback_error_none_when_healthy():
-    assert _window_stub().playback_error() is None
+    from apricus.player.video_player import PlayerWindow
+
+    assert PlayerWindow.playback_error(_window_stub()) is None
 
 
 def test_playback_error_reports_failure_before_first_frame():
+    from apricus.player.video_player import PlayerWindow
+
     obj = _window_stub()
-    obj._on_media_error(object())
-    msg = obj.playback_error()
+    PlayerWindow._on_media_error(obj, object())
+    msg = PlayerWindow.playback_error(obj)
     assert msg == "Playback failed before the first frame was shown", msg
 
 
 def test_playback_error_after_frame_drops_timing_claim():
+    from apricus.player.video_player import PlayerWindow
+
     obj = _window_stub()
-    obj._on_first_time_changed(object())
-    assert obj.playback_error() is None
-    obj._on_media_error(object())
-    assert obj.playback_error() == "Playback failed"
+    PlayerWindow._on_first_time_changed(obj, object())
+    assert PlayerWindow.playback_error(obj) is None
+    PlayerWindow._on_media_error(obj, object())
+    assert PlayerWindow.playback_error(obj) == "Playback failed"
 
 
 def test_playback_error_never_contains_urls_or_tokens():
+    from apricus.player.video_player import PlayerWindow
+
     secret = "https://host.example/v?expire=1&sig=SECRET-TOKEN-123"
     obj = _window_stub()
-    obj._on_media_error(object())
-    assert "SECRET-TOKEN-123" not in obj.playback_error()
-    assert "?" not in obj.playback_error()
-    assert secret not in obj.playback_error()
+    PlayerWindow._on_media_error(obj, object())
+    assert "SECRET-TOKEN-123" not in PlayerWindow.playback_error(obj)
+    assert "?" not in PlayerWindow.playback_error(obj)
+    assert secret not in PlayerWindow.playback_error(obj)
 
 
 def test_set_media_clears_previous_error_and_frame_flag():
     from apricus.player.video_player import PlayerWindow
 
     obj = _window_stub()
-    obj._on_media_error(object())
-    obj._on_first_time_changed(object())
+    PlayerWindow._on_media_error(obj, object())
+    PlayerWindow._on_first_time_changed(obj, object())
     fake = _FakeVlcPlayer()
-    object.__setattr__(obj, "_PlayerWindow__vlc_widget", type("W", (), {"player": fake})())
+    obj._PlayerWindow__vlc_widget = type("W", (), {"player": fake})()
     PlayerWindow.set_media(obj, object())
-    assert obj.playback_error() is None
+    assert PlayerWindow.playback_error(obj) is None
     assert obj._first_frame_reported is False
     assert fake.media is not None
 
@@ -249,16 +267,25 @@ def test_voluntary_stop_sets_no_error():
 
     obj = _window_stub()
     fake = _FakeVlcPlayer()
-    object.__setattr__(obj, "_PlayerWindow__vlc_widget", type("W", (), {"player": fake})())
+    obj._PlayerWindow__vlc_widget = type("W", (), {"player": fake})()
     PlayerWindow.stop(obj)
-    assert obj.playback_error() is None
+    assert PlayerWindow.playback_error(obj) is None
     assert fake.stopped is True
 
 
 def test_player_aggregates_first_window_error():
-    good = _window_stub()
-    bad = _window_stub()
-    bad._on_media_error(object())
+    from apricus.player.video_player import PlayerWindow
+
+    def _bound(obj):
+        # Manual binding: exercises the real method without a Gtk instance.
+        import types
+
+        obj.playback_error = types.MethodType(lambda self: PlayerWindow.playback_error(self), obj)
+        return obj
+
+    good = _bound(_window_stub())
+    bad = _bound(_window_stub())
+    PlayerWindow._on_media_error(bad, object())
     player = VideoPlayer.__new__(VideoPlayer)
     player.windows = {"m1": good, "m2": bad}
     assert player.playback_error() == "Playback failed before the first frame was shown"
