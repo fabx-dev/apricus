@@ -352,14 +352,73 @@ class ControlPanel(Adw.Application):
     def _make_about_dialog(self):
         dialog = Adw.AboutDialog()
         dialog.set_application_name("Apricus")
-        dialog.set_version(self.version)
-        dialog.set_comments("Live wallpaper for Linux. Community fork of Hidamari.")
-        dialog.set_website("https://github.com/fabx-dev/apricus")
-        dialog.add_link("GitHub", "https://github.com/fabx-dev/apricus")
-        dialog.set_developers(["fabx-dev https://github.com/fabx-dev"])
-        dialog.set_artists(["Apricus icon: original"])
         dialog.set_application_icon("io.github.fabx_dev.Apricus")
+        dialog.set_developer_name("Fabrizio (fabx-dev)")
+        dialog.set_version(self.version)
+        dialog.set_comments(
+            _(
+                "Modern live wallpaper for Linux — local videos, looping playlists, "
+                "live streams and interactive web pages.\n"
+                "Independent evolution of Hidamari with a native GTK4 + Libadwaita "
+                "control center and a gapless playback engine."
+            )
+        )
+        dialog.set_copyright("© 2026 Fabrizio (fabx-dev) · Based on Hidamari © 2022–2026 Jeff Shee")
         dialog.set_license_type(Gtk.License.GPL_3_0)
+        dialog.set_website("https://github.com/fabx-dev/apricus")
+        dialog.set_issue_url("https://github.com/fabx-dev/apricus/issues")
+        dialog.add_link(
+            _("Releases & Flatpak Bundles"), "https://github.com/fabx-dev/apricus/releases"
+        )
+        dialog.add_link(_("Contact via Email"), "mailto:fabxdev@proton.me")
+        dialog.add_link(_("Original Hidamari Project"), "https://github.com/jeffshee/hidamari")
+        dialog.set_developers(
+            [
+                "Fabrizio (fabx-dev) <fabxdev@proton.me> https://github.com/fabx-dev",
+            ]
+        )
+        dialog.set_designers(
+            [
+                "Fabrizio (fabx-dev) https://github.com/fabx-dev",
+            ]
+        )
+        dialog.set_artists(
+            [
+                _("Apricus 2.0 application icon — Fabrizio (fabx-dev)"),
+            ]
+        )
+        dialog.set_translator_credits(
+            "Fabrizio (fabx-dev) — English, Italiano, Deutsch, Français, Español, 日本語"
+        )
+        dialog.add_acknowledgement_section(
+            _("Original Upstream Project (Hidamari)"),
+            [
+                "Jeff Shee https://github.com/jeffshee/hidamari",
+            ],
+        )
+        dialog.add_acknowledgement_section(
+            _("Powered by Open Source"),
+            [
+                "GTK4 & Libadwaita https://www.gtk.org",
+                "VLC & libVLC https://www.videolan.org",
+                "yt-dlp https://github.com/yt-dlp/yt-dlp",
+                "Deno Runtime https://deno.com",
+                "WebKitGTK https://webkitgtk.org",
+            ],
+        )
+        dialog.set_release_notes_version(self.version)
+        dialog.set_release_notes(
+            "<p>Apricus 2.0 brings a complete GTK4 + Libadwaita control center and playback engine:</p>"
+            "<ul>"
+            "<li>Six dedicated workspaces: Library, Playlist, Now Playing, Streaming, Web Page and Settings</li>"
+            "<li>Visual looping playlists with thumbnails, drag-and-drop reorder, shuffle and undo</li>"
+            "<li>Now Playing dashboard with 16:9 hero preview, transport bar, metadata and Up next queue</li>"
+            "<li>Streaming &amp; Web hubs with saved favorites, recent history, LIVE badge and 10-second live preview</li>"
+            "<li>Instant left-aligned monitor chooser across all Apply actions</li>"
+            "<li>Gapless in-place video switching, ~1.4s login startup and hop-by-hop SSRF network hardening</li>"
+            "<li>Complete translations in English, Italian, German, French, Spanish and Japanese</li>"
+            "</ul>"
+        )
         return dialog
 
     def _on_sidebar_selected(self, _sidebar, row):

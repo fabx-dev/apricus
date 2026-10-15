@@ -1670,15 +1670,20 @@ def about_dialog_carries_identity_and_license():
 
     Adw.init()
     obj = app.ControlPanel.__new__(app.ControlPanel)
-    obj.version = "1.0"
+    obj.version = "2.0.1"
     dialog = obj._make_about_dialog()
     assert dialog.get_application_name() == "Apricus"
-    assert dialog.get_version() == "1.0"
+    assert dialog.get_developer_name() == "Fabrizio (fabx-dev)"
+    assert dialog.get_version() == "2.0.1"
     assert dialog.get_website() == "https://github.com/fabx-dev/apricus"
+    assert dialog.get_issue_url() == "https://github.com/fabx-dev/apricus/issues"
     assert dialog.get_license_type() == Gtk.License.GPL_3_0
-    assert "Community fork of Hidamari" in dialog.get_comments()
-    assert not dialog.get_copyright()
-    assert any("fabx-dev" in dev for dev in dialog.get_developers())
+    assert "Hidamari" in dialog.get_comments()
+    assert "Fabrizio (fabx-dev)" in dialog.get_copyright()
+    assert "Jeff Shee" in dialog.get_copyright()
+    assert any("fabxdev@proton.me" in dev for dev in dialog.get_developers())
+    assert dialog.get_release_notes_version() == "2.0.1"
+    assert "<ul>" in dialog.get_release_notes()
 
 
 @check
