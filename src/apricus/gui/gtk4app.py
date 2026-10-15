@@ -2545,23 +2545,37 @@ class ControlPanel(Adw.Application):
         return classify_stream_error(message)
 
     def _check_direct_url(self, url):
-        """Fast-path HEAD check; None when playable, 'fallback' for yt-dlp."""
+        """Fast-path HEAD check; None when playable, 'fallback' for yt-dlp.
+
+        Follows redirects hop-by-hop with allow_redirects=False so an
+        intermediate redirect to a private/loopback address is refused
+        before any socket touches it.
+        """
+        from urllib.parse import urljoin
+
         from apricus.utils import public_http_url
 
-        if not public_http_url(url):
-            return "fallback"
-        try:
-            response = requests.head(url, timeout=5, allow_redirects=True)
-            content_type = response.headers.get("Content-Type", "")
-            landed = response.url
-            response.close()
-            if not public_http_url(landed):
+        current = url
+        for _hop in range(4):
+            if not public_http_url(current):
                 return "fallback"
+            try:
+                response = requests.head(current, timeout=5, allow_redirects=False)
+                try:
+                    status = response.status_code
+                    location = response.headers.get("Location", "")
+                    content_type = response.headers.get("Content-Type", "")
+                finally:
+                    response.close()
+            except requests.exceptions.RequestException:
+                return "fallback"
+            if status in (301, 302, 303, 307, 308) and location:
+                current = urljoin(current, location)
+                continue
             if "video/" in content_type or "mpegurl" in content_type or "dash+xml" in content_type:
                 return None
             return "fallback"
-        except requests.exceptions.RequestException:
-            return "fallback"
+        return "fallback"
 
     def _set_apply_busy(self, button, busy):
         if button is None:
@@ -3231,27 +3245,39 @@ class ControlPanel(Adw.Application):
         return False
 
     def _check_web_url(self, url):
-        """Validate a web page URL; None when valid, else error."""
+        """Validate a web page URL; None when valid, else error.
+
+        Follows redirects hop-by-hop with allow_redirects=False so no
+        intermediate hop can contact a private or loopback host.
+        """
+        from urllib.parse import urljoin
+
         from apricus.utils import public_http_url, valid_http_url
 
         if not valid_http_url(url):
             return "Not a valid http(s) URL."
         if not public_http_url(url):
             return "Local network addresses are not supported."
-        try:
-            response = requests.get(url, timeout=10, stream=True)
+        current = url
+        for _hop in range(4):
             try:
-                status = response.status_code
-                landed = response.url
-            finally:
-                response.close()
-        except requests.exceptions.RequestException as e:
-            return str(e)
-        if not public_http_url(landed):
-            return "Redirects to a local network address."
-        if status >= 400:
-            return f"Error code: {status}"
-        return None
+                response = requests.get(current, timeout=10, stream=True, allow_redirects=False)
+                try:
+                    status = response.status_code
+                    location = response.headers.get("Location", "")
+                finally:
+                    response.close()
+            except requests.exceptions.RequestException as e:
+                return str(e)
+            if status in (301, 302, 303, 307, 308) and location:
+                current = urljoin(current, location)
+                if not public_http_url(current):
+                    return "Redirects to a local network address."
+                continue
+            if status >= 400:
+                return f"Error code: {status}"
+            return None
+        return "Too many redirects."
 
     def on_webpage_apply(self, *_args):
         url = self.webpage_entry.get_text().strip()

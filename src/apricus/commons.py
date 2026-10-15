@@ -17,11 +17,11 @@ TRANSLATION_DOMAIN = "apricus"
 HOME = os.environ.get("HOME")
 try:
     xdg_video_dir = subprocess.check_output(
-        "xdg-user-dir VIDEOS", shell=True, encoding="UTF-8"
+        ["xdg-user-dir", "VIDEOS"], encoding="UTF-8", timeout=5
     ).replace("\n", "")
     # Kept from Hidamari for compatibility (existing video libraries stay put).
     VIDEO_WALLPAPER_DIR = os.path.join(xdg_video_dir, "Hidamari")
-except FileNotFoundError:
+except (FileNotFoundError, subprocess.SubprocessError, OSError):
     # xdg-user-dir not found, use $HOME/Hidamari for Video directory instead
     VIDEO_WALLPAPER_DIR = os.path.join(HOME, "Hidamari")
 

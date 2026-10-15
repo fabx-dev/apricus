@@ -23,7 +23,7 @@ from apricus.commons import (
 )
 from apricus.menu import build_menu
 from apricus.player.base_player import BasePlayer
-from apricus.utils import ConfigUtil, setup_logging
+from apricus.utils import ConfigUtil, _authorize, public_http_url, setup_logging
 
 logger = logging.getLogger(LOGGER_NAME)
 
@@ -75,9 +75,35 @@ class WebWindow(Gtk.ApplicationWindow):
         self.__webview.show()
 
         self.menu = None
+        self._is_remote = False
         self.__webview.connect("button-press-event", self._on_button_press_event)
+        self.__webview.connect("permission-request", self._on_permission_request)
+        self.__webview.connect("decide-policy", self._on_decide_policy)
+
+    @staticmethod
+    def _on_permission_request(_webview, request):
+        request.deny()
+        return True
+
+    def _on_decide_policy(self, _webview, decision, decision_type):
+        if decision_type == WebKit2.PolicyDecisionType.NEW_WINDOW_ACTION:
+            decision.ignore()
+            return True
+        if decision_type == WebKit2.PolicyDecisionType.NAVIGATION_ACTION and self._is_remote:
+            try:
+                uri = decision.get_navigation_action().get_request().get_uri() or ""
+            except Exception:  # noqa: BLE001
+                uri = ""
+            if uri.startswith("file://") or (
+                uri.startswith(("http://", "https://")) and not public_http_url(uri)
+            ):
+                logger.warning("[WebPlayer] Blocked navigation to non-public URI")
+                decision.ignore()
+                return True
+        return False
 
     def load_uri(self, uri):
+        self._is_remote = uri.startswith(("http://", "https://"))
         self.__webview.load_uri(uri)
 
     def set_is_mute(self, is_mute):
@@ -161,13 +187,19 @@ class WebPlayer(BasePlayer):
         for monitor, window in self.windows.items():
             mkey = key_of.get(id(monitor), monitor.get_model())
             source = sources.get(mkey) or sources.get(monitor.get_model()) or data_source
-            # Convert to uri if necessary
-            if (
-                not source.startswith("http://")
-                and not source.startswith("https://")
-                and not source.startswith("file://")
-            ):
-                source = pathlib.Path(source).resolve().as_uri()
+            if not source:
+                continue
+            if source.startswith(("http://", "https://")):
+                if not public_http_url(source):
+                    logger.warning("[WebPlayer] Refusing non-public URL")
+                    continue
+            else:
+                path_str = source[7:] if source.startswith("file://") else source
+                resolved = pathlib.Path(path_str).resolve()
+                if not resolved.is_file() or resolved.suffix.lower() not in (".html", ".htm"):
+                    logger.warning("[WebPlayer] Refusing non-HTML local file")
+                    continue
+                source = resolved.as_uri()
             window.load_uri(source)
             if not monitor.is_primary():
                 window.set_is_mute(True)
@@ -198,13 +230,14 @@ class WebPlayer(BasePlayer):
     def is_playing(self):
         return True
 
-    def pause_playback(self):
-        pass
+    def pause_playback(self, dbus_context=None):
+        _authorize("player.pause_playback", dbus_context)
 
-    def start_playback(self):
-        pass
+    def start_playback(self, dbus_context=None):
+        _authorize("player.start_playback", dbus_context)
 
-    def reload_config(self):
+    def reload_config(self, dbus_context=None):
+        _authorize("player.reload_config", dbus_context)
         self.config = ConfigUtil().load()
 
 

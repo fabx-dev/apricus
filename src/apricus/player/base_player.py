@@ -12,7 +12,7 @@ from gi.repository import Gdk, Gio, Gtk
 from pydbus import SessionBus
 
 from apricus.commons import DBUS_NAME_PLAYER, DBUS_PROJECT, LOGGER_NAME
-from apricus.utils import gnome_desktop_icon_workaround
+from apricus.utils import _authorize, gnome_desktop_icon_workaround
 
 logger = logging.getLogger(LOGGER_NAME)
 
@@ -154,6 +154,7 @@ class BasePlayer(Gtk.Application):
         pass
 
     def quit_player(self, restore_wallpaper=True, dbus_context=None):
+        _authorize("player.quit", dbus_context)
         self.quit()
 
 

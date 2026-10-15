@@ -977,17 +977,20 @@ class ConfigUtil:
             return
         # Atomic write: a kill between truncate and content no longer wipes
         # the setup. Keep one backup generation for corrupt-file recovery.
-        os.makedirs(CONFIG_DIR, exist_ok=True)
+        os.makedirs(CONFIG_DIR, mode=0o700, exist_ok=True)
+        bak_path = CONFIG_PATH + ".bak"
         if old_config is not None:
             try:
-                with open(CONFIG_PATH + ".bak", "w", encoding="utf-8") as f:
+                with open(bak_path, "w", encoding="utf-8") as f:
                     json.dump(old_config, f, indent=3)
+                os.chmod(bak_path, 0o600)
             except OSError as e:
                 logger.warning(f"[Config] Backup failed: {e}")
         elif old_raw is not None and old_raw != json.dumps(config, indent=3):
             try:
-                with open(CONFIG_PATH + ".bak", "w", encoding="utf-8") as f:
+                with open(bak_path, "w", encoding="utf-8") as f:
                     f.write(old_raw if old_raw.endswith("\n") else old_raw + "\n")
+                os.chmod(bak_path, 0o600)
             except OSError as e:
                 logger.warning(f"[Config] Backup failed: {e}")
         tmp_path = CONFIG_PATH + ".tmp"
@@ -996,5 +999,9 @@ class ConfigUtil:
             print(json_str, file=f)
             f.flush()
             os.fsync(f.fileno())
+        try:
+            os.chmod(tmp_path, 0o600)
+        except OSError:
+            pass
         os.replace(tmp_path, CONFIG_PATH)
         logger.debug(f"[Config] Saved {CONFIG_PATH} (mode={config.get('mode')})")

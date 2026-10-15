@@ -123,9 +123,14 @@ class VLCWidget(Gtk.DrawingArea):
         # Playlist mode never needs audio: opening/closing the audio output
         # on every transition locks up PipeWire, so it is disabled entirely.
         if disable_audio:
-            vlc_options = ["--no-disable-screensaver", "--no-audio", "--aout=none"]
+            vlc_options = [
+                "--no-disable-screensaver",
+                "--no-interact",
+                "--no-audio",
+                "--aout=none",
+            ]
         else:
-            vlc_options = ["--no-disable-screensaver", "--aout=pulse"]
+            vlc_options = ["--no-disable-screensaver", "--no-interact", "--aout=pulse"]
         self.instance = vlc.Instance(vlc_options)
         self.player = self.instance.media_player_new()
 
@@ -788,14 +793,16 @@ class VideoPlayer(BasePlayer):
     def last_error(self):
         return self.playback_error() or ""
 
-    def pause_playback(self):
+    def pause_playback(self, dbus_context=None):
+        _authorize("player.pause_playback", dbus_context)
         for _monitor, window in self.windows.items():
             window.pause_fade(
                 fade_duration_sec=self.config[CONFIG_KEY_FADE_DURATION_SEC],
                 fade_interval=self.config[CONFIG_KEY_FADE_INTERVAL],
             )
 
-    def start_playback(self):
+    def start_playback(self, dbus_context=None):
+        _authorize("player.start_playback", dbus_context)
         if self._should_playback_start():
             for _monitor, window in self.windows.items():
                 window.play_fade(
@@ -1044,7 +1051,8 @@ class VideoPlayer(BasePlayer):
             pass
         return keep
 
-    def reload_config(self):
+    def reload_config(self, dbus_context=None):
+        _authorize("player.reload_config", dbus_context)
         self.config = ConfigUtil().load()
 
     def quit_player(self, restore_wallpaper=True, dbus_context=None):
