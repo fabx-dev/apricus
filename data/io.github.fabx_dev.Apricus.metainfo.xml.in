@@ -11,7 +11,7 @@
   <project_license>GPL-3.0-or-later</project_license>
 
   <description>
-    <p>Live wallpaper for Linux — local videos, looping playlists, live streams and interactive web pages. Apricus (lat.) — sunny, warmed by the sun.</p>
+    <p>Live wallpaper for the GNOME desktop on Linux — local videos, looping playlists, live streams and interactive web pages. Apricus (lat.) — sunny, warmed by the sun.</p>
     <p>Features a native GTK4 and Libadwaita control center, gapless in-place video switching, visual playlists with drag-and-drop and undo, a live Now Playing dashboard, streaming and web hubs with favorites and 10-second previews, and fast login startup.</p>
   </description>
 

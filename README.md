@@ -2,7 +2,7 @@
 
 <h1 align="center">Apricus 2.0</h1>
 
-<p align="center"><strong>Bring your Linux desktop to life — local videos, looping playlists, live streams &amp; interactive web wallpapers.</strong></p>
+<p align="center"><strong>Bring your GNOME desktop on Linux to life — local videos, looping playlists, live streams &amp; interactive web wallpapers.</strong></p>
 <p align="center"><em>Apricus (lat.) — sunny, warmed by the sun.</em></p>
 
 <p align="center">
@@ -11,7 +11,7 @@
 
 ---
 
-**Apricus 2.0** transforms your Linux desktop background into a fluid, living canvas — without draining resources or getting in your way. Set a 4K local clip on one monitor, a muted looping playlist on another, a live YouTube/Twitch stream, or an interactive WebGL globe, and let Apricus automatically pause or mute the moment you maximize a work window.
+**Apricus 2.0** transforms your **GNOME desktop** background on Linux (Ubuntu, Fedora Workstation, Debian, Zorin OS, Pop!_OS GNOME, and other Mutter/X11 desktops) into a fluid, living canvas — without draining resources or getting in your way. Set a 4K local clip on one monitor, a muted looping playlist on another, a live YouTube/Twitch stream, or an interactive WebGL globe, and let Apricus automatically pause or mute the moment you maximize a work window.
 
 Born as a community fork of [Hidamari](https://github.com/jeffshee/hidamari), **Apricus 2.0 is a complete generational leap**: a brand-new **GTK4 + Libadwaita** control center, a persistent **zero-gap playback engine**, visual **playlists with drag-and-drop and undo**, a live **Now Playing** dashboard, smart **streaming & web hubs** with favorites, thumbnails and 10-second live previews, sub-1.5-second login startup, and hardened network security.
 
@@ -124,10 +124,20 @@ apricus --systemd-enable    # disable anytime with: apricus --systemd-disable
 - **Automatic Config Migration & Backup**: Apricus 2.0 reads 1.0 configurations directly, backfills new keys without overwriting your choices, and writes a byte-identical rollback copy to `~/.config/apricus/config.json.bak`. Existing Hidamari video folders (`~/Videos/Hidamari`) are reused automatically if present.
 - **D-Bus Scripting**: `video`, `stream` and `webpage` D-Bus methods take `(source, monitor)` — pass `"all"` to apply across all monitors.
 
-### Notes & Environment Compatibility
+### Desktop Environment Compatibility
 
-- **Static Wallpaper**: currently supported on GNOME desktops.
-- **Auto-Pause / Auto-Mute on Maximized Windows**: currently requires an X11 session (on Wayland sessions playback works via XWayland, and the X11-only window-state switches are clearly marked in Settings).
+| Desktop Environment | Session | Playback | Desktop Icons | Static Wallpaper | Auto-Pause on Maximize |
+|---|---|---|---|---|---|
+| **GNOME** (Ubuntu, Fedora, Debian, Zorin OS) | Wayland & X11 | ✅ Full | ✅ Supported (DING / GTK4-DING / Zorin) | ✅ Supported | ✅ X11 (Wayland planned) |
+| **Budgie / Pantheon** | X11 | ✅ Works | — | ❌ GNOME only | ✅ Supported |
+| **Cinnamon / XFCE / MATE** | X11 | ⚠️ Partial (1) | ⚠️ Conflicts with desktop manager | ❌ GNOME only | ✅ Supported |
+| **KDE Plasma** | Wayland / X11 | ❌ Not supported (2) | — | — | — |
+
+1. On Cinnamon, XFCE and MATE, the file manager (`nemo-desktop`, `xfdesktop`, `caja`) draws its own opaque desktop window; desktop icons must be disabled for the video layer to remain visible.
+2. KDE Plasma's `plasmashell` manages its own background surface and blocks external `_NET_WM_WINDOW_TYPE_DESKTOP` windows (use a native Plasma wallpaper plugin on KDE).
+
+### Additional Notes
+
 - **Flatpak Sandbox & Video Folders**: the Flatpak uses read-only `xdg-videos:ro` access. Keep your video library inside your `Videos` folder (or grant extra folder permissions with Flatseal if using an external drive).
 - **Local Network URLs**: to prevent SSRF abuse from pasted links or redirects, Apricus refuses private/loopback (`localhost`, `192.168.x.x`, `10.x.x.x`) stream and web URLs.
 
