@@ -7,6 +7,8 @@
 
 <p align="center">
   <a href="https://github.com/fabx-dev/apricus/actions/workflows/ci.yml"><img src="https://github.com/fabx-dev/apricus/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://snapcraft.io/apricus"><img alt="apricus" src="https://snapcraft.io/apricus/badge.svg" /></a>
+  <a href="https://snapcraft.io/apricus"><img alt="apricus" src="https://snapcraft.io/apricus/trending.svg?name=0" /></a>
 </p>
 
 ---
@@ -128,7 +130,9 @@ make rpm
 
 ### Snap Package
 
-Install from the `.snap` package attached to the release (or from the Snap Store):
+[![apricus](https://snapcraft.io/apricus/badge.svg)](https://snapcraft.io/apricus)
+
+Install from the [Snap Store](https://snapcraft.io/apricus) (or from the `.snap` package attached to the release):
 
 ```bash
 sudo snap install apricus
