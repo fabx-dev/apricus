@@ -32,11 +32,7 @@ def test_base_options_shape(monkeypatch):
     # Empty runtime selection must not override yt-dlp's PATH discovery.
     assert "js_runtimes" not in options
     assert options["remote_components"] == []
-    assert options["extractor_args"]["youtube"]["player_client"] == [
-        "web_embedded",
-        "tv_simply",
-        "web",
-    ]
+    assert options["extractor_args"]["youtube"]["player_client"] == ["web_embedded"]
     assert "quiet" not in options
     assert yt_utils.base_options(quiet=True)["quiet"] is True
     monkeypatch.setattr("os.path.isfile", lambda path: path == "/app/bin/deno")

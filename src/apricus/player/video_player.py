@@ -933,8 +933,13 @@ class VideoPlayer(BasePlayer):
             logger.debug("[StaticWallpaper] refusing non-public URL")
             return
         try:
-            with yt_dlp.YoutubeDL(base_options(quiet=True)) as ydl:
-                meta = ydl.extract_info(url, download=False) or {}
+            from apricus.yt_utils import get_cached_meta, save_cached_meta
+
+            meta = get_cached_meta(url)
+            if meta is None:
+                with yt_dlp.YoutubeDL(base_options(quiet=True)) as ydl:
+                    meta = ydl.extract_info(url, download=False) or {}
+                save_cached_meta(url, meta)
             thumb_url = meta.get("thumbnail")
             data = None
             if thumb_url and thumb_url.startswith("https://"):

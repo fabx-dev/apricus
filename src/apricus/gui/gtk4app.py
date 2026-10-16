@@ -2729,11 +2729,18 @@ class ControlPanel(Adw.Application):
         cached = getattr(self, "_stream_meta_cache", None)
         if cached and cached[0] == url and (time.time() - cached[1]) < 120:
             return None
+        from apricus.yt_utils import get_cached_meta, save_cached_meta
+
+        disk_meta = get_cached_meta(url)
+        if disk_meta is not None:
+            self._stream_meta_cache = (url, time.time(), disk_meta)
+            return None
         try:
             with yt_dlp.YoutubeDL(base_options()) as ydl:
                 meta = ydl.extract_info(url, download=False) or {}
             if meta.get("formats"):
                 self._stream_meta_cache = (url, time.time(), meta)
+                save_cached_meta(url, meta)
         except Exception as e:  # noqa: BLE001 - any backend failure is a bad URL
             return self._classify_stream_error(str(e))
         return None

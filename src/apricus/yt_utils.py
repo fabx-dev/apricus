@@ -43,7 +43,7 @@ def base_options(*, quiet=False):
         "remote_components": [],
         "extractor_args": {
             "youtube": {
-                "player_client": ["web_embedded", "tv_simply", "web"],
+                "player_client": ["web_embedded"],
             },
         },
     }
@@ -58,6 +58,88 @@ def base_options(*, quiet=False):
     return options
 
 
+def _meta_cache_path():
+    cache_home = os.environ.get("XDG_CACHE_HOME") or os.path.join(os.path.expanduser("~"), ".cache")
+    return os.path.join(cache_home, "apricus", "ytdlp-meta-cache.json")
+
+
+def get_cached_meta(raw_url, ttl_s=180):
+    import json
+    import time
+
+    try:
+        with open(_meta_cache_path(), encoding="utf-8") as f:
+            data = json.load(f)
+        entry = data.get(raw_url)
+        if isinstance(entry, dict) and (time.time() - float(entry.get("ts", 0))) < ttl_s:
+            meta = entry.get("meta")
+            if isinstance(meta, dict) and meta.get("formats"):
+                return meta
+    except Exception:  # noqa: BLE001
+        pass
+    return None
+
+
+def save_cached_meta(raw_url, meta):
+    import json
+    import time
+
+    if not isinstance(meta, dict) or not meta.get("formats"):
+        return
+    slim_formats = []
+    for fmt in meta.get("formats") or []:
+        if isinstance(fmt, dict) and fmt.get("url"):
+            slim_formats.append(
+                {
+                    "format_id": fmt.get("format_id"),
+                    "url": fmt.get("url"),
+                    "ext": fmt.get("ext"),
+                    "vcodec": fmt.get("vcodec"),
+                    "acodec": fmt.get("acodec"),
+                    "width": fmt.get("width"),
+                    "height": fmt.get("height"),
+                    "quality": fmt.get("quality"),
+                    "tbr": fmt.get("tbr"),
+                }
+            )
+    if not slim_formats:
+        return
+    slim = {
+        "title": meta.get("title"),
+        "uploader": meta.get("uploader"),
+        "channel": meta.get("channel"),
+        "duration": meta.get("duration"),
+        "height": meta.get("height"),
+        "thumbnail": meta.get("thumbnail"),
+        "is_live": meta.get("is_live"),
+        "live_status": meta.get("live_status"),
+        "formats": slim_formats,
+    }
+    path = _meta_cache_path()
+    try:
+        os.makedirs(os.path.dirname(path), mode=0o700, exist_ok=True)
+        try:
+            with open(path, encoding="utf-8") as f:
+                data = json.load(f)
+            if not isinstance(data, dict):
+                data = {}
+        except Exception:  # noqa: BLE001
+            data = {}
+        now = time.time()
+        data = {
+            k: v
+            for k, v in data.items()
+            if isinstance(v, dict) and (now - float(v.get("ts", 0))) < 180
+        }
+        data[raw_url] = {"ts": now, "meta": slim}
+        tmp = path + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(data, f)
+        os.replace(tmp, path)
+    except Exception:  # noqa: BLE001
+        pass
+
+
 def get_formats(raw_url):
     from apricus.utils import public_http_url, valid_http_url
 
@@ -65,8 +147,11 @@ def get_formats(raw_url):
         raise ValueError(f"URL not supported: {raw_url}")
     if not public_http_url(raw_url):
         raise ValueError(f"Local network address not supported: {raw_url}")
-    with youtube_dl.YoutubeDL(base_options()) as ydl:
-        info = ydl.extract_info(raw_url, download=False) or {}
+    info = get_cached_meta(raw_url)
+    if info is None:
+        with youtube_dl.YoutubeDL(base_options()) as ydl:
+            info = ydl.extract_info(raw_url, download=False) or {}
+        save_cached_meta(raw_url, info)
     formats = info.get("formats") or []
     if not formats:
         raise ValueError(f"No playable formats for {raw_url}")
