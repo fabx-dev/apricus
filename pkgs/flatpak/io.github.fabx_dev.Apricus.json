@@ -141,6 +141,8 @@
                         ".ruff_cache",
                         ".vscode",
                         "_build",
+                        "dist",
+                        "snap",
                         "build-flatpak",
                         "build-flatpak2",
                         "build-flatpak3"

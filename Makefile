@@ -59,6 +59,9 @@ flatpak: ## Build & install the Flatpak (pulls SDK/Platform from flathub)
 	flatpak-builder --user --install --force-clean \
 		--install-deps-from=flathub $(FLATPAK_DIR) $(MANIFEST)
 
+deb: ## Build a Debian/Ubuntu .deb package into dist/
+	./pkgs/deb/build-deb.sh
+
 # --- Housekeeping -----------------------------------------------------------
 
 clean: ## Remove build directories and tool caches
@@ -69,4 +72,4 @@ help: ## Show this help
 		| sort \
 		| awk 'BEGIN {FS = ":.*?## "} {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
 
-.PHONY: sync run lint format build install uninstall pot update-po pypi-deps flatpak clean help
+.PHONY: sync run lint format build install uninstall pot update-po pypi-deps flatpak deb clean help

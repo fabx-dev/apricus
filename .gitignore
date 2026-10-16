@@ -4,6 +4,9 @@ __pycache__/
 # Build
 build/
 _build/
+dist/
+*.deb
+*.snap
 
 # Virtual environments
 /venv/

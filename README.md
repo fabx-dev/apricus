@@ -98,6 +98,28 @@ Or build and install locally from source (pulls runtime/SDK from Flathub):
 make flatpak
 ```
 
+### Debian / Ubuntu (`.deb` Package)
+
+Download `apricus_2.0.2_all.deb` from the [GitHub Release](https://github.com/fabx-dev/apricus/releases) and install it with `apt`:
+
+```bash
+sudo apt install ./apricus_2.0.2_all.deb
+```
+
+Or build the `.deb` locally into `dist/`:
+
+```bash
+make deb
+```
+
+### Snap Package
+
+Install from the `.snap` package attached to the release (or from the Snap Store):
+
+```bash
+sudo snap install apricus
+```
+
 ### From Source (Local Prefix)
 
 System prerequisites per distribution are listed in [docs/dev.md](docs/dev.md) (`vlc`, `ffmpeg`, `yt-dlp`, `deno`, PyGObject and GTK4/Libadwaita typelibs).

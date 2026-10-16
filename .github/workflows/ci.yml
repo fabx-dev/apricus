@@ -37,3 +37,8 @@ jobs:
 
       - name: GTK4 panel import smoke test (no display)
         run: PYTHONPATH=src uv run python -c "import apricus.gui.gtk4app, apricus.gui.gtk4lib; print('gtk4 imports ok')"
+
+      - name: Build and verify .deb package
+        run: |
+          ./pkgs/deb/build-deb.sh
+          dpkg-deb --info dist/apricus_*_all.deb

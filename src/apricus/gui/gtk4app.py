@@ -63,6 +63,7 @@ from apricus.utils import (
     get_video_paths,
     init_translations,
     is_gnome,
+    is_snap,
     is_wayland,
     setup_autostart,
     setup_logging,
@@ -120,9 +121,12 @@ class ControlPanel(Adw.Application):
         # single owner per application ID, so parallel instances (e.g. an
         # Xvfb smoke driver next to the live panel) need distinct IDs.
         kwargs.setdefault("application_id", APP_ID)
+        app_flags = (
+            Gio.ApplicationFlags.NON_UNIQUE if is_snap() else Gio.ApplicationFlags.FLAGS_NONE
+        )
         super().__init__(
             *args,
-            flags=Gio.ApplicationFlags.FLAGS_NONE,
+            flags=app_flags,
             **kwargs,
         )
         self.version = version

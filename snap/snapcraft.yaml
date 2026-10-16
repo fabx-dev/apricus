@@ -1,0 +1,96 @@
+name: apricus
+base: core24
+adopt-info: apricus
+summary: Modern live wallpaper for GNOME — videos, playlists, streams & web pages
+description: |
+  Apricus transforms your GNOME desktop background on Linux into a fluid,
+  living canvas — without draining resources or getting in your way.
+
+  Features:
+  - Native GTK4 + Libadwaita Control Center (Library, Playlist, Now Playing, Streaming, Web Page, Settings)
+  - Visual looping video playlists with thumbnails, drag-and-drop reorder, shuffle and undo
+  - Now Playing dashboard with 16:9 hero preview, transport controls, media metadata and Up next queue
+  - Streaming hub (YouTube, Twitch, live & direct streams) with saved favorites, recent history, cached thumbnails, LIVE badge and 10-second live preview
+  - Interactive Web Page wallpapers with reachability/title detector, Inspiration presets and static wallpaper snapshots
+  - Gapless in-place video switching, fast login startup, automatic pause/mute on maximized windows (X11) and per-monitor wallpaper assignment
+  - Translated into English, Italian, German, French, Spanish and Japanese
+grade: stable
+confinement: strict
+compression: lzo
+license: GPL-3.0+
+contact: mailto:fabxdev@proton.me
+issues: https://github.com/fabx-dev/apricus/issues
+source-code: https://github.com/fabx-dev/apricus
+website: https://github.com/fabx-dev/apricus
+
+apps:
+  apricus:
+    command: usr/bin/apricus
+    extensions: [gnome]
+    common-id: io.github.fabx_dev.Apricus
+    desktop: usr/share/applications/io.github.fabx_dev.Apricus.desktop
+    autostart: io.github.fabx_dev.Apricus.desktop
+    environment:
+      PYTHONPATH: $SNAP/usr/share/apricus:$SNAP/usr/lib/python3/dist-packages:$PYTHONPATH
+      VLC_PLUGIN_PATH: $SNAP/usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR/vlc/plugins
+      GI_TYPELIB_PATH: $SNAP/usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR/girepository-1.0:$GI_TYPELIB_PATH
+    plugs:
+      - home
+      - network
+      - network-bind
+      - audio-playback
+      - opengl
+      - x11
+      - wayland
+      - desktop
+      - desktop-legacy
+      - gsettings
+      - screen-inhibit-control
+
+parts:
+  deno:
+    plugin: dump
+    source:
+      - on amd64: https://github.com/denoland/deno/releases/download/v2.9.7/deno-x86_64-unknown-linux-gnu.zip
+      - on arm64: https://github.com/denoland/deno/releases/download/v2.9.7/deno-aarch64-unknown-linux-gnu.zip
+    organize:
+      deno: bin/deno
+
+  apricus:
+    after: [deno]
+    plugin: meson
+    source: .
+    parse-info: [usr/share/metainfo/io.github.fabx_dev.Apricus.metainfo.xml]
+    meson-parameters:
+      - --prefix=/usr
+    build-packages:
+      - gettext
+      - desktop-file-utils
+      - libglib2.0-dev
+      - python3-pip
+    stage-packages:
+      - dbus
+      - dconf-cli
+      - ffmpeg
+      - gir1.2-ayatanaappindicator3-0.1
+      - gir1.2-gnomedesktop-4.0
+      - gir1.2-wnck-3.0
+      - libayatana-appindicator3-1
+      - libgnome-desktop-4-2t64
+      - libvlc5
+      - libwnck-3-0
+      - python3-dbus
+      - python3-gi
+      - python3-gi-cairo
+      - python3-pydbus
+      - python3-requests
+      - python3-setproctitle
+      - python3-vlc
+      - totem-video-thumbnailer
+      - vlc
+      - vlc-plugin-base
+      - vlc-plugin-video-output
+      - xdg-user-dirs
+    override-build: |
+      craftctl default
+      pip3 install --break-system-packages --no-deps --target="$CRAFT_PART_INSTALL/usr/lib/python3/dist-packages" yt-dlp

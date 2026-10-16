@@ -142,6 +142,11 @@ def is_flatpak():
     return os.path.isfile("/.flatpak-info")
 
 
+def is_snap():
+    """Check if Apricus is running inside a Snap package."""
+    return bool(os.environ.get("SNAP"))
+
+
 def valid_http_url(url):
     """Return a stripped http(s) URL, or None when it must not be fetched.
 
@@ -467,7 +472,7 @@ def gnome_desktop_icon_workaround():
     Workaround for GNOME desktop icon extensions not displaying the icons on top of Apricus.
     Call this right after the wallpaper is shown.
     """
-    if not is_gnome():
+    if not is_gnome() or is_snap():
         return
     extension_list = [
         "ding@rastersoft.com",

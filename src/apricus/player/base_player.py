@@ -8,11 +8,11 @@ import setproctitle
 
 gi.require_version("Gtk", "3.0")
 gi.require_version("Gdk", "3.0")
-from gi.repository import Gdk, Gio, Gtk
+from gi.repository import Gdk, Gio, GLib, Gtk
 from pydbus import SessionBus
 
 from apricus.commons import DBUS_NAME_PLAYER, DBUS_PROJECT, LOGGER_NAME
-from apricus.utils import _authorize, gnome_desktop_icon_workaround
+from apricus.utils import _authorize, gnome_desktop_icon_workaround, is_snap
 
 logger = logging.getLogger(LOGGER_NAME)
 
@@ -43,9 +43,10 @@ class BasePlayer(Gtk.Application):
     """
 
     def __init__(self, *args, **kwargs):
-        super().__init__(
-            *args, application_id=APP_ID, flags=Gio.ApplicationFlags.FLAGS_NONE, **kwargs
+        app_flags = (
+            Gio.ApplicationFlags.NON_UNIQUE if is_snap() else Gio.ApplicationFlags.FLAGS_NONE
         )
+        super().__init__(*args, application_id=APP_ID, flags=app_flags, **kwargs)
         setproctitle.setproctitle(mp.current_process().name)
         self.windows = dict()
         self._monitor_detect()
@@ -94,6 +95,18 @@ class BasePlayer(Gtk.Application):
     def do_startup(self):
         Gtk.Application.do_startup(self)
 
+    def _lower_desktop_windows(self):
+        for window in self.windows.values():
+            if window is None:
+                continue
+            try:
+                gdk_win = window.get_window()
+                if gdk_win is not None:
+                    gdk_win.lower()
+            except Exception:  # noqa: BLE001
+                pass
+        return False
+
     def do_activate(self):
         for monitor in self.windows:
             if not self.windows[monitor]:
@@ -105,6 +118,10 @@ class BasePlayer(Gtk.Application):
                 window.move(x, y)
                 self.windows[monitor] = window
             self.windows[monitor].present()
+        # Lower our DESKTOP window below DING's desktop-icons window after DING's
+        # map-event idle handler finishes (works inside strict Snap too).
+        for delay_ms in (200, 600):
+            GLib.timeout_add(delay_ms, self._lower_desktop_windows)
         # Workaround for DING extension
         gnome_desktop_icon_workaround()
 

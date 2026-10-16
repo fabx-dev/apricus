@@ -8,11 +8,38 @@ from apricus.commons import LOGGER_NAME
 from apricus.utils import (
     is_flatpak,
     is_gnome,
+    is_snap,
     is_wayland,
     setup_systemd_autostart,
 )
 
 logger = logging.getLogger(LOGGER_NAME)
+
+
+def _ensure_snap_internal_dbus():
+    """Start a private session bus inside Snap so server/player/gui IPC never
+    needs a custom AppArmor dbus slot on the host session bus."""
+    if not is_snap() or os.environ.get("APRICUS_INTERNAL_DBUS") == "1":
+        return
+    import subprocess
+
+    host_bus = os.environ.get("DBUS_SESSION_BUS_ADDRESS", "")
+    try:
+        addr = (
+            subprocess.check_output(
+                ["dbus-daemon", "--session", "--fork", "--print-address"],
+                encoding="utf-8",
+                timeout=5,
+            )
+            .strip()
+            .splitlines()[0]
+        )
+        if addr:
+            os.environ["APRICUS_HOST_DBUS_ADDRESS"] = host_bus
+            os.environ["DBUS_SESSION_BUS_ADDRESS"] = addr
+            os.environ["APRICUS_INTERNAL_DBUS"] = "1"
+    except Exception as e:  # noqa: BLE001
+        logger.debug(f"[Snap] Private D-Bus startup skipped: {e}")
 
 
 # TODO: Add locale support
@@ -76,10 +103,12 @@ def main(version="devel", pkgdatadir="/usr/share/apricus", localedir="/usr/share
     sys_info.append(f"is_gnome = {is_gnome()}")
     sys_info.append(f"is_wayland = {is_wayland()}")
     sys_info.append(f"is_flatpak = {is_flatpak()}")
+    sys_info.append(f"is_snap = {is_snap()}")
     sys_info.append("--------------------------")
     sys_info_str = "\n".join(sys_info)
     logger.info(f"Apricus v{version}\n{sys_info_str}")
     logger.info(f"[Args] {vars(args)}")
+    _ensure_snap_internal_dbus()
     perf.mark("main: imports done")
 
     # Clear sys.argv as it has influence to the Gtk.Application

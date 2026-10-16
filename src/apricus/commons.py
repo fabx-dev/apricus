@@ -15,6 +15,7 @@ DBUS_NAME_PLAYER = f"{DBUS_PROJECT}.player"
 TRANSLATION_DOMAIN = "apricus"
 
 HOME = os.environ.get("HOME")
+REAL_HOME = os.environ.get("SNAP_REAL_HOME") or HOME
 try:
     xdg_video_dir = subprocess.check_output(
         ["xdg-user-dir", "VIDEOS"], encoding="UTF-8", timeout=5
@@ -22,8 +23,8 @@ try:
     # Kept from Hidamari for compatibility (existing video libraries stay put).
     VIDEO_WALLPAPER_DIR = os.path.join(xdg_video_dir, "Hidamari")
 except (FileNotFoundError, subprocess.SubprocessError, OSError):
-    # xdg-user-dir not found, use $HOME/Hidamari for Video directory instead
-    VIDEO_WALLPAPER_DIR = os.path.join(HOME, "Hidamari")
+    # xdg-user-dir not found, use $REAL_HOME/Hidamari for Video directory instead
+    VIDEO_WALLPAPER_DIR = os.path.join(REAL_HOME, "Hidamari")
 
 xdg_config_home = os.environ.get("XDG_CONFIG_HOME", os.path.join(HOME, ".config"))
 AUTOSTART_DIR = os.path.join(xdg_config_home, "autostart")

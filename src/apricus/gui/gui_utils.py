@@ -10,7 +10,7 @@ gi.require_version("GnomeDesktop", "4.0")
 from gi.repository import GdkPixbuf, Gio, GLib, GnomeDesktop
 
 from apricus.commons import LOGGER_NAME
-from apricus.utils import is_flatpak
+from apricus.utils import is_flatpak, is_snap
 
 logger = logging.getLogger(LOGGER_NAME)
 
@@ -49,7 +49,7 @@ def generate_thumbnail(filename):
     if not factory.can_thumbnail(uri, mime_type, mtime):
         return None
 
-    if is_flatpak():
+    if is_flatpak() or is_snap():
         pixbuf = _generate_thumbnail_flatpak(filename)
     else:
         pixbuf = factory.generate_thumbnail(uri, mime_type)
