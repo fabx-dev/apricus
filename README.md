@@ -89,7 +89,7 @@ The legacy 3-tab GTK3 window has been replaced by a native **GTK4 + Libadwaita**
 Ready-made Flatpak bundles are attached to each [GitHub Release](https://github.com/fabx-dev/apricus/releases):
 
 ```bash
-flatpak install --user apricus-2.0.1.flatpak apricus-locale.flatpak
+flatpak install --user apricus-2.0.2.flatpak apricus-locale.flatpak
 ```
 
 Or build and install locally from source (pulls runtime/SDK from Flathub):

@@ -25,6 +25,16 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="2.0.2" date="2026-10-16" type="stable">
+      <description>
+        <ul>
+          <li>Web Page wallpapers now capture and apply a static wallpaper snapshot and display a live preview in Now Playing</li>
+          <li>Larger 96x54 thumbnails in Streaming rows pre-populated from disk cache without avatar flash on tab switch</li>
+          <li>Flicker-free Library grid when selecting a video and choosing a monitor</li>
+          <li>Fixed D-Bus transitions between WebPlayer and VideoPlayer</li>
+        </ul>
+      </description>
+    </release>
     <release version="2.0.1" date="2026-10-16" type="stable">
       <description>
         <ul>

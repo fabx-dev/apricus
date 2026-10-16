@@ -33,6 +33,7 @@ from pydbus import SessionBus
 
 from apricus.commons import (
     AUTOSTART_DESKTOP_PATH,
+    CONFIG_DIR,
     CONFIG_KEY_DATA_SOURCE,
     CONFIG_KEY_MODE,
     CONFIG_KEY_MUTE,
@@ -328,12 +329,12 @@ class ControlPanel(Adw.Application):
             return
         css, text = self._sidebar_status_text(server is not None, mode)
         playing = False
-        if server is not None:
+        if server is not None and mode in (MODE_VIDEO, MODE_STREAM, MODE_PLAYLIST):
             try:
                 paused = bool(server.is_paused_by_user)
             except Exception:  # noqa: BLE001 - unknown state means not playing
                 paused = True
-            playing = not paused and mode in (MODE_VIDEO, MODE_STREAM, MODE_PLAYLIST)
+            playing = not paused
         show_eq = bool(playing and self._animations_enabled() and eq is not None)
         if eq is not None:
             eq.set_visible(show_eq)
@@ -368,7 +369,8 @@ class ControlPanel(Adw.Application):
         dialog.set_website("https://github.com/fabx-dev/apricus")
         dialog.set_issue_url("https://github.com/fabx-dev/apricus/issues")
         dialog.add_link(
-            _("Releases & Flatpak Bundles"), "https://github.com/fabx-dev/apricus/releases"
+            _("Releases and Flatpak Bundles"),
+            "https://github.com/fabx-dev/apricus/releases",
         )
         dialog.add_link(_("Contact via Email"), "mailto:fabxdev@proton.me")
         dialog.add_link(_("Original Hidamari Project"), "https://github.com/jeffshee/hidamari")
@@ -399,8 +401,8 @@ class ControlPanel(Adw.Application):
         dialog.add_acknowledgement_section(
             _("Powered by Open Source"),
             [
-                "GTK4 & Libadwaita https://www.gtk.org",
-                "VLC & libVLC https://www.videolan.org",
+                "GTK4 and Libadwaita https://www.gtk.org",
+                "VLC and libVLC https://www.videolan.org",
                 "yt-dlp https://github.com/yt-dlp/yt-dlp",
                 "Deno Runtime https://deno.com",
                 "WebKitGTK https://webkitgtk.org",
@@ -624,7 +626,15 @@ class ControlPanel(Adw.Application):
         ]
 
     def _popup_monitor_chooser(self, anchor, path, on_pick):
+        prev = getattr(anchor, "_active_popover", None)
+        if prev is not None:
+            try:
+                prev.unparent()
+            except Exception:  # noqa: BLE001
+                pass
+            anchor._active_popover = None
         popover = Gtk.Popover()
+        anchor._active_popover = popover
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
         for label, key in self._monitor_menu_items(path):
             btn = Gtk.Button(label=label)
@@ -752,7 +762,7 @@ class ControlPanel(Adw.Application):
             logger.warning(f"[GUI4] Could not open video folder: {e.message}")
 
     def on_refresh_library(self, *_args):
-        self._lib_paths_shown = None
+        self._force_lib_reload = True
         self._refresh_all()
 
     def _playlist_page(self):
@@ -973,13 +983,16 @@ class ControlPanel(Adw.Application):
     def _reload_queue_store(self):
         from apricus.gui.gtk4lib import VideoItem
 
-        sig = tuple(self.playlist_paths)
-        if sig == getattr(
-            self, "_queue_paths_shown", None
-        ) and self.queue_store.get_n_items() == len(sig):
-            return
-        self._queue_paths_shown = sig
-        items = [VideoItem(p) for p in self.playlist_paths]
+        paths = list(self.playlist_paths)
+        if self.queue_store is not None:
+            n = self.queue_store.get_n_items()
+            if n == len(paths) and all(
+                self.queue_store.get_item(i) is not None
+                and self.queue_store.get_item(i).path == paths[i]
+                for i in range(n)
+            ):
+                return
+        items = [VideoItem(p) for p in paths]
         self.queue_store.splice(0, self.queue_store.get_n_items(), items)
 
     def on_queue_up(self, *_args):
@@ -1332,7 +1345,12 @@ class ControlPanel(Adw.Application):
             queue = list(getattr(self, "playlist_paths", None) or [])
             if queue:
                 current = queue[0]
-        paused = bool(server.is_paused_by_user) if server is not None else True
+        paused = True
+        if server is not None and mode in (MODE_VIDEO, MODE_STREAM, MODE_PLAYLIST):
+            try:
+                paused = bool(server.is_paused_by_user)
+            except Exception:  # noqa: BLE001
+                paused = True
         has_content = bool(current)
         content = getattr(self, "np_content", None)
         empty = getattr(self, "np_empty", None)
@@ -1439,8 +1457,56 @@ class ControlPanel(Adw.Application):
         self.np_stack.set_visible_child_name(target_name)
         self._np_visible_pic = target_name
 
+    @staticmethod
+    def _static_cache_path(source):
+        import hashlib
+
+        digest = hashlib.sha256((source or "").encode("utf-8")).hexdigest()[:16]
+        return os.path.join(CONFIG_DIR, f"static-{digest}.png")
+
+    def _try_load_static_hero(self, path, generation):
+        static_png = self._static_cache_path(path)
+        if not os.path.isfile(static_png):
+            return False
+        try:
+            from gi.repository import GdkPixbuf
+
+            st = os.stat(static_png)
+            if (
+                getattr(self, "_np_static_mtime", None) == (static_png, st.st_mtime_ns)
+                and getattr(self, "_np_current_path", None) == path
+            ):
+                return True
+            pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(static_png, 640, -1)
+            if pixbuf is not None:
+                self._np_static_mtime = (static_png, st.st_mtime_ns)
+                self._show_hero_texture(Gdk.Texture.new_for_pixbuf(pixbuf), generation)
+                return True
+        except Exception:  # noqa: BLE001
+            pass
+        return False
+
+    def _poll_web_np_hero(self, path, generation):
+        if generation != getattr(self, "np_generation", generation):
+            return False
+        if path != getattr(self, "_np_current_path", None):
+            return False
+        self._try_load_static_hero(path, generation)
+        return False
+
     def _load_np_hero(self, path, generation):
         from apricus.gui.gtk4lib import VideoItem, load_texture_async
+
+        self._np_static_mtime = None
+        is_web_or_remote = "://" in (path or "") or (path or "").lower().endswith((".html", ".htm"))
+        if is_web_or_remote:
+            if not self._try_load_static_hero(path, generation):
+                (self.np_pic_b if self._np_visible_pic == "a" else self.np_pic_a).set_paintable(
+                    None
+                )
+            for delay_ms in (1800, 3500, 5500):
+                GLib.timeout_add(delay_ms, self._poll_web_np_hero, path, generation)
+            return
 
         video = self._find_queue_item(path) or VideoItem(path)
 
@@ -2132,17 +2198,27 @@ class ControlPanel(Adw.Application):
         row.set_title(self._plain(self._stream_row_title(entry)))
         row.set_subtitle(self._plain(url))
         thumb_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
-        thumb_box.set_size_request(64, 36)
+        thumb_box.set_size_request(96, 54)
         thumb_box.set_valign(Gtk.Align.CENTER)
         overlay = Gtk.Overlay()
-        avatar = Adw.Avatar(text=self._web_monogram(self._stream_site(url)), size=32)
+        avatar = Adw.Avatar(text=self._web_monogram(self._stream_site(url)), size=36)
         avatar.set_tooltip_text(self._stream_site(url))
         overlay.set_child(avatar)
         picture = Gtk.Picture()
         picture.set_content_fit(Gtk.ContentFit.COVER)
-        picture.set_size_request(64, 36)
+        picture.set_size_request(96, 54)
         picture.set_can_shrink(True)
-        picture.set_visible(False)
+        cached_thumb = None
+        try:
+            cached_thumb = self._thumb_cache().lookup(url)
+        except Exception:  # noqa: BLE001
+            cached_thumb = None
+        if cached_thumb and os.path.isfile(cached_thumb):
+            picture.set_filename(cached_thumb)
+            picture.set_visible(True)
+            avatar.set_visible(False)
+        else:
+            picture.set_visible(False)
         overlay.add_overlay(picture)
         if entry.get("is_live"):
             badge = Gtk.Label(label=_("LIVE"))
@@ -2189,19 +2265,25 @@ class ControlPanel(Adw.Application):
             return
         history, favorites = self._load_stream_data()
         fav_set = set(favorites)
-        self._clear_listbox(self.saved_list)
-        for url in favorites[:20]:
-            entry = next((e for e in history if e["url"] == url), None)
-            if entry is None:
-                entry = self._history_entry(url)
-            self.saved_list.append(self._stream_row(entry, True, True))
-        self._clear_listbox(self.recent_list)
-        for entry in history[:8]:
-            self.recent_list.append(self._stream_row(entry, entry["url"] in fav_set))
-        empty = not favorites and not history
-        self.saved_group.set_visible(not empty)
-        self.recent_list.set_visible(not empty)
-        self.stream_empty.set_visible(empty)
+        sig = (
+            tuple(favorites[:20]),
+            tuple((e["url"], e.get("title") or "", bool(e.get("is_live"))) for e in history[:8]),
+        )
+        if sig != getattr(self, "_stream_lists_sig", None):
+            self._stream_lists_sig = sig
+            self._clear_listbox(self.saved_list)
+            for url in favorites[:20]:
+                entry = next((e for e in history if e["url"] == url), None)
+                if entry is None:
+                    entry = self._history_entry(url)
+                self.saved_list.append(self._stream_row(entry, True, True))
+            self._clear_listbox(self.recent_list)
+            for entry in history[:8]:
+                self.recent_list.append(self._stream_row(entry, entry["url"] in fav_set))
+            empty = not favorites and not history
+            self.saved_group.set_visible(not empty)
+            self.recent_list.set_visible(not empty)
+            self.stream_empty.set_visible(empty)
         self._thumb_generation = getattr(self, "_thumb_generation", 0) + 1
         self._schedule_visible_thumbs()
 
@@ -3304,16 +3386,16 @@ class ControlPanel(Adw.Application):
                 size = os.path.getsize(current)
             except OSError:
                 size = None
-            rows["title"].set_subtitle(os.path.basename(current))
-            rows["address"].set_subtitle(current)
+            rows["title"].set_subtitle(self._plain(os.path.basename(current)))
+            rows["address"].set_subtitle(self._plain(current))
             rows["source"].set_subtitle(
-                _("Local web page — {size}").format(size=self._format_file_size(size))
+                self._plain(_("Local web page — {size}").format(size=self._format_file_size(size)))
             )
         else:
             rows["title"].set_subtitle("…")
-            rows["address"].set_subtitle(current)
+            rows["address"].set_subtitle(self._plain(current))
             rows["source"].set_subtitle(
-                _("Remote — {domain}").format(domain=self._web_domain(current))
+                self._plain(_("Remote — {domain}").format(domain=self._web_domain(current)))
             )
             self._web_generation += 1
             generation = self._web_generation
@@ -3339,7 +3421,7 @@ class ControlPanel(Adw.Application):
         if current != url:
             return False
         if title:
-            self.web_detail_rows["title"].set_subtitle(title)
+            self.web_detail_rows["title"].set_subtitle(self._plain(title))
         return False
 
     def _check_web_url(self, url):
@@ -3732,13 +3814,16 @@ class ControlPanel(Adw.Application):
         from apricus.gui.gtk4lib import VideoItem
 
         paths = get_video_paths(resolve_video_dir(self.config))
-        sig = tuple(paths)
-        if sig == getattr(self, "_lib_paths_shown", None) and self.video_store.get_n_items() == len(
-            sig
-        ):
-            self._on_lib_selection()
-            return
-        self._lib_paths_shown = sig
+        force = getattr(self, "_force_lib_reload", False)
+        self._force_lib_reload = False
+        if not force and self.video_store is not None:
+            n = self.video_store.get_n_items()
+            if n == len(paths) and all(
+                self.video_store.get_item(i) is not None
+                and self.video_store.get_item(i).path == paths[i]
+                for i in range(n)
+            ):
+                return
         items = [VideoItem(p) for p in paths]
         self.video_store.splice(0, self.video_store.get_n_items(), items)
         self._on_lib_selection()

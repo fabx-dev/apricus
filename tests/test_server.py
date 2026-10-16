@@ -320,6 +320,25 @@ def test_server_playback_error_proxies_player_last_error(monkeypatch):
     assert s.playback_error == ""
 
 
+def test_web_player_proxy_without_vlc_methods_never_breaks_server_transitions(monkeypatch):
+    """When WebPlayer is active, its D-Bus proxy lacks preview_static,
+    switch_media, is_paused_by_user and last_error. Switching to video or
+    stream must never raise AttributeError, and is_paused_by_user must
+    always return a bool (never None, which breaks D-Bus 'b' marshalling)."""
+
+    class _WebPlayerProxy:
+        mode = srv.MODE_WEBPAGE
+
+    monkeypatch.setattr(srv, "get_instance", lambda _name: _WebPlayerProxy())
+    s = srv.ApricusServer.__new__(srv.ApricusServer)
+    s.player_process = type("P", (), {"is_alive": lambda self: True})()
+    srv.ApricusServer._preview_static(srv.MODE_VIDEO, "/tmp/v.mp4")
+    srv.ApricusServer._preview_static(srv.MODE_STREAM, "https://example.com/v")
+    assert s._try_switch_media(srv.MODE_VIDEO) is False
+    assert s.is_paused_by_user is None
+    assert s.playback_error == ""
+
+
 def test_pause_flag_roundtrips_in_playlist_mode():
     """In MODE_PLAYLIST the pause flag must round-trip like other modes.
 

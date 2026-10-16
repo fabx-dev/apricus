@@ -2,7 +2,7 @@
 name = "apricus"
 # Release version lives in meson.build (single source of truth); this
 # metadata only describes the uv dev environment (package = false below).
-version = "2.0.1"
+version = "2.0.2"
 description = "Live wallpaper for Linux. Written in Python."
 readme = "README.md"
 license = "GPL-3.0-or-later"

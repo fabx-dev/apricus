@@ -1994,7 +1994,7 @@ def stream_row_widgets_have_thumb_slot_and_live_badge():
     )
     pic = getattr(row, "_thumb_picture", None)
     assert pic is not None and isinstance(pic, Gtk.Picture)
-    assert pic.get_size_request() == (64, 36)
+    assert pic.get_size_request() == (96, 54)
     assert pic.get_visible() is False
     texts = []
 

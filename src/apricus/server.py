@@ -273,11 +273,15 @@ class ApricusServer:
             return False
         try:
             player = get_instance(DBUS_NAME_PLAYER)
-            if player is None or player.mode not in [MODE_VIDEO, MODE_STREAM, MODE_PLAYLIST]:
+            if (
+                player is None
+                or not hasattr(player, "switch_media")
+                or player.mode not in [MODE_VIDEO, MODE_STREAM, MODE_PLAYLIST]
+            ):
                 return False
             player.switch_media(mode)
             return True
-        except GLib.Error:
+        except (GLib.Error, AttributeError):
             return False
 
     @staticmethod
@@ -299,9 +303,9 @@ class ApricusServer:
             return
         try:
             player = get_instance(DBUS_NAME_PLAYER)
-            if player:
+            if player and hasattr(player, "preview_static"):
                 player.preview_static(video)
-        except GLib.Error:
+        except (GLib.Error, AttributeError):
             pass
 
     @staticmethod
@@ -309,9 +313,12 @@ class ApricusServer:
         """Quit current player. Internal respawns pass restore_wallpaper=False
         so the desktop keeps the current static frame instead of flashing
         the pre-Apricus wallpaper between switches."""
-        player = get_instance(DBUS_NAME_PLAYER)
-        if player:
-            player.quit_player(restore_wallpaper)
+        try:
+            player = get_instance(DBUS_NAME_PLAYER)
+            if player and hasattr(player, "quit_player"):
+                player.quit_player(restore_wallpaper)
+        except (GLib.Error, AttributeError):
+            pass
 
     def video(self, video_path=None, monitor="", dbus_context=None):
         _authorize("video", dbus_context)
@@ -478,14 +485,20 @@ class ApricusServer:
     def is_paused_by_user(self):
         player = get_instance(DBUS_NAME_PLAYER)
         if player is not None and player.mode in [MODE_VIDEO, MODE_STREAM, MODE_PLAYLIST]:
-            return player.is_paused_by_user
+            try:
+                return player.is_paused_by_user
+            except (GLib.Error, AttributeError):
+                return None
         return None
 
     @is_paused_by_user.setter
     def is_paused_by_user(self, is_paused_by_user):
         player = get_instance(DBUS_NAME_PLAYER)
         if player is not None and player.mode in [MODE_VIDEO, MODE_STREAM, MODE_PLAYLIST]:
-            player.is_paused_by_user = is_paused_by_user
+            try:
+                player.is_paused_by_user = bool(is_paused_by_user)
+            except (GLib.Error, AttributeError):
+                pass
 
     @property
     def is_static_wallpaper(self):
@@ -525,8 +538,8 @@ class ApricusServer:
         player = get_instance(DBUS_NAME_PLAYER)
         if player is not None and player.mode in [MODE_VIDEO, MODE_STREAM, MODE_PLAYLIST]:
             try:
-                return player.last_error or ""
-            except GLib.Error:
+                return getattr(player, "last_error", "") or ""
+            except (GLib.Error, AttributeError):
                 return ""
         return ""
 
