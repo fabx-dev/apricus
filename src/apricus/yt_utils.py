@@ -25,11 +25,22 @@ def js_runtime_options():
 
 
 def base_options(*, quiet=False):
-    """Shared YoutubeDL options: no playlists, bounded sockets, JS engine."""
+    """Shared YoutubeDL options: no playlists, bounded sockets, JS engine.
+
+    The default ``android_vr`` YouTube client yields ``googlevideo.com`` URLs
+    that return HTTP 403 when opened directly by external players like VLC;
+    ``web_embedded`` (with ``tv_simply`` / ``web`` fallbacks) produces standard
+    HTTPS streams playable by libVLC.
+    """
     options = {
         "noplaylist": True,
         "socket_timeout": 15,
         "remote_components": [],
+        "extractor_args": {
+            "youtube": {
+                "player_client": ["web_embedded", "tv_simply", "web"],
+            },
+        },
     }
     js_runtimes = js_runtime_options()
     if js_runtimes:

@@ -1491,6 +1491,8 @@ class ControlPanel(Adw.Application):
             return False
         if path != getattr(self, "_np_current_path", None):
             return False
+        if getattr(self, "_np_stream_thumb_loaded", None) == (path, generation):
+            return False
         self._try_load_static_hero(path, generation)
         return False
 
@@ -1498,9 +1500,23 @@ class ControlPanel(Adw.Application):
         from apricus.gui.gtk4lib import VideoItem, load_texture_async
 
         self._np_static_mtime = None
+        self._np_stream_thumb_loaded = None
         is_web_or_remote = "://" in (path or "") or (path or "").lower().endswith((".html", ".htm"))
         if is_web_or_remote:
-            if not self._try_load_static_hero(path, generation):
+            loaded = self._try_load_static_hero(path, generation)
+            if not loaded and "://" in (path or ""):
+                try:
+                    cached = self._thumb_cache().lookup(path)
+                    if cached and os.path.isfile(cached):
+                        from gi.repository import GdkPixbuf
+
+                        pb = GdkPixbuf.Pixbuf.new_from_file_at_size(cached, 640, -1)
+                        if pb is not None:
+                            self._show_hero_texture(Gdk.Texture.new_for_pixbuf(pb), generation)
+                            loaded = True
+                except Exception:  # noqa: BLE001
+                    pass
+            if not loaded:
                 (self.np_pic_b if self._np_visible_pic == "a" else self.np_pic_a).set_paintable(
                     None
                 )
@@ -1538,6 +1554,8 @@ class ControlPanel(Adw.Application):
         except Exception as e:  # noqa: BLE001 - hero simply stays empty
             logger.debug(f"[GUI4] Stream thumbnail failed for {url}: {e}")
             return False
+        if texture is not None:
+            self._np_stream_thumb_loaded = (url, generation)
         self._show_hero_texture(texture, generation)
         return False
 
