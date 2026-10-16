@@ -13,7 +13,7 @@
 
 **Apricus 2.0** transforms your **GNOME desktop** background on Linux (Ubuntu, Fedora Workstation, Debian, Zorin OS, Pop!_OS GNOME, and other Mutter/X11 desktops) into a fluid, living canvas — without draining resources or getting in your way. Set a 4K local clip on one monitor, a muted looping playlist on another, a live YouTube/Twitch stream, or an interactive WebGL globe, and let Apricus automatically pause or mute the moment you maximize a work window.
 
-Born as a community fork of [Hidamari](https://github.com/jeffshee/hidamari), **Apricus 2.0 is a complete generational leap**: a brand-new **GTK4 + Libadwaita** control center, a persistent **zero-gap playback engine**, visual **playlists with drag-and-drop and undo**, a live **Now Playing** dashboard, smart **streaming & web hubs** with favorites, thumbnails and 10-second live previews, sub-1.5-second login startup, and hardened network security.
+Apricus 2.0 is a community fork of [Hidamari](https://github.com/jeffshee/hidamari), building on the original project with additional features and architectural changes. It introduces a GTK4 and Libadwaita control center, a persistent playback engine designed to avoid gaps during playback, visual playlists with drag-and-drop support and undo, a live Now Playing dashboard, and dedicated streaming and web hubs with favorites, thumbnails, and 10-second previews. Other changes include optimized startup time (under 1.5 seconds at login) and improved network security.
 
 ---
 
