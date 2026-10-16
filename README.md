@@ -6,9 +6,15 @@
 <p align="center"><em>Apricus (lat.) — sunny, warmed by the sun.</em></p>
 
 <p align="center">
+  <a href="https://github.com/fabx-dev/apricus/releases/latest"><img src="https://img.shields.io/github/v/release/fabx-dev/apricus?label=release&color=blue" alt="Latest Release"></a>
   <a href="https://github.com/fabx-dev/apricus/actions/workflows/ci.yml"><img src="https://github.com/fabx-dev/apricus/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/fabx-dev/apricus/actions/workflows/release-packages.yml"><img src="https://github.com/fabx-dev/apricus/actions/workflows/release-packages.yml/badge.svg" alt="Release Packages"></a>
   <a href="https://snapcraft.io/apricus"><img alt="apricus" src="https://snapcraft.io/apricus/badge.svg" /></a>
   <a href="https://snapcraft.io/apricus"><img alt="apricus" src="https://snapcraft.io/apricus/trending.svg?name=0" /></a>
+  <br>
+  <a href="COPYING"><img src="https://img.shields.io/badge/license-GPL--3.0--or--later-blue" alt="License: GPL-3.0-or-later"></a>
+  <img src="https://img.shields.io/badge/GTK4%20%2B%20Libadwaita-GNOME-4A86CF?logo=gnome&logoColor=white" alt="GTK4 + Libadwaita">
+  <img src="https://img.shields.io/badge/python-3.10%2B-3776AB?logo=python&logoColor=white" alt="Python 3.10+">
 </p>
 
 ---
