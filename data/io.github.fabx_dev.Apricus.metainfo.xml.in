@@ -1,37 +1,52 @@
-<?xml version='1.0' encoding='utf-8'?>
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Copyright 2026 Fabrizio (fabx-dev) -->
 <component type="desktop-application">
   <id>io.github.fabx_dev.Apricus</id>
   <name>Apricus</name>
   <summary>Live wallpaper for Linux</summary>
-  <developer id="io.github.fabx-dev">
-    <name>fabx-dev</name>
+  <developer id="io.github.fabx_dev">
+    <name translate="no">Fabrizio (fabx-dev)</name>
   </developer>
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>GPL-3.0-or-later</project_license>
 
   <description>
     <p>Live wallpaper for Linux — local videos, looping playlists, live streams and interactive web pages. Apricus (lat.) — sunny, warmed by the sun.</p>
-    <p>Features a native GTK4 + Libadwaita control center, gapless in-place video switching, visual playlists with drag-and-drop and undo, a live Now Playing dashboard, streaming and web hubs with favorites and 10-second previews, and ~1.4s login startup.</p>
+    <p>Features a native GTK4 and Libadwaita control center, gapless in-place video switching, visual playlists with drag-and-drop and undo, a live Now Playing dashboard, streaming and web hubs with favorites and 10-second previews, and fast login startup.</p>
   </description>
+
+  <branding>
+    <color type="primary" scheme_preference="light">#3e7cd6</color>
+    <color type="primary" scheme_preference="dark">#14224b</color>
+  </branding>
+
   <screenshots>
     <screenshot type="default">
-      <image type="source">https://raw.githubusercontent.com/fabx-dev/apricus/master/res/screenshot-1.png</image>
+      <image>https://raw.githubusercontent.com/fabx-dev/apricus/v2.0.2/res/apricus-2-library.png</image>
+      <caption>Video library with asynchronous thumbnails and monitor selector</caption>
     </screenshot>
     <screenshot>
-      <image type="source">https://raw.githubusercontent.com/fabx-dev/apricus/master/res/screenshot-2.png</image>
+      <image>https://raw.githubusercontent.com/fabx-dev/apricus/v2.0.2/res/apricus-2-playlist.png</image>
+      <caption>Looping video playlist with drag-and-drop reorder and shuffle</caption>
     </screenshot>
     <screenshot>
-      <image type="source">https://raw.githubusercontent.com/fabx-dev/apricus/master/res/screenshot-3.png</image>
+      <image>https://raw.githubusercontent.com/fabx-dev/apricus/v2.0.2/res/apricus-2-now-playing.png</image>
+      <caption>Now Playing dashboard with widescreen preview and media details</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/fabx-dev/apricus/v2.0.2/res/apricus-2-streaming.png</image>
+      <caption>Streaming hub with saved sources, cached thumbnails and LIVE badge</caption>
     </screenshot>
   </screenshots>
+
   <releases>
     <release version="2.0.2" date="2026-10-16" type="stable">
       <description>
         <ul>
           <li>Web Page wallpapers now capture and apply a static wallpaper snapshot and display a live preview in Now Playing</li>
-          <li>Larger 96x54 thumbnails in Streaming rows pre-populated from disk cache without avatar flash on tab switch</li>
+          <li>YouTube stream playback fix using web_embedded client and instant cached hero thumbnail in Now Playing</li>
+          <li>Larger 96x54 thumbnails in Streaming rows pre-populated from disk cache without avatar flash</li>
           <li>Flicker-free Library grid when selecting a video and choosing a monitor</li>
-          <li>Fixed D-Bus transitions between WebPlayer and VideoPlayer</li>
         </ul>
       </description>
     </release>
@@ -39,15 +54,16 @@
       <description>
         <ul>
           <li>Instant monitor chooser on Streaming and Web Page Apply buttons with left-aligned menu items</li>
-          <li>Translated monitor chooser entries ("Set for all monitors") across all 6 supported languages</li>
-          <li>Performance optimizations: in-memory texture and metadata caches, D-Bus bus reuse, flicker-free Now Playing refresh</li>
+          <li>Translated monitor chooser entries across all 6 supported languages</li>
+          <li>Enriched About dialog with developer details, release notes and credits</li>
+          <li>Performance optimizations: in-memory texture and metadata caches, D-Bus bus reuse, flicker-free refresh</li>
         </ul>
       </description>
     </release>
     <release version="2.0.0" date="2026-10-15" type="stable">
       <description>
         <ul>
-          <li>New GTK4 + Libadwaita control center (Library, Playlist, Now Playing, Streaming, Web Page, Settings)</li>
+          <li>New GTK4 and Libadwaita control center (Library, Playlist, Now Playing, Streaming, Web Page, Settings)</li>
           <li>Visual playlist rows with thumbnails, drag-and-drop reorder, shuffle and undo</li>
           <li>Now Playing dashboard with 16:9 hero preview, transport controls, media metadata and Up next queue</li>
           <li>Streaming hub with saved favorites, recent history, lazy thumbnail cache, LIVE badge and 10-second live preview</li>
@@ -72,19 +88,33 @@
       </description>
     </release>
   </releases>
+
   <url type="homepage">https://github.com/fabx-dev/apricus</url>
   <url type="bugtracker">https://github.com/fabx-dev/apricus/issues</url>
-  <categories>
-    <category>GTK</category>
-    <category>Utility</category>
-  </categories>
-  <recommends>
-    <control>pointing</control>
-    <control>keyboard</control>
-  </recommends>
-  <content_rating type="oars-1.1"/>
+  <url type="vcs-browser">https://github.com/fabx-dev/apricus</url>
+
+  <translation type="gettext">apricus</translation>
   <launchable type="desktop-id">io.github.fabx_dev.Apricus.desktop</launchable>
   <provides>
     <binary>apricus</binary>
   </provides>
+
+  <categories>
+    <category>Utility</category>
+  </categories>
+  <keywords>
+    <keyword>wallpaper</keyword>
+    <keyword>live wallpaper</keyword>
+    <keyword>video wallpaper</keyword>
+    <keyword>animated wallpaper</keyword>
+    <keyword>playlist</keyword>
+    <keyword>streaming</keyword>
+  </keywords>
+
+  <requires>
+    <control>keyboard</control>
+    <control>pointing</control>
+    <display_length compare="ge">768</display_length>
+  </requires>
+  <content_rating type="oars-1.1"/>
 </component>

@@ -14,20 +14,24 @@ if desktop_utils.found()
   )
 endif
 
-appstream_file = i18n.merge_file(
-  input: 'io.github.fabx_dev.Apricus.appdata.xml.in',
-  output: 'io.github.fabx_dev.Apricus.appdata.xml',
+metainfo_file = i18n.merge_file(
+  input: 'io.github.fabx_dev.Apricus.metainfo.xml.in',
+  output: 'io.github.fabx_dev.Apricus.metainfo.xml',
   po_dir: '../po',
   install: true,
-  install_dir: join_paths(get_option('datadir'), 'appdata')
+  install_dir: join_paths(get_option('datadir'), 'metainfo')
 )
 
 appstream_util = find_program('appstream-util', required: false)
 if appstream_util.found()
-  test('Validate appstream file', appstream_util,
-    args: ['validate', appstream_file]
+  test('Validate metainfo file', appstream_util,
+    args: ['validate', metainfo_file]
   )
 endif
+
+install_data('../COPYING',
+  install_dir: join_paths(get_option('datadir'), 'licenses', 'io.github.fabx_dev.Apricus')
+)
 
 install_data('io.github.fabx_dev.Apricus.gschema.xml',
   install_dir: join_paths(get_option('datadir'), 'glib-2.0/schemas')

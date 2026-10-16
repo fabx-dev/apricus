@@ -1,9 +1,11 @@
 [Desktop Entry]
 Name=Apricus
+Comment=Live wallpaper for Linux
 Exec=apricus
 Icon=io.github.fabx_dev.Apricus
 Terminal=false
 Type=Application
 Categories=GTK;Utility;
+Keywords=wallpaper;live;video;stream;playlist;animated;background;
 StartupNotify=false
 StartupWMClass=io.github.fabx_dev.Apricus.gui4
