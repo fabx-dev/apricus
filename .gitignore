@@ -6,6 +6,7 @@ build/
 _build/
 dist/
 *.deb
+*.rpm
 *.snap
 
 # Virtual environments

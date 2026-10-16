@@ -17,7 +17,7 @@ jobs:
       - name: Install system deps (PyGObject + GI typelibs)
         run: |
           sudo apt-get update
-          sudo apt-get install -y python3-gi gir1.2-gtk-3.0 gir1.2-gdk-3.0 gir1.2-appindicator3-0.1 gir1.2-gnomedesktop-4.0 gir1.2-wnck-3.0 gir1.2-webkit2-4.1 gir1.2-gtk-4.0 gir1.2-adw-1 meson ninja-build gettext desktop-file-utils libglib2.0-dev libglib2.0-dev-bin
+          sudo apt-get install -y python3-gi gir1.2-gtk-3.0 gir1.2-gdk-3.0 gir1.2-appindicator3-0.1 gir1.2-gnomedesktop-4.0 gir1.2-wnck-3.0 gir1.2-webkit2-4.1 gir1.2-gtk-4.0 gir1.2-adw-1 meson ninja-build gettext desktop-file-utils libglib2.0-dev libglib2.0-dev-bin rpm
 
       - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
 
@@ -38,7 +38,9 @@ jobs:
       - name: GTK4 panel import smoke test (no display)
         run: PYTHONPATH=src uv run python -c "import apricus.gui.gtk4app, apricus.gui.gtk4lib; print('gtk4 imports ok')"
 
-      - name: Build and verify .deb package
+      - name: Build and verify .deb and .rpm packages
         run: |
           ./pkgs/deb/build-deb.sh
           dpkg-deb --info dist/apricus_*_all.deb
+          ./pkgs/rpm/build-rpm.sh
+          rpm -qip dist/apricus-*.noarch.rpm

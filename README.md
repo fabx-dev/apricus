@@ -112,6 +112,20 @@ Or build the `.deb` locally into `dist/`:
 make deb
 ```
 
+### Fedora (`.rpm` Package)
+
+Download `apricus-2.0.2-1.noarch.rpm` from the [GitHub Release](https://github.com/fabx-dev/apricus/releases) and install it with `dnf`:
+
+```bash
+sudo dnf install ./apricus-2.0.2-1.noarch.rpm
+```
+
+Or build the `.rpm` locally into `dist/`:
+
+```bash
+make rpm
+```
+
 ### Snap Package
 
 Install from the `.snap` package attached to the release (or from the Snap Store):

@@ -1,4 +1,4 @@
-name: Release Packages (.deb, .snap, .flatpak)
+name: Release Packages (.deb, .rpm, .snap, .flatpak)
 
 on:
   push:
@@ -31,6 +31,28 @@ jobs:
         with:
           name: package-deb
           path: dist/apricus_*_all.deb
+
+  build-rpm:
+    name: Build .rpm package
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Install build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y meson ninja-build gettext desktop-file-utils libglib2.0-dev libglib2.0-dev-bin libgtk-4-bin rpm
+
+      - name: Build .rpm
+        run: |
+          ./pkgs/rpm/build-rpm.sh
+          rpm -qip dist/apricus-*.noarch.rpm
+
+      - name: Upload .rpm artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: package-rpm
+          path: dist/apricus-*.noarch.rpm
 
   build-snap:
     name: Build .snap package
@@ -110,7 +132,7 @@ jobs:
 
   attach-to-release:
     name: Attach packages to GitHub Release
-    needs: [build-deb, build-snap, build-flatpak]
+    needs: [build-deb, build-rpm, build-snap, build-flatpak]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-24.04
     steps:
