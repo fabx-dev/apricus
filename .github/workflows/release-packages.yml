@@ -119,8 +119,8 @@ jobs:
           sha256sum apricus* > SHA256SUMS.txt
           cat SHA256SUMS.txt
           TAG="${GITHUB_REF#refs/tags/}"
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" --clobber apricus* SHA256SUMS.txt
+          if gh release view "$TAG" -R "${{ github.repository }}" >/dev/null 2>&1; then
+            gh release upload "$TAG" -R "${{ github.repository }}" --clobber apricus* SHA256SUMS.txt
           else
-            gh release create "$TAG" --title "Apricus ${TAG#v}" --generate-notes apricus* SHA256SUMS.txt
+            gh release create "$TAG" -R "${{ github.repository }}" --title "Apricus ${TAG#v}" --generate-notes apricus* SHA256SUMS.txt
           fi
