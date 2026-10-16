@@ -49,8 +49,9 @@ def test_js_runtime_options_without_deno(monkeypatch):
     assert yt_utils.js_runtime_options() == {}
 
 
-def test_get_formats_passes_shared_options(monkeypatch):
+def test_get_formats_passes_shared_options(monkeypatch, tmp_path):
     _FakeYDL.seen.clear()
+    monkeypatch.setattr(yt_utils, "_meta_cache_path", lambda: str(tmp_path / "cache.json"))
     monkeypatch.setattr(yt_utils.youtube_dl, "YoutubeDL", _FakeYDL)
     formats = yt_utils.get_formats("https://example.com/v")
     assert len(formats) == 1
@@ -59,11 +60,12 @@ def test_get_formats_passes_shared_options(monkeypatch):
     assert params["remote_components"] == []
 
 
-def test_get_formats_empty_raises(monkeypatch):
+def test_get_formats_empty_raises(monkeypatch, tmp_path):
     class _Empty(_FakeYDL):
         def extract_info(self, url, download=False):
             return {}
 
+    monkeypatch.setattr(yt_utils, "_meta_cache_path", lambda: str(tmp_path / "cache.json"))
     monkeypatch.setattr(yt_utils.youtube_dl, "YoutubeDL", _Empty)
     with pytest.raises(ValueError):
         yt_utils.get_formats("https://example.com/v")
