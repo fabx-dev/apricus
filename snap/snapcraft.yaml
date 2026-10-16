@@ -86,7 +86,6 @@ parts:
       - python3-requests
       - python3-setproctitle
       - python3-vlc
-      - totem-video-thumbnailer
       - vlc
       - vlc-plugin-base
       - vlc-plugin-video-output

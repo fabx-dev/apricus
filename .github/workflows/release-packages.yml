@@ -19,7 +19,7 @@ jobs:
       - name: Install build deps
         run: |
           sudo apt-get update
-          sudo apt-get install -y meson ninja-build gettext desktop-file-utils libglib2.0-bin libgtk-4-bin
+          sudo apt-get install -y meson ninja-build gettext desktop-file-utils libglib2.0-dev libglib2.0-dev-bin libgtk-4-bin
 
       - name: Build .deb
         run: |

@@ -16,19 +16,41 @@ logger = logging.getLogger(LOGGER_NAME)
 
 
 def _generate_thumbnail_flatpak(filename):
-    # Inside Flatpak, DesktopThumbnailFactory runs the thumbnailer via
+    # Inside Flatpak/Snap, DesktopThumbnailFactory runs the thumbnailer via
     # `flatpak-spawn --sandbox`, where glycin (which writes the PNG on
     # recent GNOME runtimes) can't spawn its own sandboxed loader — nested
     # sandboxes are blocked, so every thumbnail fails. Run the bundled
-    # thumbnailer directly instead; glycin's single-level sandbox then
-    # works via the org.freedesktop.Flatpak portal.
+    # thumbnailer (or ffmpeg fallback) directly instead.
+    import shutil
+
     with tempfile.TemporaryDirectory() as tmp_dir:
         output = os.path.join(tmp_dir, "thumbnail.png")
-        subprocess.run(
-            ["totem-video-thumbnailer", "-s", "256", filename, output],
-            check=True,
-            timeout=60,
-        )
+        if shutil.which("totem-video-thumbnailer"):
+            subprocess.run(
+                ["totem-video-thumbnailer", "-s", "256", filename, output],
+                check=True,
+                timeout=60,
+            )
+        else:
+            subprocess.run(
+                [
+                    "ffmpeg",
+                    "-y",
+                    "-ss",
+                    "00:00:01",
+                    "-i",
+                    filename,
+                    "-vframes",
+                    "1",
+                    "-vf",
+                    "scale=256:-1",
+                    output,
+                ],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                check=True,
+                timeout=60,
+            )
         return GdkPixbuf.Pixbuf.new_from_file(output)
 
 
