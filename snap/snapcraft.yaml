@@ -89,3 +89,18 @@ parts:
     override-build: |
       craftctl default
       pip3 install --break-system-packages --no-deps --target="$CRAFT_PART_INSTALL/usr/lib/python3/dist-packages" yt-dlp
+
+  cleanup:
+    after:
+      - deno
+      - apricus
+    plugin: nil
+    build-snaps:
+      - core24
+      - gnome-46-2404
+      - mesa-2404
+    override-prime: |
+      set -eux
+      for snap in "core24" "gnome-46-2404" "mesa-2404"; do
+        cd "/snap/$snap/current" && find . -type f,l -exec rm -rf "${CRAFT_PRIME}/{}" \;
+      done
