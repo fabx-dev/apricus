@@ -42,6 +42,14 @@ def setup_render_device():
     """
     if os.environ.get("SNAP"):
         os.environ.setdefault("WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS", "1")
+        # Inside strict Snap confinement the WebKitGTK child processes
+        # (WebKitNetworkProcess/WebKitWebProcess) live in gnome-platform and
+        # are exposed via the snap.yaml layout binds. Force software
+        # compositing so a missing GPU render node never leaves a white page.
+        os.environ.setdefault("WEBKIT_DISABLE_DMABUF_RENDERER", "1")
+        os.environ.setdefault("LIBGL_ALWAYS_SOFTWARE", "1")
+    if os.environ.get("SNAP"):
+        os.environ.setdefault("WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS", "1")
     overrides = (
         "WEBKIT_WEB_RENDER_DEVICE_FILE",
         "WEBKIT_DMABUF_RENDERER_FORCE_SHM",

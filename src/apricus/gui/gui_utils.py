@@ -71,28 +71,59 @@ def generate_thumbnail(filename):
     """Generate and cache a thumbnail. Returns its path, or None if one can't
     be produced (e.g. no usable thumbnailer, or it failed)."""
     factory = _get_thumb_factory()
-    mtime = os.path.getmtime(filename)
+    try:
+        mtime = os.path.getmtime(filename)
+    except OSError:
+        return None
     file = Gio.file_new_for_path(filename)
     uri = file.get_uri()
-    info = file.query_info("standard::content-type", Gio.FileQueryInfoFlags.NONE, None)
-    mime_type = info.get_content_type()
-
-    cached = factory.lookup(uri, mtime)
-    if cached is not None:
-        return cached
-
-    if not factory.can_thumbnail(uri, mime_type, mtime):
+    try:
+        info = file.query_info("standard::content-type", Gio.FileQueryInfoFlags.NONE, None)
+        mime_type = info.get_content_type()
+    except GLib.Error:
         return None
 
+    with _thumb_factory_lock:
+        try:
+            cached = factory.lookup(uri, mtime)
+        except Exception:  # noqa: BLE001 - corrupt cache must not kill thumbs
+            cached = None
+        if cached is not None:
+            return cached
+
+    # Inside Flatpak/Snap the .thumbnailer files for video (totem/ffmpeg)
+    # are not shipped, so can_thumbnail() is always False even though our
+    # direct ffmpeg fallback below works fine. Skip the gate there.
+    if not (is_flatpak() or is_snap()):
+        with _thumb_factory_lock:
+            try:
+                if not factory.can_thumbnail(uri, mime_type, mtime):
+                    return None
+            except Exception:  # noqa: BLE001
+                return None
+
     if is_flatpak() or is_snap():
-        pixbuf = _generate_thumbnail_flatpak(filename)
+        try:
+            pixbuf = _generate_thumbnail_flatpak(filename)
+        except Exception as e:  # noqa: BLE001 - ffmpeg/totem failure
+            logger.debug(f"[Thumbnail] fallback generation failed: {e}")
+            return None
     else:
-        pixbuf = factory.generate_thumbnail(uri, mime_type)
+        try:
+            pixbuf = factory.generate_thumbnail(uri, mime_type)
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"[Thumbnail] generation failed: {e}")
+            return None
     if pixbuf is None:
         return None
 
-    factory.save_thumbnail(pixbuf, uri, mtime)
-    return factory.lookup(uri, mtime)
+    with _thumb_factory_lock:
+        try:
+            factory.save_thumbnail(pixbuf, uri, mtime)
+            return factory.lookup(uri, mtime)
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"[Thumbnail] cache save failed: {e}")
+            return None
 
 
 def _set_thumbnail(list_store, idx, video_path, thumbnail, token=0, current_token=None):

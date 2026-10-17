@@ -71,7 +71,7 @@ from apricus.yt_utils import youtube_dl as yt_dlp
 
 
 class _LazyRequests:
-    """Lazy proxy for requests so GUI cold start avoids its ~125 ms import."""
+    """Lazy proxy for requests so GUI cold startup avoids its ~125 ms import."""
 
     _mod = None
 
