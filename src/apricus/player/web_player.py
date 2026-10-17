@@ -72,6 +72,39 @@ def setup_render_device():
     os.environ["WEBKIT_DMABUF_RENDERER_FORCE_SHM"] = "1"
 
 
+def _is_blank_pixbuf(pixbuf, sample_step=97, white_threshold=250):
+    """True when a snapshot is (almost) entirely white.
+
+    Guards the static-wallpaper cache against WebKit blank captures: a page
+    that hasn't painted yet (slow JS, blocked subresources, crashed
+    WebProcess) snapshots as solid white. Sampling every Nth pixel keeps
+    the check under a millisecond on 1080p surfaces.
+    """
+    try:
+        w, h = pixbuf.get_width(), pixbuf.get_height()
+        if w <= 0 or h <= 0:
+            return True
+        px = pixbuf.get_pixels()
+        channels = pixbuf.get_n_channels()
+        stride = pixbuf.get_rowstride()
+        step = max(1, sample_step)
+        checked = 0
+        for y in range(0, h, step):
+            base = y * stride
+            for x in range(0, w, step):
+                off = base + x * channels
+                if px[off] < white_threshold or px[off + 1] < white_threshold:
+                    return False
+                if channels >= 3 and px[off + 2] < white_threshold:
+                    return False
+                checked += 1
+                if checked > 4000:
+                    return False
+        return True
+    except Exception:  # noqa: BLE001 - undecodable surface counts as blank
+        return True
+
+
 class WebWindow(Gtk.ApplicationWindow):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -92,10 +125,16 @@ class WebWindow(Gtk.ApplicationWindow):
         self._is_remote = False
         self._snapshot_cb = None
         self._load_token = 0
+        self._snapshot_attempts = 0
         self.__webview.connect("button-press-event", self._on_button_press_event)
         self.__webview.connect("permission-request", self._on_permission_request)
         self.__webview.connect("decide-policy", self._on_decide_policy)
         self.__webview.connect("load-changed", self._on_load_changed)
+        self.__webview.connect("load-failed", self._on_load_failed)
+        try:
+            self.__webview.connect("web-process-terminated", self._on_web_process_terminated)
+        except TypeError:
+            pass
 
     @staticmethod
     def _on_permission_request(_webview, request):
@@ -123,13 +162,37 @@ class WebWindow(Gtk.ApplicationWindow):
         self._is_remote = uri.startswith(("http://", "https://"))
         self._snapshot_cb = snapshot_cb
         self._load_token += 1
+        self._snapshot_attempts = 0
+        logger.info(f"[WebPlayer] Loading {uri[:80]}")
         self.__webview.load_uri(uri)
+
+    def _on_load_failed(self, _webview, _event, uri, error):
+        try:
+            msg = error.message if hasattr(error, "message") else str(error)
+        except Exception:  # noqa: BLE001
+            msg = "unknown"
+        logger.warning(f"[WebPlayer] Load failed for {uri[:80]}: {msg}")
+        return False
+
+    def _on_web_process_terminated(self, _webview, reason):
+        logger.warning(f"[WebPlayer] Web process terminated ({reason}); reloading")
+        self._load_token += 1
+        GLib.timeout_add_seconds(2, self._reload_after_crash)
+        return False
+
+    def _reload_after_crash(self):
+        try:
+            self.__webview.reload()
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"[WebPlayer] reload after crash failed: {e}")
+        return False
 
     def _on_load_changed(self, _webview, load_event):
         if load_event != WebKit2.LoadEvent.FINISHED or self._snapshot_cb is None:
             return
         token = self._load_token
-        for delay_ms in (1500, 4500):
+        self._snapshot_attempts = 0
+        for delay_ms in (1500, 4500, 9000):
             GLib.timeout_add(delay_ms, self._request_snapshot, token)
 
     def _request_snapshot(self, token):
@@ -158,8 +221,18 @@ class WebWindow(Gtk.ApplicationWindow):
             if w <= 0 or h <= 0:
                 return
             pixbuf = Gdk.pixbuf_get_from_surface(surface, 0, 0, w, h)
-            if pixbuf is not None:
-                self._snapshot_cb(pixbuf)
+            if pixbuf is None:
+                return
+            if _is_blank_pixbuf(pixbuf):
+                self._snapshot_attempts += 1
+                logger.warning(
+                    "[WebPlayer] Blank snapshot discarded "
+                    f"(attempt {self._snapshot_attempts}/3); retrying"
+                )
+                if self._snapshot_attempts < 3:
+                    GLib.timeout_add(4000, self._request_snapshot, token)
+                return
+            self._snapshot_cb(pixbuf)
         except Exception as e:  # noqa: BLE001
             logger.debug(f"[WebPlayer] snapshot finish failed: {e}")
 
@@ -209,6 +282,9 @@ class WebPlayer(BasePlayer):
         return os.path.join(CONFIG_DIR, f"static-{digest}.png")
 
     def _save_web_snapshot(self, raw_source, pixbuf):
+        if _is_blank_pixbuf(pixbuf):
+            logger.warning("[WebPlayer] Blank snapshot not saved (page not painted yet)")
+            return
         try:
             os.makedirs(CONFIG_DIR, exist_ok=True)
             cached = self._static_cache_path(raw_source)
@@ -293,8 +369,13 @@ class WebPlayer(BasePlayer):
                 and self.wallpaper.supports_static
             ):
                 cached = self._static_cache_path(raw_source)
-                if os.path.isfile(cached):
+                if os.path.isfile(cached) and os.path.getsize(cached) > 100 * 1024:
+                    # Large caches are real page renders; tiny ones are the
+                    # old all-white placeholders (18KB @1080p) — never paint
+                    # those or the desktop stays white.
                     self.wallpaper.apply_static(cached)
+                elif os.path.isfile(cached):
+                    logger.warning("[WebPlayer] Ignoring suspiciously small static cache")
         self.volume = self.config[CONFIG_KEY_VOLUME]
         self.is_mute = self.config[CONFIG_KEY_MUTE]
 

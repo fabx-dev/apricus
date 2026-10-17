@@ -45,6 +45,7 @@
         <ul>
           <li>Fixed missing video thumbnails in Snap/Flatpak by bypassing the thumbnailer registry gate and using the direct ffmpeg fallback</li>
           <li>Hardened Web Page wallpapers in Snap with forced software compositing fallback so pages never render white</li>
+          <li>Web pages no longer paint a white desktop: blank snapshots are discarded with reload retries, crash/load failures are logged, and suspiciously small static caches are ignored</li>
           <li>Replaced lazy module proxies with function-local imports to keep GUI/player cold startup fast without behaviour changes</li>
         </ul>
       </description>
