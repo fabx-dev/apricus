@@ -41,6 +41,7 @@ apps:
       - home
       - network
       - network-bind
+      - network-status
       - audio-playback
       - opengl
       - x11
