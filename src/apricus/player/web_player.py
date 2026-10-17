@@ -40,6 +40,8 @@ def setup_render_device():
     render node instead, or fall back to shared-memory buffers on NVIDIA-only
     systems. Must be called before the first WebView is created.
     """
+    if os.environ.get("SNAP"):
+        os.environ.setdefault("WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS", "1")
     overrides = (
         "WEBKIT_WEB_RENDER_DEVICE_FILE",
         "WEBKIT_DMABUF_RENDERER_FORCE_SHM",

@@ -23,9 +23,10 @@ def js_runtime_options():
         return {"deno": {"path": FLATPAK_DENO_PATH}}
     snap_dir = os.environ.get("SNAP") or ""
     if snap_dir:
-        snap_deno = os.path.join(snap_dir, "bin", "deno")
-        if os.path.isfile(snap_deno):
-            return {"deno": {"path": snap_deno}}
+        for rel in (("usr", "bin", "deno"), ("bin", "deno")):
+            snap_deno = os.path.join(snap_dir, *rel)
+            if os.path.isfile(snap_deno):
+                return {"deno": {"path": snap_deno}}
     return {}
 
 

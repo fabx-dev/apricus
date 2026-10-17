@@ -32,7 +32,11 @@ apps:
     autostart: io.github.fabx_dev.Apricus.desktop
     environment:
       PYTHONPATH: $SNAP/usr/share/apricus:$SNAP/gnome-platform/usr/lib/python3/dist-packages:$SNAP/usr/lib/python3/dist-packages
+      LD_LIBRARY_PATH: $SNAP/usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR:$SNAP/usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR/vlc:$SNAP/usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR/blas:$SNAP/usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR/lapack:$LD_LIBRARY_PATH
       VLC_PLUGIN_PATH: $SNAP/usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR/vlc/plugins
+      PYTHON_VLC_LIB_PATH: $SNAP/usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR/libvlc.so.5
+      PYTHON_VLC_MODULE_PATH: $SNAP/usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR/vlc
+      WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS: "1"
     plugs:
       - home
       - network
@@ -53,7 +57,7 @@ parts:
       - on amd64: https://github.com/denoland/deno/releases/download/v2.9.7/deno-x86_64-unknown-linux-gnu.zip
       - on arm64: https://github.com/denoland/deno/releases/download/v2.9.7/deno-aarch64-unknown-linux-gnu.zip
     organize:
-      deno: bin/deno
+      deno: usr/bin/deno
 
   apricus:
     after: [deno]
@@ -88,7 +92,7 @@ parts:
       - xdg-user-dirs
     override-build: |
       craftctl default
-      pip3 install --break-system-packages --no-deps --target="$CRAFT_PART_INSTALL/usr/lib/python3/dist-packages" yt-dlp
+      pip3 install --break-system-packages --no-deps --target="$CRAFT_PART_INSTALL/usr/lib/python3/dist-packages" yt-dlp yt-dlp-ejs
 
   cleanup:
     after:
@@ -102,5 +106,18 @@ parts:
     override-prime: |
       set -eux
       for snap in "core24" "gnome-46-2404" "mesa-2404"; do
-        cd "/snap/$snap/current" && find . -type f,l -exec rm -rf "${CRAFT_PRIME}/{}" \;
+        cd "/snap/$snap/current" && find . -type f,l ! -name "deno" -exec rm -rf "${CRAFT_PRIME}/{}" \;
       done
+      if [ -f "${CRAFT_STAGE}/usr/bin/deno" ] && [ ! -f "${CRAFT_PRIME}/usr/bin/deno" ]; then
+        mkdir -p "${CRAFT_PRIME}/usr/bin"
+        cp -a "${CRAFT_STAGE}/usr/bin/deno" "${CRAFT_PRIME}/usr/bin/deno"
+      fi
+      for sub in blas lapack; do
+        if [ -d "${CRAFT_STAGE}/usr/lib/${CRAFT_ARCH_TRIPLET_BUILD_FOR}/${sub}" ]; then
+          cp -a "${CRAFT_STAGE}/usr/lib/${CRAFT_ARCH_TRIPLET_BUILD_FOR}/${sub}"/lib*.so* "${CRAFT_PRIME}/usr/lib/${CRAFT_ARCH_TRIPLET_BUILD_FOR}/" || true
+        fi
+      done
+      ln -sf libvlc.so.5 "${CRAFT_PRIME}/usr/lib/${CRAFT_ARCH_TRIPLET_BUILD_FOR}/libvlc.so"
+      LD_LIBRARY_PATH="/snap/gnome-46-2404/current/usr/lib/${CRAFT_ARCH_TRIPLET_BUILD_FOR}:/snap/gnome-46-2404/current/lib/${CRAFT_ARCH_TRIPLET_BUILD_FOR}:${CRAFT_PRIME}/usr/lib/${CRAFT_ARCH_TRIPLET_BUILD_FOR}:${CRAFT_PRIME}/usr/lib/${CRAFT_ARCH_TRIPLET_BUILD_FOR}/vlc" \
+        "${CRAFT_PRIME}/usr/lib/${CRAFT_ARCH_TRIPLET_BUILD_FOR}/vlc/vlc-cache-gen" \
+        "${CRAFT_PRIME}/usr/lib/${CRAFT_ARCH_TRIPLET_BUILD_FOR}/vlc/plugins" || true

@@ -276,6 +276,10 @@ class PlayerWindow(Gtk.ApplicationWindow):
         )
 
     def media_new(self, *args):
+        if args and isinstance(args[0], str) and os.environ.get("SNAP"):
+            mrl = args[0]
+            if mrl.startswith(("https://", "http://")):
+                args = (f"avio://{mrl}", *args[1:])
         return self.__vlc_widget.instance.media_new(*args)
 
     def set_media(self, *args):
