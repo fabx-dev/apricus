@@ -25,15 +25,15 @@ website: https://github.com/fabx-dev/apricus
 
 apps:
   apricus:
-    command: usr/bin/apricus
+    command: usr/bin/python3 $SNAP/usr/bin/apricus
     extensions: [gnome]
     common-id: io.github.fabx_dev.Apricus
     desktop: usr/share/applications/io.github.fabx_dev.Apricus.desktop
     autostart: io.github.fabx_dev.Apricus.desktop
     environment:
-      PYTHONPATH: $SNAP/usr/share/apricus:$SNAP/usr/lib/python3/dist-packages:$PYTHONPATH
+      PYTHONPATH: $SNAP/usr/share/apricus:$SNAP/usr/lib/python3/dist-packages:$SNAP/gnome-platform/usr/lib/python3/dist-packages
       VLC_PLUGIN_PATH: $SNAP/usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR/vlc/plugins
-      GI_TYPELIB_PATH: $SNAP/usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR/girepository-1.0:$GI_TYPELIB_PATH
+      GI_TYPELIB_PATH: $SNAP/usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR/girepository-1.0:$SNAP/gnome-platform/usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR/girepository-1.0:$SNAP/gnome-platform/usr/lib/girepository-1.0
     plugs:
       - home
       - network

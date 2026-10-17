@@ -32,7 +32,7 @@ from apricus.commons import (
     resolve_video_dir,
 )
 from apricus.monitor import Monitors
-from apricus.utils import ConfigUtil, EndSessionHandler, _authorize, get_video_paths
+from apricus.utils import ConfigUtil, EndSessionHandler, _authorize, get_video_paths, is_snap
 
 # NOTE: menu and the player mains pin Gtk 3 namespaces at import time
 # (gi forbids two Gtk majors in one process). They must never be imported
@@ -548,6 +548,10 @@ _bus_singleton = None
 
 
 def get_instance(dbus_name):
+    if is_snap():
+        from apricus.snap_ipc import get_service
+
+        return get_service(dbus_name)
     global _bus_singleton
     if _bus_singleton is None:
         _bus_singleton = SessionBus()
@@ -565,10 +569,15 @@ def main(version, pkgdatadir, localedir, args):
     else:
         # Pause before launching
         time.sleep(args.p)
-        bus = SessionBus()
         server = ApricusServer(version, pkgdatadir, localedir, args)
         try:
-            bus.publish(DBUS_NAME_SERVER, server)
+            if is_snap():
+                from apricus.snap_ipc import publish_service
+
+                publish_service(DBUS_NAME_SERVER, server)
+            else:
+                bus = SessionBus()
+                bus.publish(DBUS_NAME_SERVER, server)
             loop.run()
         except RuntimeError as e:
             raise Exception("Failed to create server") from e

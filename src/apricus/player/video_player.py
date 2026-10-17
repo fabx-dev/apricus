@@ -1093,10 +1093,17 @@ def main():
     faulthandler.enable()
     setup_logging()
     logger.info(f"[Player] pid={os.getpid()}")
-    bus = SessionBus()
     app = VideoPlayer()
     try:
-        bus.publish(DBUS_NAME_PLAYER, app)
+        from apricus.utils import is_snap
+
+        if is_snap():
+            from apricus.snap_ipc import publish_service
+
+            publish_service(DBUS_NAME_PLAYER, app)
+        else:
+            bus = SessionBus()
+            bus.publish(DBUS_NAME_PLAYER, app)
     except RuntimeError as e:
         logger.error(e)
     app.run(sys.argv)

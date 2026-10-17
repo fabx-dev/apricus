@@ -442,6 +442,10 @@ class ControlPanel(Adw.Application):
         self.sidebar.select_row(row)
 
     def _server(self):
+        if is_snap():
+            from apricus.snap_ipc import get_service
+
+            return get_service(DBUS_NAME_SERVER)
         try:
             bus = getattr(self, "_session_bus", None)
             if bus is None:

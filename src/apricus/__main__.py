@@ -16,32 +16,6 @@ from apricus.utils import (
 logger = logging.getLogger(LOGGER_NAME)
 
 
-def _ensure_snap_internal_dbus():
-    """Start a private session bus inside Snap so server/player/gui IPC never
-    needs a custom AppArmor dbus slot on the host session bus."""
-    if not is_snap() or os.environ.get("APRICUS_INTERNAL_DBUS") == "1":
-        return
-    import subprocess
-
-    host_bus = os.environ.get("DBUS_SESSION_BUS_ADDRESS", "")
-    try:
-        addr = (
-            subprocess.check_output(
-                ["dbus-daemon", "--session", "--fork", "--print-address"],
-                encoding="utf-8",
-                timeout=5,
-            )
-            .strip()
-            .splitlines()[0]
-        )
-        if addr:
-            os.environ["APRICUS_HOST_DBUS_ADDRESS"] = host_bus
-            os.environ["DBUS_SESSION_BUS_ADDRESS"] = addr
-            os.environ["APRICUS_INTERNAL_DBUS"] = "1"
-    except Exception as e:  # noqa: BLE001
-        logger.debug(f"[Snap] Private D-Bus startup skipped: {e}")
-
-
 # TODO: Add locale support
 def main(version="devel", pkgdatadir="/usr/share/apricus", localedir="/usr/share/locale"):
     # Make sure that X11 is the backend. Revert Wayland to XWayland.
@@ -108,7 +82,6 @@ def main(version="devel", pkgdatadir="/usr/share/apricus", localedir="/usr/share
     sys_info_str = "\n".join(sys_info)
     logger.info(f"Apricus v{version}\n{sys_info_str}")
     logger.info(f"[Args] {vars(args)}")
-    _ensure_snap_internal_dbus()
     perf.mark("main: imports done")
 
     # Clear sys.argv as it has influence to the Gtk.Application

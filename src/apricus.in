@@ -1,4 +1,4 @@
-#!@PYTHON@
+#!/usr/bin/env python3
 
 # apricus.in
 # 
@@ -18,14 +18,16 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+import os
 import sys
 import signal
 import locale
 import gettext
 
 VERSION = '@VERSION@'
-pkgdatadir = '@pkgdatadir@'
-localedir = '@localedir@'
+_snap = os.environ.get('SNAP') or ''
+pkgdatadir = (_snap + '@pkgdatadir@') if _snap else '@pkgdatadir@'
+localedir = (_snap + '@localedir@') if _snap else '@localedir@'
 
 sys.path.insert(1, pkgdatadir)
 signal.signal(signal.SIGINT, signal.SIG_DFL)

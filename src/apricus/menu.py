@@ -11,7 +11,7 @@ from gi.repository import GLib, Gtk
 from pydbus import SessionBus
 
 from apricus.commons import DBUS_NAME_SERVER, LOGGER_NAME, MODE_VIDEO, MODE_WEBPAGE, PROJECT
-from apricus.utils import init_translations, setup_logging
+from apricus.utils import init_translations, is_snap, setup_logging
 
 logger = logging.getLogger(LOGGER_NAME)
 
@@ -31,6 +31,10 @@ def get_session_bus():
 
 
 def connect():
+    if is_snap():
+        from apricus.snap_ipc import get_service
+
+        return get_service(DBUS_NAME_SERVER)
     # Connect to server using singleton SessionBus
     bus = get_session_bus()
     try:

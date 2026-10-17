@@ -69,6 +69,9 @@ jobs:
           sudo snapcraft pack --destructive-mode
           mkdir -p dist
           mv apricus_*.snap dist/
+          unsquashfs -d /tmp/snap-check dist/apricus_*.snap usr/bin/apricus usr/share/apricus >/dev/null
+          head -n1 /tmp/snap-check/usr/bin/apricus | grep -q "/usr/bin/env python3"
+          rm -rf /tmp/snap-check
 
       - name: Upload .snap artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

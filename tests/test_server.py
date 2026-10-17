@@ -339,6 +339,53 @@ def test_web_player_proxy_without_vlc_methods_never_breaks_server_transitions(mo
     assert s.playback_error == ""
 
 
+def test_snap_ipc_roundtrip_methods_and_properties(tmp_path, monkeypatch):
+    """snap_ipc must expose properties (get/set) and methods over a Unix
+    socket without touching the host D-Bus session bus."""
+    from gi.repository import GLib
+
+    from apricus import snap_ipc
+
+    monkeypatch.setenv("XDG_RUNTIME_DIR", str(tmp_path))
+
+    class _FakeServer:
+        def __init__(self):
+            self.mode = "MODE_VIDEO"
+            self.volume = 50
+            self.seen = []
+
+        def video(self, path, monitor):
+            self.seen.append((path, monitor))
+            return "ok"
+
+    obj = _FakeServer()
+    sock = snap_ipc.publish_service("io.github.fabx_dev.Apricus.test", obj)
+    ctx = GLib.MainContext.default()
+    results = {}
+
+    def _client():
+        proxy = snap_ipc.get_service("io.github.fabx_dev.Apricus.test")
+        assert proxy is not None
+        results["mode"] = proxy.mode
+        proxy.volume = 80
+        results["vol"] = proxy.volume
+        results["call"] = proxy.video("/a.mp4", "HDMI-1")
+
+    import threading
+    import time
+
+    t = threading.Thread(target=_client)
+    t.start()
+    deadline = time.monotonic() + 5
+    while t.is_alive() and time.monotonic() < deadline:
+        ctx.iteration(False)
+        time.sleep(0.01)
+    t.join(timeout=1)
+    sock.close()
+    assert results == {"mode": "MODE_VIDEO", "vol": 80, "call": "ok"}
+    assert obj.seen == [("/a.mp4", "HDMI-1")]
+
+
 def test_pause_flag_roundtrips_in_playlist_mode():
     """In MODE_PLAYLIST the pause flag must round-trip like other modes.
 
