@@ -25,7 +25,7 @@ website: https://github.com/fabx-dev/apricus
 
 apps:
   apricus:
-    command: usr/bin/python3 $SNAP/usr/bin/apricus
+    command: usr/bin/apricus
     extensions: [gnome]
     common-id: io.github.fabx_dev.Apricus
     desktop: usr/share/applications/io.github.fabx_dev.Apricus.desktop
