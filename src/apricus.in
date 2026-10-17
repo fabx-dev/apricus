@@ -30,6 +30,9 @@ pkgdatadir = (_snap + '@pkgdatadir@') if _snap else '@pkgdatadir@'
 localedir = (_snap + '@localedir@') if _snap else '@localedir@'
 
 sys.path.insert(1, pkgdatadir)
+_cur_py = os.environ.get('PYTHONPATH') or ''
+if pkgdatadir not in _cur_py.split(':'):
+    os.environ['PYTHONPATH'] = f"{pkgdatadir}:{_cur_py}" if _cur_py else pkgdatadir
 signal.signal(signal.SIGINT, signal.SIG_DFL)
 locale.bindtextdomain('apricus', localedir)
 locale.textdomain('apricus')

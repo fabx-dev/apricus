@@ -547,18 +547,23 @@ class EndSessionHandler:
 
     def __init__(self, on_end_session: callable):
         self.on_end_session = on_end_session
-
-        if is_gnome():
-            session_bus = pydbus.SessionBus()
-            proxy = session_bus.get("org.gnome.SessionManager")
-            client_id = proxy.RegisterClient("", "")
-            self.session_client = session_bus.get("org.gnome.SessionManager", client_id)
-            self.session_client.QueryEndSession.connect(self.__query_end_session_handler_gnome)
-            self.session_client.EndSession.connect(self.__end_session_handler_gnome)
-        else:
-            system_bus = pydbus.SystemBus()
-            proxy = system_bus.get(".login1")
-            proxy.PrepareForShutdown.connect(self.__end_session_handler)
+        self.session_client = None
+        if is_snap():
+            return
+        try:
+            if is_gnome():
+                session_bus = pydbus.SessionBus()
+                proxy = session_bus.get("org.gnome.SessionManager")
+                client_id = proxy.RegisterClient("", "")
+                self.session_client = session_bus.get("org.gnome.SessionManager", client_id)
+                self.session_client.QueryEndSession.connect(self.__query_end_session_handler_gnome)
+                self.session_client.EndSession.connect(self.__end_session_handler_gnome)
+            else:
+                system_bus = pydbus.SystemBus()
+                proxy = system_bus.get(".login1")
+                proxy.PrepareForShutdown.connect(self.__end_session_handler)
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"[EndSessionHandler] unavailable in this sandbox: {e}")
 
     def __end_session_response_gnome(self, ok=True):
         if ok:

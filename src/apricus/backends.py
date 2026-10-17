@@ -107,9 +107,12 @@ class GnomeWallpaperBackend(WallpaperBackend):
             except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
                 logger.error(f"[StaticWallpaper] {e}")
         else:
-            gso = self._settings()
-            self.original_wallpaper_uri = gso.get_string("picture-uri")
-            self.original_wallpaper_uri_dark = gso.get_string("picture-uri-dark")
+            try:
+                gso = self._settings()
+                self.original_wallpaper_uri = gso.get_string("picture-uri")
+                self.original_wallpaper_uri_dark = gso.get_string("picture-uri-dark")
+            except Exception as e:  # noqa: BLE001
+                logger.debug(f"[StaticWallpaper] capture skipped: {e}")
 
     def apply_static(self, image_path):
         from pathlib import Path
@@ -129,9 +132,12 @@ class GnomeWallpaperBackend(WallpaperBackend):
             except subprocess.CalledProcessError as e:
                 logger.error(f"[StaticWallpaper] {e}")
         else:
-            gso = self._settings()
-            gso.set_string("picture-uri", uri)
-            gso.set_string("picture-uri-dark", uri)
+            try:
+                gso = self._settings()
+                gso.set_string("picture-uri", uri)
+                gso.set_string("picture-uri-dark", uri)
+            except Exception as e:  # noqa: BLE001
+                logger.debug(f"[StaticWallpaper] background set skipped: {e}")
             try:
                 Gio.Settings.new("org.gnome.desktop.screensaver").set_string("picture-uri", uri)
             except Exception as e:
@@ -147,9 +153,14 @@ class GnomeWallpaperBackend(WallpaperBackend):
             except subprocess.CalledProcessError as e:
                 logger.error(f"[StaticWallpaper] {e}")
         else:
-            gso = self._settings()
-            gso.set_string("picture-uri", self.original_wallpaper_uri)
-            gso.set_string("picture-uri-dark", self.original_wallpaper_uri_dark)
+            try:
+                gso = self._settings()
+                if self.original_wallpaper_uri is not None:
+                    gso.set_string("picture-uri", self.original_wallpaper_uri)
+                if self.original_wallpaper_uri_dark is not None:
+                    gso.set_string("picture-uri-dark", self.original_wallpaper_uri_dark)
+            except Exception as e:  # noqa: BLE001
+                logger.debug(f"[StaticWallpaper] restore skipped: {e}")
 
     def _spawn_set(self, key, value):
         subprocess.run(
