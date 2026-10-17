@@ -26,17 +26,24 @@ class _FakeYDL:
 
 def test_base_options_shape(monkeypatch):
     monkeypatch.setattr("os.path.isfile", lambda path: False)
+    monkeypatch.setattr("shutil.which", lambda cmd: None)
     options = yt_utils.base_options()
     assert options["noplaylist"] is True
     assert options["socket_timeout"] == 15
     # Empty runtime selection must not override yt-dlp's PATH discovery.
     assert "js_runtimes" not in options
     assert options["remote_components"] == []
-    assert options["extractor_args"]["youtube"]["player_client"] == ["web_embedded"]
+    assert options["extractor_args"]["youtube"]["player_client"] == [
+        "web_embedded",
+        "tv_simply",
+        "ios",
+    ]
     assert "quiet" not in options
     assert yt_utils.base_options(quiet=True)["quiet"] is True
     monkeypatch.setattr("os.path.isfile", lambda path: path == "/app/bin/deno")
-    assert yt_utils.base_options()["js_runtimes"] == {"deno": {"path": "/app/bin/deno"}}
+    opts_deno = yt_utils.base_options()
+    assert opts_deno["js_runtimes"] == {"deno": {"path": "/app/bin/deno"}}
+    assert opts_deno["extractor_args"]["youtube"]["player_client"] == ["web_embedded"]
 
 
 def test_js_runtime_options_prefers_bundled_deno(monkeypatch):

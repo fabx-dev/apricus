@@ -64,6 +64,8 @@ Depends: python3 (>= 3.10),
  gir1.2-wnck-3.0,
  gir1.2-ayatanaappindicator3-0.1 | gir1.2-appindicator3-0.1,
  vlc,
+ vlc-plugin-base,
+ vlc-plugin-video-output,
  ffmpeg,
  dconf-cli,
  xdg-user-dirs

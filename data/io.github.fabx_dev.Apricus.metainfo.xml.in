@@ -22,24 +22,34 @@
 
   <screenshots>
     <screenshot type="default">
-      <image>https://raw.githubusercontent.com/fabx-dev/apricus/v2.0.2/res/apricus-2-library.png</image>
+      <image>https://raw.githubusercontent.com/fabx-dev/apricus/v2.0.3/res/apricus-2-library.png</image>
       <caption>Video library with asynchronous thumbnails and monitor selector</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/fabx-dev/apricus/v2.0.2/res/apricus-2-playlist.png</image>
+      <image>https://raw.githubusercontent.com/fabx-dev/apricus/v2.0.3/res/apricus-2-playlist.png</image>
       <caption>Looping video playlist with drag-and-drop reorder and shuffle</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/fabx-dev/apricus/v2.0.2/res/apricus-2-now-playing.png</image>
+      <image>https://raw.githubusercontent.com/fabx-dev/apricus/v2.0.3/res/apricus-2-now-playing.png</image>
       <caption>Now Playing dashboard with widescreen preview and media details</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/fabx-dev/apricus/v2.0.2/res/apricus-2-streaming.png</image>
+      <image>https://raw.githubusercontent.com/fabx-dev/apricus/v2.0.3/res/apricus-2-streaming.png</image>
       <caption>Streaming hub with saved sources, cached thumbnails and LIVE badge</caption>
     </screenshot>
   </screenshots>
 
   <releases>
+    <release version="2.0.3" date="2026-10-17" type="stable">
+      <description>
+        <ul>
+          <li>Full Snap confinement support with pre-built VLC plugin cache, bundled Deno 2.9.7 + yt-dlp-ejs and WebKitGTK sandbox compatibility</li>
+          <li>High-definition YouTube DASH audio slave routing via avio:// in Snap and automatic yt-dlp client fallback when Deno is absent on native installs</li>
+          <li>Persist mute, volume and behaviour flags across restarts when toggled from the desktop context menu or system tray</li>
+          <li>Multi-monitor primary display detection fix in monitor_sync and improved Debian (.deb) and Fedora (.rpm) package dependencies</li>
+        </ul>
+      </description>
+    </release>
     <release version="2.0.2" date="2026-10-16" type="stable">
       <description>
         <ul>

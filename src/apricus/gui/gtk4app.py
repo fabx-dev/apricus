@@ -2792,7 +2792,7 @@ class ControlPanel(Adw.Application):
         if button is None:
             return
         button.set_sensitive(not busy)
-        button.set_label("Checking…" if busy else "Apply")
+        button.set_label(_("Checking…") if busy else _("Apply"))
 
     def on_stream_apply(self, *_args):
         url = self.stream_entry.get_text().strip()

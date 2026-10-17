@@ -459,6 +459,7 @@ class ApricusServer:
     @volume.setter
     def volume(self, volume):
         self.config[CONFIG_KEY_VOLUME] = volume
+        self._save_config()
         player = get_instance(DBUS_NAME_PLAYER)
         if player is not None:
             player.volume = volume
@@ -470,6 +471,7 @@ class ApricusServer:
     @is_mute.setter
     def is_mute(self, is_mute):
         self.config[CONFIG_KEY_MUTE] = is_mute
+        self._save_config()
         player = get_instance(DBUS_NAME_PLAYER)
         if player is not None:
             player.is_mute = is_mute
@@ -507,6 +509,7 @@ class ApricusServer:
     @is_static_wallpaper.setter
     def is_static_wallpaper(self, is_static_wallpaper):
         self.config[CONFIG_KEY_STATIC_WALLPAPER] = is_static_wallpaper
+        self._save_config()
         player = get_instance(DBUS_NAME_PLAYER)
         if player is not None:
             player.reload_config()
@@ -518,6 +521,7 @@ class ApricusServer:
     @is_pause_when_maximized.setter
     def is_pause_when_maximized(self, is_pause_when_maximized):
         self.config[CONFIG_KEY_PAUSE_WHEN_MAXIMIZED] = is_pause_when_maximized
+        self._save_config()
         player = get_instance(DBUS_NAME_PLAYER)
         if player is not None:
             player.reload_config()
@@ -529,6 +533,7 @@ class ApricusServer:
     @is_mute_when_maximized.setter
     def is_mute_when_maximized(self, is_mute_when_maximized):
         self.config[CONFIG_KEY_MUTE_WHEN_MAXIMIZED] = is_mute_when_maximized
+        self._save_config()
         player = get_instance(DBUS_NAME_PLAYER)
         if player is not None:
             player.reload_config()

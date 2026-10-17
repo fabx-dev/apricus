@@ -360,6 +360,9 @@ class PlayerWindow(Gtk.ApplicationWindow):
         self.__vlc_widget.player.video_set_crop_geometry(crop_geometry)
 
     def add_audio_track(self, audio):
+        if isinstance(audio, str) and os.environ.get("SNAP"):
+            if audio.startswith(("https://", "http://")):
+                audio = f"avio://{audio}"
         self.__vlc_widget.player.add_slave(vlc.MediaSlaveType(1), audio, True)
 
     def set_cover(self, image_path):
@@ -818,7 +821,7 @@ class VideoPlayer(BasePlayer):
     def monitor_sync(self):
         primary_monitor = None
         for monitor, _window in self.windows.items():
-            if monitor.is_primary:
+            if monitor.is_primary():
                 primary_monitor = monitor
                 break
         if primary_monitor:

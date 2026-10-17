@@ -419,3 +419,27 @@ def test_pause_flag_still_none_without_player():
     with patch.object(srv, "get_instance", return_value=None):
         assert s.is_paused_by_user is None
         s.is_paused_by_user = True  # must not raise
+
+
+def test_server_property_setters_persist_to_disk(monkeypatch):
+    """Toggling mute/volume/flags on ApricusServer (e.g. from the desktop
+    context menu or systray) must save the updated config to disk."""
+    saved = []
+    monkeypatch.setattr(srv, "get_instance", lambda _name: None)
+    s = srv.ApricusServer.__new__(srv.ApricusServer)
+    s.config = {
+        srv.CONFIG_KEY_VOLUME: 50,
+        srv.CONFIG_KEY_MUTE: False,
+        srv.CONFIG_KEY_STATIC_WALLPAPER: True,
+        srv.CONFIG_KEY_PAUSE_WHEN_MAXIMIZED: True,
+        srv.CONFIG_KEY_MUTE_WHEN_MAXIMIZED: False,
+    }
+    s._save_config = lambda: saved.append(dict(s.config))
+
+    s.is_mute = True
+    s.volume = 75
+    s.is_static_wallpaper = False
+    assert len(saved) == 3
+    assert saved[-1][srv.CONFIG_KEY_MUTE] is True
+    assert saved[-1][srv.CONFIG_KEY_VOLUME] == 75
+    assert saved[-1][srv.CONFIG_KEY_STATIC_WALLPAPER] is False

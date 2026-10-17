@@ -38,19 +38,23 @@ def base_options(*, quiet=False):
     ``web_embedded`` (with ``tv_simply`` / ``web`` fallbacks) produces standard
     HTTPS streams playable by libVLC.
     """
+    import shutil
+
+    js_runtimes = js_runtime_options()
+    has_deno = bool(js_runtimes or shutil.which("deno"))
+    clients = ["web_embedded"] if has_deno else ["web_embedded", "tv_simply", "ios"]
     options = {
         "noplaylist": True,
         "socket_timeout": 15,
         "remote_components": [],
         "extractor_args": {
             "youtube": {
-                "player_client": ["web_embedded"],
+                "player_client": clients,
             },
         },
     }
-    js_runtimes = js_runtime_options()
     if js_runtimes:
-        # Only pin when we know a binary (Flatpak bundle). Passing an
+        # Only pin when we know a binary (Flatpak/Snap bundle). Passing an
         # empty dict would override yt-dlp's default PATH discovery and
         # disable runtimes instead of leaving them enabled.
         options["js_runtimes"] = js_runtimes

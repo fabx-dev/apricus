@@ -38,6 +38,15 @@ Type=Application
 Categories=GTK;Utility;
 StartupNotify=false
 """
+AUTOSTART_DESKTOP_CONTENT_SNAP = """[Desktop Entry]
+Name=Apricus
+Exec=/snap/bin/apricus -b
+Icon=io.github.fabx_dev.Apricus
+Terminal=false
+Type=Application
+Categories=GTK;Utility;
+StartupNotify=false
+"""
 AUTOSTART_DESKTOP_CONTENT_FLATPAK = """[Desktop Entry]
 Name=Apricus
 Exec=/usr/bin/flatpak run --command=apricus io.github.fabx_dev.Apricus -b

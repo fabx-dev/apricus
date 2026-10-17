@@ -31,6 +31,7 @@ def wnck():
 from apricus.commons import (
     AUTOSTART_DESKTOP_CONTENT,
     AUTOSTART_DESKTOP_CONTENT_FLATPAK,
+    AUTOSTART_DESKTOP_CONTENT_SNAP,
     AUTOSTART_DESKTOP_PATH,
     AUTOSTART_DIR,
     CONFIG_DIR,
@@ -328,6 +329,8 @@ def setup_autostart(autostart):
                 # (1) So that we know if autostart is enabled by looking the file in sandbox
                 # (2) Acts as a fallback in case the portal doesn't work
                 f.write(AUTOSTART_DESKTOP_CONTENT_FLATPAK)
+            elif is_snap():
+                f.write(AUTOSTART_DESKTOP_CONTENT_SNAP)
             else:
                 f.write(AUTOSTART_DESKTOP_CONTENT)
     else:

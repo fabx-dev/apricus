@@ -202,7 +202,7 @@ class WebPlayer(BasePlayer):
 
     def _save_web_snapshot(self, raw_source, pixbuf):
         try:
-            os.makedirs(CONFIG_DIR, mode=0o700, exist_ok=True)
+            os.makedirs(CONFIG_DIR, exist_ok=True)
             cached = self._static_cache_path(raw_source)
             tmp = f"{cached}.tmp.png"
             pixbuf.savev(tmp, "png", [], [])

@@ -62,9 +62,9 @@ Requires:       gdk-pixbuf2
 Requires:       gnome-desktop4
 Requires:       webkit2gtk4.1
 Requires:       libwnck3
-Requires:       libappindicator-gtk3
+Requires:       (libayatana-appindicator-gtk3 or libappindicator-gtk3)
 Requires:       vlc
-Requires:       ffmpeg-free
+Requires:       (ffmpeg-free or ffmpeg)
 Requires:       dconf
 Requires:       xdg-user-dirs
 Recommends:     yt-dlp
