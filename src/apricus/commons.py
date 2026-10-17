@@ -16,15 +16,42 @@ TRANSLATION_DOMAIN = "apricus"
 
 HOME = os.environ.get("HOME")
 REAL_HOME = os.environ.get("SNAP_REAL_HOME") or HOME
-try:
-    xdg_video_dir = subprocess.check_output(
-        ["xdg-user-dir", "VIDEOS"], encoding="UTF-8", timeout=5
-    ).replace("\n", "")
-    # Kept from Hidamari for compatibility (existing video libraries stay put).
-    VIDEO_WALLPAPER_DIR = os.path.join(xdg_video_dir, "Hidamari")
-except (FileNotFoundError, subprocess.SubprocessError, OSError):
-    # xdg-user-dir not found, use $REAL_HOME/Hidamari for Video directory instead
-    VIDEO_WALLPAPER_DIR = os.path.join(REAL_HOME, "Hidamari")
+
+
+def _resolve_xdg_video_dir():
+    """Resolve XDG VIDEOS dir without spawning a subprocess on the fast path."""
+    user_dirs = os.path.join(
+        os.environ.get("XDG_CONFIG_HOME") or os.path.join(HOME or "", ".config"),
+        "user-dirs.dirs",
+    )
+    try:
+        if os.path.isfile(user_dirs):
+            with open(user_dirs, encoding="utf-8", errors="ignore") as f:
+                for line in f:
+                    line = line.strip()
+                    if line.startswith("XDG_VIDEOS_DIR="):
+                        val = line.split("=", 1)[1].strip().strip('"')
+                        val = val.replace("$HOME", HOME or REAL_HOME or "")
+                        if val:
+                            return val
+    except OSError:
+        pass
+    try:
+        out = subprocess.check_output(["xdg-user-dir", "VIDEOS"], encoding="UTF-8", timeout=2)
+        val = out.replace("\n", "").strip()
+        if val:
+            return val
+    except (FileNotFoundError, subprocess.SubprocessError, OSError):
+        pass
+    return None
+
+
+_xdg_video_dir = _resolve_xdg_video_dir()
+VIDEO_WALLPAPER_DIR = (
+    os.path.join(_xdg_video_dir, "Hidamari")
+    if _xdg_video_dir
+    else os.path.join(REAL_HOME, "Hidamari")
+)
 
 xdg_config_home = os.environ.get("XDG_CONFIG_HOME", os.path.join(HOME, ".config"))
 AUTOSTART_DIR = os.path.join(xdg_config_home, "autostart")

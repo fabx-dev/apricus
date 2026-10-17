@@ -55,9 +55,10 @@ def _load_pixbuf(video_path, width=192):
     from apricus.gui.gui_utils import generate_thumbnail
 
     thumb = generate_thumbnail(video_path)
-    source = thumb or video_path
+    if not thumb:
+        return None
     try:
-        return GdkPixbuf.Pixbuf.new_from_file_at_size(source, width, -1)
+        return GdkPixbuf.Pixbuf.new_from_file_at_size(thumb, width, -1)
     except (GLib.Error, OSError) as e:
         logger.debug("[GTK4Thumb] Skipped %s: %s", os.path.basename(video_path), e)
         return None

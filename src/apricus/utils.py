@@ -431,8 +431,15 @@ def get_video_paths(video_dir=None):
         filepath = os.path.join(directory, filename)
         try:
             file = Gio.file_new_for_path(filepath)
-            info = file.query_info("standard::content-type", Gio.FileQueryInfoFlags.NONE, None)
-            mime_type = info.get_content_type()
+            info = file.query_info(
+                "standard::fast-content-type,standard::content-type",
+                Gio.FileQueryInfoFlags.NONE,
+                None,
+            )
+            fast_fn = getattr(info, "get_attribute_string", None)
+            mime_type = (
+                fast_fn("standard::fast-content-type") if fast_fn else None
+            ) or info.get_content_type()
         except GLib.Error as e:
             logger.debug(f"[Utils] Skipped {filename}: {e}")
             continue
@@ -923,12 +930,13 @@ class ConfigUtil:
                     self._checkMissingMonitors(config, CONFIG_TEMPLATE)
                     self._clamp_config(config)
                     if self._check(config):
-                        logs = []
-                        logs.append("--------- Config ---------")
-                        logs.append(pformat(config, indent=3))
-                        logs.append("--------------------------")
-                        logs_str = "\n".join(logs)
-                        logger.debug(f"[Config] Loaded {CONFIG_PATH}\n{logs_str}")
+                        if logger.isEnabledFor(logging.DEBUG):
+                            logs = [
+                                "--------- Config ---------",
+                                pformat(config, indent=3),
+                                "--------------------------",
+                            ]
+                            logger.debug(f"[Config] Loaded {CONFIG_PATH}\n" + "\n".join(logs))
                         return config
                 except json.decoder.JSONDecodeError:
                     logger.debug("[Config] JSONDecodeError")

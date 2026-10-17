@@ -1,9 +1,23 @@
 import logging
 import os
 
-import yt_dlp as youtube_dl
-
 from apricus.commons import LOGGER_NAME
+
+
+class _LazyYTDLP:
+    """Lazy proxy for yt_dlp so importing yt_utils costs 0 ms until extraction."""
+
+    _mod = None
+
+    def __getattr__(self, name):
+        if self._mod is None:
+            import yt_dlp
+
+            type(self)._mod = yt_dlp
+        return getattr(self._mod, name)
+
+
+youtube_dl = _LazyYTDLP()
 
 logger = logging.getLogger(LOGGER_NAME)
 

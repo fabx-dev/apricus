@@ -26,8 +26,6 @@ import gi
 
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
-import requests
-import yt_dlp
 from gi.repository import Adw, Gdk, Gio, GLib, GObject, Gtk
 from pydbus import SessionBus
 
@@ -69,10 +67,28 @@ from apricus.utils import (
     setup_logging,
 )
 from apricus.yt_utils import base_options
+from apricus.yt_utils import youtube_dl as yt_dlp
+
+
+class _LazyRequests:
+    """Lazy proxy for requests so GUI cold start avoids its ~125 ms import."""
+
+    _mod = None
+
+    def __getattr__(self, name):
+        if self._mod is None:
+            import requests as _req
+
+            type(self)._mod = _req
+        return getattr(self._mod, name)
+
+
+requests = _LazyRequests()
 
 logger = logging.getLogger(LOGGER_NAME)
 
 APP_ID = f"{PROJECT}.gui4"
+_UNSET = object()
 
 
 def _capped_get(url, timeout, max_bytes):
@@ -325,7 +341,7 @@ class ControlPanel(Adw.Application):
         settings = Gtk.Settings.get_default()
         return bool(settings and settings.props.gtk_enable_animations)
 
-    def _refresh_sidebar_status(self, server, mode):
+    def _refresh_sidebar_status(self, server, mode, paused=None):
         dot = getattr(self, "sidebar_dot", None)
         label = getattr(self, "sidebar_status", None)
         eq = getattr(self, "sidebar_eq", None)
@@ -334,10 +350,11 @@ class ControlPanel(Adw.Application):
         css, text = self._sidebar_status_text(server is not None, mode)
         playing = False
         if server is not None and mode in (MODE_VIDEO, MODE_STREAM, MODE_PLAYLIST):
-            try:
-                paused = bool(server.is_paused_by_user)
-            except Exception:  # noqa: BLE001 - unknown state means not playing
-                paused = True
+            if paused is None:
+                try:
+                    paused = bool(server.is_paused_by_user)
+                except Exception:  # noqa: BLE001 - unknown state means not playing
+                    paused = True
             playing = not paused
         show_eq = bool(playing and self._animations_enabled() and eq is not None)
         if eq is not None:
@@ -1145,10 +1162,12 @@ class ControlPanel(Adw.Application):
 
         ConfigUtil().save(self.config)
 
-    def _refresh_playlist_status(self):
+    def _refresh_playlist_status(self, server=_UNSET, mode=None):
         n = len(self.playlist_paths)
-        server = self._server()
-        mode = server.mode if server is not None else self.config.get(CONFIG_KEY_MODE)
+        if mode is None:
+            if server is _UNSET:
+                server = self._server()
+            mode = server.mode if server is not None else self.config.get(CONFIG_KEY_MODE)
         if n == 0:
             text = _("Queue empty — add videos from Library")
         elif mode == MODE_PLAYLIST:
@@ -1342,9 +1361,11 @@ class ControlPanel(Adw.Application):
             return _("Paused") if paused else _("Playing")
         return _("Static")
 
-    def _refresh_now_playing(self):
-        server = self._server()
-        mode = server.mode if server is not None else self.config.get(CONFIG_KEY_MODE)
+    def _refresh_now_playing(self, server=_UNSET, mode=None, paused=None):
+        if server is _UNSET:
+            server = self._server()
+        if mode is None:
+            mode = server.mode if server is not None else self.config.get(CONFIG_KEY_MODE)
         current = (self.config.get(CONFIG_KEY_DATA_SOURCE) or {}).get("Default", "")
         if mode == MODE_PLAYLIST:
             # A playlist never rewrites data_source.Default, so the hero
@@ -1353,12 +1374,13 @@ class ControlPanel(Adw.Application):
             queue = list(getattr(self, "playlist_paths", None) or [])
             if queue:
                 current = queue[0]
-        paused = True
-        if server is not None and mode in (MODE_VIDEO, MODE_STREAM, MODE_PLAYLIST):
-            try:
-                paused = bool(server.is_paused_by_user)
-            except Exception:  # noqa: BLE001
-                paused = True
+        if paused is None:
+            paused = True
+            if server is not None and mode in (MODE_VIDEO, MODE_STREAM, MODE_PLAYLIST):
+                try:
+                    paused = bool(server.is_paused_by_user)
+                except Exception:  # noqa: BLE001
+                    paused = True
         has_content = bool(current)
         content = getattr(self, "np_content", None)
         empty = getattr(self, "np_empty", None)
@@ -3799,12 +3821,18 @@ class ControlPanel(Adw.Application):
     def _refresh_all(self):
         server = self._server()
         mode = server.mode if server is not None else self.config.get(CONFIG_KEY_MODE)
-        n_videos = len(get_video_paths(resolve_video_dir(self.config)))
-        self._refresh_source_row(n_videos)
-        self._reload_library_store()
+        paused = True
+        if server is not None and mode in (MODE_VIDEO, MODE_STREAM, MODE_PLAYLIST):
+            try:
+                paused = bool(server.is_paused_by_user)
+            except Exception:  # noqa: BLE001
+                paused = True
+        paths = get_video_paths(resolve_video_dir(self.config))
+        self._refresh_source_row(len(paths))
+        self._reload_library_store(paths)
         self._reload_queue_store()
-        self._refresh_playlist_status()
-        self._refresh_now_playing()
+        self._refresh_playlist_status(server=server, mode=mode)
+        self._refresh_now_playing(server=server, mode=mode, paused=paused)
         self.shuffle_check.set_active(bool(self.config.get("playlist_shuffle")))
         playlist = (self.config.get("playlist") or {}).get("Default", [])
         self.playlist_status.set_text(
@@ -3822,7 +3850,7 @@ class ControlPanel(Adw.Application):
             if p_err:
                 p_banner.set_title(_(p_err))
             p_banner.set_revealed(bool(p_err and server is not None))
-        self._refresh_sidebar_status(server, mode)
+        self._refresh_sidebar_status(server, mode, paused=paused)
 
     @staticmethod
     def _playback_error(server):
@@ -3843,10 +3871,11 @@ class ControlPanel(Adw.Application):
                 pass
         self._refresh_all()
 
-    def _reload_library_store(self):
+    def _reload_library_store(self, paths=None):
         from apricus.gui.gtk4lib import VideoItem
 
-        paths = get_video_paths(resolve_video_dir(self.config))
+        if paths is None:
+            paths = get_video_paths(resolve_video_dir(self.config))
         force = getattr(self, "_force_lib_reload", False)
         self._force_lib_reload = False
         if not force and self.video_store is not None:

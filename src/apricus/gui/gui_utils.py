@@ -54,10 +54,23 @@ def _generate_thumbnail_flatpak(filename):
         return GdkPixbuf.Pixbuf.new_from_file(output)
 
 
+_thumb_factory = None
+_thumb_factory_lock = threading.Lock()
+
+
+def _get_thumb_factory():
+    global _thumb_factory
+    if _thumb_factory is None:
+        with _thumb_factory_lock:
+            if _thumb_factory is None:
+                _thumb_factory = GnomeDesktop.DesktopThumbnailFactory()
+    return _thumb_factory
+
+
 def generate_thumbnail(filename):
     """Generate and cache a thumbnail. Returns its path, or None if one can't
     be produced (e.g. no usable thumbnailer, or it failed)."""
-    factory = GnomeDesktop.DesktopThumbnailFactory()
+    factory = _get_thumb_factory()
     mtime = os.path.getmtime(filename)
     file = Gio.file_new_for_path(filename)
     uri = file.get_uri()

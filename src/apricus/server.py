@@ -199,7 +199,9 @@ class ApricusServer:
         # Pre-apply the new video's cached static frame so the switch shows
         # the incoming wallpaper instead of the previous one. Best-effort:
         # cache misses are refreshed by the new player as usual.
-        self._preview_static(mode, data_source)
+        proc = getattr(self, "player_process", None)
+        if proc and proc.is_alive():
+            self._preview_static(mode, data_source)
 
         # Reuse the live player when staying inside the VLC family: no
         # unmap/respawn gap, the windows (and their covers) survive.
@@ -210,7 +212,8 @@ class ApricusServer:
 
         # Quit current (keep its wallpaper: the new player overwrites it)
         # then create a new player
-        self._quit_player(restore_wallpaper=False)
+        if proc and proc.is_alive():
+            self._quit_player(restore_wallpaper=False)
 
         # Terminate old player process and wait for it to finish
         if self.player_process:
@@ -573,7 +576,12 @@ def main(version, pkgdatadir, localedir, args):
         server.show_gui()
     else:
         # Pause before launching
-        time.sleep(args.p)
+        if args.p:
+            time.sleep(args.p)
+        # Defer GUI spawn until the server is published on D-Bus / Snap IPC so
+        # the GUI never races or blocks waiting for Introspect on cold start.
+        want_gui = not args.background
+        args.background = True
         server = ApricusServer(version, pkgdatadir, localedir, args)
         try:
             if is_snap():
@@ -581,8 +589,12 @@ def main(version, pkgdatadir, localedir, args):
 
                 publish_service(DBUS_NAME_SERVER, server)
             else:
-                bus = SessionBus()
-                bus.publish(DBUS_NAME_SERVER, server)
+                global _bus_singleton
+                if _bus_singleton is None:
+                    _bus_singleton = SessionBus()
+                _bus_singleton.publish(DBUS_NAME_SERVER, server)
+            if want_gui:
+                server.show_gui()
             loop.run()
         except RuntimeError as e:
             raise Exception("Failed to create server") from e

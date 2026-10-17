@@ -5,18 +5,18 @@ import logging
 import os
 import time
 
-from apricus.commons import LOGGER_NAME
-
-logger = logging.getLogger(LOGGER_NAME)
-
-# Captured at import time. `apricus.perf` must be imported before any other
-# `apricus` module so T0 is the true process start (see `__main__.py`).
+# Captured at import time BEFORE importing apricus.commons so T0 is the true
+# process start (see `__main__.py`).
 # Forkserver children inherit APRICUS_T0 from the server so their marks are
 # on the same login-timescale clock (see server.ApricusServer).
 try:
     _T0 = float(os.environ.get("APRICUS_T0", "0")) or time.monotonic()
 except ValueError:
     _T0 = time.monotonic()
+
+from apricus.commons import LOGGER_NAME  # noqa: E402
+
+logger = logging.getLogger(LOGGER_NAME)
 
 
 def start_time():

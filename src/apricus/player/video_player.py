@@ -11,7 +11,6 @@ import time
 from threading import Timer
 
 import gi
-import yt_dlp
 
 gi.require_version("Gtk", "3.0")
 gi.require_version("Gdk", "3.0")
@@ -49,6 +48,7 @@ from apricus.utils import (
     setup_logging,
 )
 from apricus.yt_utils import get_best_audio, get_formats, get_optimal_video
+from apricus.yt_utils import youtube_dl as yt_dlp
 
 logger = logging.getLogger(LOGGER_NAME)
 
@@ -456,12 +456,16 @@ class VideoPlayer(BasePlayer):
 
         # DE-specific behavior (wallpaper + window state) lives in backends.
         self.wallpaper = create_wallpaper_backend()
-        self.wallpaper.capture_original()
 
         # Handler should be created after everything initialized
         self.active_handler, self.window_state = None, None
         self.is_any_maximized, self.is_any_fullscreen = False, False
         self.is_paused_by_user = False
+        GLib.idle_add(self._deferred_capture_original)
+
+    def _deferred_capture_original(self):
+        self.wallpaper.capture_original()
+        return False
 
     def new_window(self, gdk_monitor):
         rect = gdk_monitor.get_geometry()
@@ -675,13 +679,10 @@ class VideoPlayer(BasePlayer):
         self.is_mute = self.config[CONFIG_KEY_MUTE]
         self.start_playback()
 
-        # Everything is initialized. Create handlers if haven't (singleton pattern).
+        # Everything is initialized. Create handlers on idle so the first video
+        # frame renders without waiting on screensaver D-Bus or Wnck sync.
         if setup_handlers:
-            if not self.active_handler:
-                self.active_handler = ActiveHandler(self._on_active_changed)
-            if not self.window_state:
-                self.window_state = create_window_state_backend(self._on_window_state_changed)
-                self.window_state.start()
+            GLib.idle_add(self._setup_handlers_idle)
 
         if self.config[CONFIG_KEY_STATIC_WALLPAPER] and self.mode == MODE_VIDEO:
             self.set_static_wallpaper()
@@ -705,6 +706,14 @@ class VideoPlayer(BasePlayer):
                 self.wallpaper.prune_cache(self._live_cache_paths())
         else:
             self.wallpaper.prune_cache(self._live_cache_paths())
+
+    def _setup_handlers_idle(self):
+        if not self.active_handler:
+            self.active_handler = ActiveHandler(self._on_active_changed)
+        if not self.window_state:
+            self.window_state = create_window_state_backend(self._on_window_state_changed)
+            self.window_state.start()
+        return False
 
     @staticmethod
     def _queue_for(playlist, key, model):
