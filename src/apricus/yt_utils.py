@@ -24,6 +24,10 @@ logger = logging.getLogger(LOGGER_NAME)
 #: Flatpak install path of the bundled Deno binary (see pkgs/flatpak/deno.json).
 FLATPAK_DENO_PATH = "/app/bin/deno"
 
+#: Native (.deb/.rpm) install path of the bundled Deno binary
+#: (see pkgs/deno.env; same pinned release as Flatpak and Snap).
+NATIVE_DENO_PATH = "/usr/lib/apricus/deno"
+
 
 #: yt-dlp releases before this cannot handle current YouTube player
 #: responses (challenge/PO-token era): extraction ends with no formats.
@@ -63,6 +67,8 @@ def js_runtime_options():
             snap_deno = os.path.join(snap_dir, *rel)
             if os.path.isfile(snap_deno):
                 return {"deno": {"path": snap_deno}}
+    if os.path.isfile(NATIVE_DENO_PATH):
+        return {"deno": {"path": NATIVE_DENO_PATH}}
     return {}
 
 

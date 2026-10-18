@@ -2,8 +2,10 @@
 # Copyright (C) 2026 fabx-dev
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Build a native Debian/Ubuntu package (dist/apricus_<version>_all.deb)
-# from the current Meson source tree.
+# Build a native Debian/Ubuntu package (dist/apricus_<version>_<arch>.deb)
+# from the current Meson source tree. The package is arch-specific because
+# it bundles the pinned Deno runtime (see pkgs/deno.env, same release as
+# the Flatpak and Snap builds) under /usr/lib/apricus/deno.
 
 set -euo pipefail
 
@@ -16,9 +18,16 @@ if [[ -z "$VERSION" ]]; then
     exit 1
 fi
 
+DEB_ARCH="$(dpkg-architecture -qDEB_BUILD_ARCH 2>/dev/null || echo amd64)"
+case "$DEB_ARCH" in
+    amd64) DENO_ARCH="x86_64" ;;
+    arm64) DENO_ARCH="aarch64" ;;
+    *) echo "ERROR: bundled deno unsupported on Debian arch: $DEB_ARCH" >&2; exit 1 ;;
+esac
+
 DEB_VERSION="${VERSION//-/\~}"
 PKG_NAME="apricus"
-ARCH="all"
+ARCH="$DEB_ARCH"
 WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/apricus-deb.XXXXXX")"
 BUILD_DIR="$WORK_DIR/meson-build"
 STAGE_DIR="$WORK_DIR/${PKG_NAME}_${DEB_VERSION}_${ARCH}"
@@ -33,6 +42,41 @@ DESTDIR="$STAGE_DIR" meson install -C "$BUILD_DIR" --no-rebuild
 rm -f "$STAGE_DIR/usr/share/glib-2.0/schemas/gschemas.compiled"
 rm -f "$STAGE_DIR/usr/share/icons/hicolor/icon-theme.cache"
 find "$STAGE_DIR" -name "__pycache__" -type d -prune -exec rm -rf {} +
+
+# Bundle the pinned Deno runtime (same release as Flatpak/Snap) so yt-dlp
+# can solve YouTube JS challenges without any system deno. Installed to a
+# private path to never shadow a user/system deno on PATH.
+# shellcheck disable=SC1091
+source "$ROOT_DIR/pkgs/deno.env"
+DENO_URL_VAR="DENO_URL_${DENO_ARCH}"
+DENO_SHA_VAR="DENO_SHA256_${DENO_ARCH}"
+DENO_ZIP="$WORK_DIR/deno.zip"
+python3 - "$DENO_ZIP" "${!DENO_URL_VAR}" <<'PY'
+import sys
+import urllib.request
+
+dest, url = sys.argv[1], sys.argv[2]
+req = urllib.request.Request(url, headers={"User-Agent": "apricus-build"})
+with urllib.request.urlopen(req, timeout=120) as resp, open(dest, "wb") as f:
+    while True:
+        chunk = resp.read(1048576)
+        if not chunk:
+            break
+        f.write(chunk)
+print(f"Downloaded {url}", flush=True)
+PY
+echo "${!DENO_SHA_VAR}  $DENO_ZIP" | sha256sum -c -
+python3 - "$DENO_ZIP" "$WORK_DIR" <<'PY'
+import sys
+import zipfile
+
+archive, destdir = sys.argv[1], sys.argv[2]
+with zipfile.ZipFile(archive) as zf:
+    zf.extract("deno", destdir)
+print("Extracted deno", flush=True)
+PY
+install -Dm755 "$WORK_DIR/deno" "$STAGE_DIR/usr/lib/apricus/deno"
+"$STAGE_DIR/usr/lib/apricus/deno" --version
 
 mkdir -p "$STAGE_DIR/DEBIAN"
 

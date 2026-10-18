@@ -51,6 +51,16 @@ def test_js_runtime_options_prefers_bundled_deno(monkeypatch):
     assert yt_utils.js_runtime_options() == {"deno": {"path": "/app/bin/deno"}}
 
 
+def test_js_runtime_options_prefers_native_deb_rpm_deno(monkeypatch):
+    """Native .deb/.rpm bundle Deno at /usr/lib/apricus/deno (pkgs/deno.env)."""
+    monkeypatch.delenv("SNAP", raising=False)
+    monkeypatch.setattr("os.path.isfile", lambda path: path == "/usr/lib/apricus/deno")
+    assert yt_utils.js_runtime_options() == {"deno": {"path": "/usr/lib/apricus/deno"}}
+    opts = yt_utils.base_options()
+    assert opts["js_runtimes"] == {"deno": {"path": "/usr/lib/apricus/deno"}}
+    assert opts["extractor_args"]["youtube"]["player_client"] == ["web_embedded"]
+
+
 def test_js_runtime_options_without_deno(monkeypatch):
     monkeypatch.setattr("os.path.isfile", lambda path: False)
     assert yt_utils.js_runtime_options() == {}

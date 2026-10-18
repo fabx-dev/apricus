@@ -96,7 +96,7 @@ The legacy 3-tab GTK3 window has been replaced by a native **GTK4 + Libadwaita**
 Ready-made Flatpak bundles are attached to each [GitHub Release](https://github.com/fabx-dev/apricus/releases):
 
 ```bash
-flatpak install --user apricus-2.0.5.flatpak apricus-locale.flatpak
+flatpak install --user apricus-2.0.6.flatpak apricus-locale.flatpak
 ```
 
 Or build and install locally from source (pulls runtime/SDK from Flathub):
@@ -107,10 +107,10 @@ make flatpak
 
 ### Debian / Ubuntu (`.deb` Package)
 
-Download `apricus_2.0.5_all.deb` from the [GitHub Release](https://github.com/fabx-dev/apricus/releases) and install it with `apt`:
+Download `apricus_2.0.6_amd64.deb` (or `arm64`) from the [GitHub Release](https://github.com/fabx-dev/apricus/releases) and install it with `apt`:
 
 ```bash
-sudo apt install ./apricus_2.0.5_all.deb
+sudo apt install ./apricus_2.0.6_amd64.deb
 ```
 
 Or build the `.deb` locally into `dist/`:
@@ -121,10 +121,10 @@ make deb
 
 ### Fedora (`.rpm` Package)
 
-Download `apricus-2.0.5-1.noarch.rpm` from the [GitHub Release](https://github.com/fabx-dev/apricus/releases) and install it with `dnf`:
+Download `apricus-2.0.6-1.x86_64.rpm` (or `aarch64`) from the [GitHub Release](https://github.com/fabx-dev/apricus/releases) and install it with `dnf`:
 
 ```bash
-sudo dnf install ./apricus-2.0.5-1.noarch.rpm
+sudo dnf install ./apricus-2.0.6-1.x86_64.rpm
 ```
 
 Or build the `.rpm` locally into `dist/`:

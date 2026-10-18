@@ -24,13 +24,13 @@ jobs:
       - name: Build .deb
         run: |
           ./pkgs/deb/build-deb.sh
-          dpkg-deb --info dist/apricus_*_all.deb
+          dpkg-deb --info dist/apricus_*.deb
 
       - name: Upload .deb artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: package-deb
-          path: dist/apricus_*_all.deb
+          path: dist/apricus_*.deb
 
   build-rpm:
     name: Build .rpm package
@@ -46,13 +46,13 @@ jobs:
       - name: Build .rpm
         run: |
           ./pkgs/rpm/build-rpm.sh
-          rpm -qip dist/apricus-*.noarch.rpm
+          rpm -qip dist/apricus-*.rpm
 
       - name: Upload .rpm artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: package-rpm
-          path: dist/apricus-*.noarch.rpm
+          path: dist/apricus-*.rpm
 
   build-snap:
     name: Build .snap package

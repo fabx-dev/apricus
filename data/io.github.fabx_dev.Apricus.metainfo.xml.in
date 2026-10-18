@@ -22,24 +22,33 @@
 
   <screenshots>
     <screenshot type="default">
-      <image>https://raw.githubusercontent.com/fabx-dev/apricus/v2.0.5/res/apricus-2-library.png</image>
+      <image>https://raw.githubusercontent.com/fabx-dev/apricus/v2.0.6/res/apricus-2-library.png</image>
       <caption>Video library with asynchronous thumbnails and monitor selector</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/fabx-dev/apricus/v2.0.5/res/apricus-2-playing.png</image>
+      <image>https://raw.githubusercontent.com/fabx-dev/apricus/v2.0.6/res/apricus-2-playing.png</image>
       <caption>Looping video playlist with drag-and-drop reorder and shuffle</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/fabx-dev/apricus/v2.0.5/res/apricus-2-now-playing.png</image>
+      <image>https://raw.githubusercontent.com/fabx-dev/apricus/v2.0.6/res/apricus-2-now-playing.png</image>
       <caption>Now Playing dashboard with widescreen preview and media details</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/fabx-dev/apricus/v2.0.5/res/apricus-2-streaming.png</image>
+      <image>https://raw.githubusercontent.com/fabx-dev/apricus/v2.0.6/res/apricus-2-streaming.png</image>
       <caption>Streaming hub with saved sources, cached thumbnails and LIVE badge</caption>
     </screenshot>
   </screenshots>
 
   <releases>
+    <release version="2.0.6" date="2026-10-18" type="stable">
+      <description>
+        <ul>
+          <li>Bundled pinned Deno 2.9.7 in native .deb and .rpm packages so YouTube streams extract out of the box with the same fast path as Snap and Flatpak</li>
+          <li>YouTube failures now report clear actionable errors (missing or outdated yt-dlp) instead of cryptic backend text, and stream resolution failures surface in the playback banner</li>
+          <li>Web page wallpapers stay transparent until first paint, revealing the desktop wallpaper instead of a gray flash at autostart</li>
+        </ul>
+      </description>
+    </release>
     <release version="2.0.5" date="2026-10-17" type="stable">
       <description>
         <ul>
