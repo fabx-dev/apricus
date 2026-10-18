@@ -33,6 +33,20 @@ sys.path.insert(1, pkgdatadir)
 _cur_py = os.environ.get('PYTHONPATH') or ''
 if pkgdatadir not in _cur_py.split(':'):
     os.environ['PYTHONPATH'] = f"{pkgdatadir}:{_cur_py}" if _cur_py else pkgdatadir
+# Native .deb/.rpm vendor a pinned yt-dlp stack under /usr/lib/apricus/python
+# (see pkgs/ytdlp.env): it must win over any stale system yt-dlp in every
+# process, including forkserver/spawn children that only inherit PYTHONPATH.
+_vendordir = '/usr/lib/apricus/python'
+if (
+    not _snap
+    and not os.path.isfile('/.flatpak-info')
+    and os.path.isdir(_vendordir)
+    and _vendordir not in sys.path
+):
+    sys.path.insert(0, _vendordir)
+    _cur_py = os.environ.get('PYTHONPATH') or ''
+    if _vendordir not in _cur_py.split(':'):
+        os.environ['PYTHONPATH'] = f"{_vendordir}:{_cur_py}" if _cur_py else _vendordir
 signal.signal(signal.SIGINT, signal.SIG_DFL)
 locale.bindtextdomain('apricus', localedir)
 locale.textdomain('apricus')

@@ -43,7 +43,7 @@
     <release version="2.0.6" date="2026-10-18" type="stable">
       <description>
         <ul>
-          <li>Bundled pinned Deno 2.9.7 in native .deb and .rpm packages so YouTube streams extract out of the box with the same fast path as Snap and Flatpak</li>
+          <li>Bundled pinned Deno 2.9.7 and a vendored yt-dlp + yt-dlp-ejs stack in native .deb and .rpm packages, so YouTube streams play out of the box with the same fast path as Snap and Flatpak on every distro</li>
           <li>YouTube failures now report clear actionable errors (missing or outdated yt-dlp) instead of cryptic backend text, and stream resolution failures surface in the playback banner</li>
           <li>Web page wallpapers stay transparent until first paint, revealing the desktop wallpaper instead of a gray flash at autostart</li>
         </ul>

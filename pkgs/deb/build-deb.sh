@@ -78,6 +78,63 @@ PY
 install -Dm755 "$WORK_DIR/deno" "$STAGE_DIR/usr/lib/apricus/deno"
 "$STAGE_DIR/usr/lib/apricus/deno" --version
 
+# Vendor the pinned yt-dlp stack (same releases as Flatpak/Snap) so
+# streaming works identically on every distro, regardless of the (often
+# stale) system yt-dlp. Pure-python wheels: arch-independent. Optional
+# runtime deps (brotli, mutagen, ...) degrade gracefully inside yt-dlp;
+# requests/urllib3 come from the system packages.
+# shellcheck disable=SC1091
+source "$ROOT_DIR/pkgs/ytdlp.env"
+mkdir -p "$STAGE_DIR/usr/lib/apricus/python"
+for _pkg in "YTDLP" "YTDLP_EJS"; do
+    _wheel_var="${_pkg}_WHEEL"
+    _url_var="${_pkg}_URL"
+    _sha_var="${_pkg}_SHA256"
+    _zip="$WORK_DIR/${!_wheel_var}"
+    python3 - "$_zip" "${!_url_var}" <<'PY'
+import sys
+import urllib.request
+
+dest, url = sys.argv[1], sys.argv[2]
+req = urllib.request.Request(url, headers={"User-Agent": "apricus-build"})
+with urllib.request.urlopen(req, timeout=120) as resp, open(dest, "wb") as f:
+    while True:
+        chunk = resp.read(1048576)
+        if not chunk:
+            break
+        f.write(chunk)
+print(f"Downloaded {url}", flush=True)
+PY
+    echo "${!_sha_var}  $_zip" | sha256sum -c -
+    python3 - "$_zip" "$STAGE_DIR/usr/lib/apricus/python" <<'PY'
+import sys
+import zipfile
+
+archive, destdir = sys.argv[1], sys.argv[2]
+with zipfile.ZipFile(archive) as zf:
+    zf.extractall(destdir)
+print(f"Staged {archive}", flush=True)
+PY
+done
+PYTHONPATH="$STAGE_DIR/usr/lib/apricus/python" python3 - "$YTDLP_VERSION" "$YTDLP_EJS_VERSION" <<'PY'
+import sys
+
+import yt_dlp
+import yt_dlp_ejs
+import yt_dlp_ejs.yt.solver
+
+
+def _norm(text):
+    return ".".join(str(int(p)) for p in text.split(".")[:3])
+
+
+want_ydl, want_ejs = sys.argv[1], sys.argv[2]
+assert _norm(yt_dlp.version.__version__) == _norm(want_ydl), yt_dlp.version.__version__
+assert _norm(yt_dlp_ejs.version) == _norm(want_ejs), yt_dlp_ejs.version
+assert callable(yt_dlp_ejs.yt.solver.core) and callable(yt_dlp_ejs.yt.solver.lib)
+print("Vendored yt-dlp stack OK:", yt_dlp.version.__version__, yt_dlp_ejs.version)
+PY
+
 mkdir -p "$STAGE_DIR/DEBIAN"
 
 INSTALLED_KB="$(du -sk "$STAGE_DIR/usr" | awk '{print $1}')"
@@ -112,8 +169,7 @@ Depends: python3 (>= 3.10),
  vlc-plugin-video-output,
  ffmpeg,
  dconf-cli,
- xdg-user-dirs,
- yt-dlp
+ xdg-user-dirs
 Recommends: totem-video-thumbnailer
 Description: Modern live wallpaper for the GNOME desktop on Linux
  Apricus transforms your GNOME desktop background on Linux into a fluid,

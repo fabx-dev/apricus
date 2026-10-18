@@ -164,6 +164,31 @@ def test_error_classes_without_runtime_assumptions(raw, expected):
     assert expected in yt_utils.classify_stream_error(raw)
 
 
+def test_pin_consistency():
+    """pkgs/ytdlp.env pins must satisfy the runtime gates: never ship a
+    yt-dlp that our own version check would call 'too old', and never drift
+    below the pyproject floor used for dev/Flatpak."""
+    import pathlib
+    import re
+
+    env = {}
+    for line in pathlib.Path("pkgs/ytdlp.env").read_text().splitlines():
+        m = re.match(r'([A-Z_]+)="([^"]+)"', line.strip())
+        if m:
+            env[m.group(1)] = m.group(2)
+    assert env["YTDLP_VERSION"], "YTDLP_VERSION pin missing"
+    assert env["YTDLP_EJS_VERSION"], "YTDLP_EJS_VERSION pin missing"
+
+    def _triplet(text):
+        return tuple(int(p) for p in re.split(r"[.]", text)[:3])
+
+    assert _triplet(env["YTDLP_VERSION"]) >= yt_utils.MIN_YT_DLP_VERSION
+    pyproject = pathlib.Path("pyproject.toml").read_text()
+    m = re.search(r"yt-dlp\[default\]>=([0-9.]+)", pyproject)
+    assert m, "pyproject yt-dlp floor not found"
+    assert _triplet(env["YTDLP_VERSION"]) >= _triplet(m.group(1))
+
+
 def test_classify_stream_error_handles_none_and_plain():
     assert yt_utils.classify_stream_error(None) == "Unknown stream error"
     assert yt_utils.classify_stream_error("") == "Unknown stream error"
