@@ -68,8 +68,9 @@ Depends: python3 (>= 3.10),
  vlc-plugin-video-output,
  ffmpeg,
  dconf-cli,
- xdg-user-dirs
-Recommends: yt-dlp, totem-video-thumbnailer
+ xdg-user-dirs,
+ yt-dlp
+Recommends: totem-video-thumbnailer
 Description: Modern live wallpaper for the GNOME desktop on Linux
  Apricus transforms your GNOME desktop background on Linux into a fluid,
  living canvas supporting local videos, muted looping playlists, live

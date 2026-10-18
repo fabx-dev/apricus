@@ -461,6 +461,10 @@ class VideoPlayer(BasePlayer):
         self.active_handler, self.window_state = None, None
         self.is_any_maximized, self.is_any_fullscreen = False, False
         self.is_paused_by_user = False
+        # Last stream-resolution failure (yt-dlp/format selection), surfaced
+        # via playback_error()/last_error so the GUI banner fires instead of
+        # leaving a silent black monitor. Reset on every _apply_source().
+        self._resolve_error = None
         GLib.idle_add(self._deferred_capture_original)
 
     def _deferred_capture_original(self):
@@ -567,6 +571,9 @@ class VideoPlayer(BasePlayer):
         return False
 
     def _apply_source(self, data_source, setup_handlers):
+        # New media, new verdict: drop the previous resolution failure so a
+        # stale error can never mask the fresh attempt (and vice versa).
+        self._resolve_error = None
 
         # Stable config keys for live monitors (unique models keep the bare
         # model; duplicates get Model#i). Order matches self.windows.
@@ -637,12 +644,13 @@ class VideoPlayer(BasePlayer):
                     continue
                 try:
                     formats = get_formats(source)
+                    max_height = max(m.get_geometry().height for m, _ in targets)
+                    video_url, video_width, video_height = get_optimal_video(formats, max_height)
+                    audio_url = get_best_audio(formats)
                 except Exception as e:
                     logger.warning(f"[Stream] Cannot resolve {source}: {e}")
+                    self._resolve_error = str(e) or "Stream resolution failed."
                     continue
-                max_height = max(m.get_geometry().height for m, _ in targets)
-                video_url, video_width, video_height = get_optimal_video(formats, max_height)
-                audio_url = get_best_audio(formats)
 
                 for monitor, window in targets:
                     media = window.media_new(video_url)
@@ -794,11 +802,15 @@ class VideoPlayer(BasePlayer):
         return not self.is_paused_by_user
 
     def playback_error(self):
-        """First window failure for the current media, if any (None else).
+        """First failure for the current media, if any (None else).
 
+        Stream-resolution failures (yt-dlp/format selection) come first:
+        they leave no media on the windows, so no window error exists yet.
         Lets the GUI report a dead stream instead of trusting is_playing,
         which only mirrors the user-pause flag. See PlayerWindow.
         """
+        if getattr(self, "_resolve_error", None):
+            return self._resolve_error
         for window in self.windows.values():
             err = window.playback_error()
             if err is not None:

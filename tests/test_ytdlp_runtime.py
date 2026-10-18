@@ -159,6 +159,30 @@ def test_classify_stream_error_handles_none_and_plain():
     assert yt_utils.classify_stream_error("") == "Unknown stream error"
 
 
+def test_classify_missing_ytdlp_and_empty_format_errors():
+    assert "not installed" in yt_utils.classify_stream_error("ERROR: No module named 'yt_dlp'")
+    assert "update yt-dlp" in yt_utils.classify_stream_error(
+        "ERROR: [youtube] abc123: No video formats found!"
+    )
+    assert "No playable formats" in yt_utils.classify_stream_error(
+        "No playable formats found for this stream."
+    )
+
+
+def test_yt_dlp_version_probe_never_raises():
+    version = yt_utils._yt_dlp_version()
+    assert version is None or (len(version) == 3 and all(isinstance(n, int) for n in version))
+
+
+def test_get_best_audio_without_audio_formats_raises_clear_error():
+    from apricus.yt_utils import get_best_audio
+
+    with pytest.raises(ValueError, match="[Aa]udio formats"):
+        get_best_audio([_fmt("v", acodec="none", vcodec="h264")])
+    with pytest.raises(ValueError, match="[Aa]udio formats"):
+        get_best_audio([])
+
+
 def test_flatpak_bundles_pinned_deno():
     """The Flatpak must ship Deno at /app/bin/deno (pinned, both arches);
     never inside the generated pypi-deps.json."""

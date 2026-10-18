@@ -25,6 +25,28 @@ logger = logging.getLogger(LOGGER_NAME)
 FLATPAK_DENO_PATH = "/app/bin/deno"
 
 
+#: yt-dlp releases before this cannot handle current YouTube player
+#: responses (challenge/PO-token era): extraction ends with no formats.
+MIN_YT_DLP_VERSION = (2025, 10, 1)
+
+
+def _yt_dlp_version():
+    """Running yt-dlp version as a (year, month, day) tuple, or None.
+
+    None when yt-dlp is not installed (lazy import raises) or the version
+    string is unparseable. Never raises.
+    """
+    try:
+        version = youtube_dl.version.__version__
+    except Exception:  # noqa: BLE001 - missing module or attribute
+        return None
+    try:
+        parts = str(version).split(".")
+        return (int(parts[0]), int(parts[1]), int(parts[2].split(".")[0]))
+    except (IndexError, ValueError):
+        return None
+
+
 def js_runtime_options():
     """Explicit yt-dlp JavaScript runtime selection.
 
@@ -165,15 +187,28 @@ def get_formats(raw_url):
     if not valid_http_url(raw_url):
         raise ValueError(f"URL not supported: {raw_url}")
     if not public_http_url(raw_url):
-        raise ValueError(f"Local network address not supported: {raw_url}")
+        raise ValueError("Local network address not supported.")
     info = get_cached_meta(raw_url)
     if info is None:
-        with youtube_dl.YoutubeDL(base_options()) as ydl:
-            info = ydl.extract_info(raw_url, download=False) or {}
+        try:
+            with youtube_dl.YoutubeDL(base_options()) as ydl:
+                info = ydl.extract_info(raw_url, download=False) or {}
+        except ImportError as e:
+            raise ValueError("yt-dlp is not installed. Install yt-dlp to play streams.") from e
+        except Exception as e:
+            if "no video formats found" in str(e).lower():
+                version = _yt_dlp_version()
+                if version is not None and version < MIN_YT_DLP_VERSION:
+                    raise ValueError(
+                        f"yt-dlp {version[0]}.{version[1]:02d} is too old to "
+                        "extract this video. Update yt-dlp and try again."
+                    ) from e
+                raise ValueError("This video could not be extracted. Try again later.") from e
+            raise
         save_cached_meta(raw_url, info)
     formats = info.get("formats") or []
     if not formats:
-        raise ValueError(f"No playable formats for {raw_url}")
+        raise ValueError("No playable formats found for this stream.")
     return formats
 
 
@@ -198,6 +233,15 @@ def classify_stream_error(message):
         return "Video protection needs a JavaScript runtime. Some formats may be missing."
     if "unsupported url" in low:
         return "URL not supported."
+    if "no module named" in low:
+        return "yt-dlp is not installed. Install yt-dlp to play streams."
+    if "no video formats found" in low:
+        return (
+            "This video could not be extracted. If the problem persists, "
+            "update yt-dlp to the latest release and try again."
+        )
+    if "no playable formats" in low:
+        return "No playable formats found for this stream."
     if "404" in low or "not found" in low:
         return "Not found (404)."
     msg = message or ""
@@ -244,6 +288,8 @@ def get_best_audio(formats):
     filtered = list(filter_audio(formats))
     if not filtered:
         filtered = list(filter_audio_video(formats))
+    if not filtered:
+        raise ValueError("No audio formats found for this stream.")
     best = max(filtered, key=lambda x: x.get("quality", -1))
     return best["url"]
 

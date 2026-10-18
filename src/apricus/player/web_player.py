@@ -75,6 +75,17 @@ def setup_render_device():
 class WebWindow(Gtk.ApplicationWindow):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # Transparent until the first paint: the desktop wallpaper behind
+        # (user photo or cached static frame) stays visible instead of the
+        # theme-gray flash. The page paints over it once loaded.
+        try:
+            screen = self.get_screen()
+            rgba = screen.get_rgba_visual() if screen is not None else None
+            if rgba is not None:
+                self.set_visual(rgba)
+            self.set_app_paintable(True)
+        except Exception:  # noqa: BLE001 - fall back to theme background
+            pass
         # Hardened defaults: a wallpaper must not read local files on behalf
         # of remote pages (nor vice versa). JavaScript stays on: most
         # wallpaper pages need it.
@@ -85,6 +96,10 @@ class WebWindow(Gtk.ApplicationWindow):
             enable_webaudio=False,
         )
         self.__webview = WebKit2.WebView.new_with_settings(settings)
+        try:
+            self.__webview.set_background_color(Gdk.RGBA(0, 0, 0, 0))
+        except Exception:  # noqa: BLE001 - older WebKitGTK without the API
+            pass
         self.add(self.__webview)
         self.__webview.show()
 
@@ -254,8 +269,30 @@ class WebPlayer(BasePlayer):
         return WebWindow(application=self)
 
     def do_activate(self):
+        self._preapply_cached_static()
         super().do_activate()
         self.data_source = self.config[CONFIG_KEY_DATA_SOURCE]["Default"]
+
+    def _preapply_cached_static(self):
+        """Paint the cached frame before windows map.
+
+        The WebViews start transparent, so the layer behind them should
+        already show the last page frame (or the user's photo on first
+        boot) instead of whatever was there before.
+        """
+        try:
+            if not self.config.get(CONFIG_KEY_STATIC_WALLPAPER, True):
+                return
+            if not self.wallpaper.supports_static:
+                return
+            raw = (self.config.get(CONFIG_KEY_DATA_SOURCE) or {}).get("Default", "")
+            if not raw:
+                return
+            cached = self._static_cache_path(raw)
+            if os.path.isfile(cached):
+                self.wallpaper.apply_static(cached)
+        except Exception as e:  # noqa: BLE001 - best effort only
+            logger.debug(f"[WebPlayer] static pre-apply skipped: {e}")
 
     @property
     def mode(self):
