@@ -3918,6 +3918,11 @@ class ControlPanel(Adw.Application):
 
 def main(version="devel", pkgdatadir="/usr/share/apricus", localedir="/usr/share/locale"):
     del pkgdatadir  # GTK4 UI has no compiled resources yet
+    # Set the program name before any Gtk init: under X11 GDK derives the
+    # window WM_CLASS from it, and the desktop file matches windows to the
+    # launcher via StartupWMClass. Without this the class is "python" and
+    # GNOME docks the running panel under a separate generic gear icon.
+    GLib.set_prgname(APP_ID)
     setup_logging()
     init_translations(localedir)
     Adw.init()
