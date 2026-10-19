@@ -173,13 +173,14 @@ apricus --systemd-enable    # disable anytime with: apricus --systemd-disable
 
 | Desktop Environment | Session | Playback | Desktop Icons | Static Wallpaper | Auto-Pause on Maximize |
 |---|---|---|---|---|---|
-| **GNOME** (Ubuntu, Fedora, Debian, Zorin OS) | Wayland & X11 | ✅ Full | ✅ Supported (DING / GTK4-DING / Zorin) | ✅ Supported | ✅ X11 (Wayland planned) |
+| **GNOME** (Ubuntu, Fedora, Debian, Zorin OS) | Wayland & X11 | ✅ Full | ⚠️ X11 sessions only (3) | ✅ Supported | ✅ X11 (Wayland planned) |
 | **Budgie / Pantheon** | X11 | ✅ Works | — | ❌ GNOME only | ✅ Supported |
 | **Cinnamon / XFCE / MATE** | X11 | ⚠️ Partial (1) | ⚠️ Conflicts with desktop manager | ❌ GNOME only | ✅ Supported |
 | **KDE Plasma** | Wayland / X11 | ❌ Not supported (2) | — | — | — |
 
 1. On Cinnamon, XFCE and MATE, the file manager (`nemo-desktop`, `xfdesktop`, `caja`) draws its own opaque desktop window; desktop icons must be disabled for the video layer to remain visible.
 2. KDE Plasma's `plasmashell` manages its own background surface and blocks external `_NET_WM_WINDOW_TYPE_DESKTOP` windows (use a native Plasma wallpaper plugin on KDE).
+3. On GNOME **Wayland** sessions the live wallpaper may cover desktop icons (DING / GTK4-DING): the compositor ignores X11 restacking of desktop-layer windows and DING always lowers itself below other desktop windows, so no application-side workaround exists (verified against Mutter 18 and the DING sources). Workaround: log in with an **X11 session** ("Ubuntu on Xorg" at login), where icon stacking works normally. A proper fix requires either compositor support (not available on GNOME, which has no layer-shell protocol) or a DING-side change; tracked for a future release.
 
 ### Additional Notes
 
