@@ -476,6 +476,7 @@ def sidebar_builds_four_rows_and_pages():
         "webpage",
         "settings",
     ]
+    assert obj.sidebar_server_dot is not None and obj.sidebar_server_label is not None
     assert obj.sidebar_dot is not None and obj.sidebar_status is not None
     assert obj.sidebar_version is not None
     assert "test" in obj.sidebar_version.get_text()
@@ -484,6 +485,7 @@ def sidebar_builds_four_rows_and_pages():
     # free window space (compute_expand propagates up).
     assert obj.sidebar_box.get_hexpand_set() is True
     assert obj.sidebar_box.get_hexpand() is False
+    assert obj.sidebar_server_label.get_hexpand() is False
     assert obj.sidebar_status.get_hexpand() is False
     obj._library_page()
     assert obj.video_store is not None and obj.video_selection is not None
@@ -1659,6 +1661,32 @@ def sidebar_status_text_maps_states():
     assert (css, text) == ("success", "Ready — Playlist (muted)"), (css, text)
     css, text = app.ControlPanel._sidebar_status_text(True, "BOGUS")
     assert (css, text) == ("success", "Ready — Static wallpaper"), (css, text)
+    assert app.ControlPanel._sidebar_server_text(False) == ("error", "Server down")
+    assert app.ControlPanel._sidebar_server_text(True) == ("success", "Ready")
+    assert app.ControlPanel._sidebar_activity_state(False, "MODE_VIDEO", False) == (
+        "media-playback-stop-symbolic",
+        "Nothing playing",
+    )
+    assert app.ControlPanel._sidebar_activity_state(True, "MODE_VIDEO", True) == (
+        "media-playback-pause-symbolic",
+        "Paused",
+    )
+    assert app.ControlPanel._sidebar_activity_state(True, "MODE_VIDEO", False) == (
+        "media-playback-start-symbolic",
+        "Single video",
+    )
+    assert app.ControlPanel._sidebar_activity_state(True, "MODE_PLAYLIST", False) == (
+        "list-queue-symbolic",
+        "Playlist",
+    )
+    assert app.ControlPanel._sidebar_activity_state(True, "MODE_WEBPAGE", True) == (
+        "web-browser-symbolic",
+        "Web page",
+    )
+    assert app.ControlPanel._sidebar_activity_state(True, "MODE_NULL", True) == (
+        "video-display-symbolic",
+        "Static",
+    )
 
 
 @check

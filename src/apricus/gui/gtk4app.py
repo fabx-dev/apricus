@@ -234,12 +234,26 @@ class ControlPanel(Adw.Application):
         sidebar.connect("row-selected", self._on_sidebar_selected)
         self.sidebar = sidebar
         box.append(sidebar)
+        server_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        server_row.set_margin_top(8)
+        server_row.set_margin_bottom(2)
+        server_row.set_margin_start(12)
+        server_row.set_margin_end(12)
+        self.sidebar_server_dot = Gtk.Label(label="●")
+        server_row.append(self.sidebar_server_dot)
+        self.sidebar_server_label = Gtk.Label(label="")
+        self.sidebar_server_label.set_xalign(0)
+        self.sidebar_server_label.set_ellipsize(Pango.EllipsizeMode.END)
+        self.sidebar_server_label.set_max_width_chars(14)
+        server_row.append(self.sidebar_server_label)
+        box.append(server_row)
         status_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        status_row.set_margin_top(8)
+        status_row.set_margin_top(2)
         status_row.set_margin_bottom(2)
         status_row.set_margin_start(12)
         status_row.set_margin_end(12)
-        self.sidebar_dot = Gtk.Label(label="●")
+        self.sidebar_dot = Gtk.Image.new_from_icon_name("video-display-symbolic")
+        self.sidebar_dot.set_pixel_size(14)
         status_row.append(self.sidebar_dot)
         self.sidebar_eq = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=2)
         self.sidebar_eq.set_valign(Gtk.Align.CENTER)
@@ -341,31 +355,69 @@ class ControlPanel(Adw.Application):
         settings = Gtk.Settings.get_default()
         return bool(settings and settings.props.gtk_enable_animations)
 
+    @staticmethod
+    def _sidebar_server_text(server_present):
+        """(dot_css_class, server_text) for Row 1 of the sidebar footer."""
+        if not server_present:
+            return "error", _("Server down")
+        ready = _("Ready — {mode}").format(mode="").split("—")[0].strip() or "Ready"
+        return "success", ready
+
+    @staticmethod
+    def _sidebar_activity_state(server_present, mode, paused):
+        """(icon_name, activity_text) for Row 2 of the sidebar footer."""
+        if not server_present:
+            return "media-playback-stop-symbolic", _("Nothing playing")
+        if mode in (MODE_VIDEO, MODE_STREAM, MODE_PLAYLIST) and paused:
+            return "media-playback-pause-symbolic", _("Paused")
+        if mode == MODE_PLAYLIST:
+            return ControlPanel._mode_icon(mode), _("Playlist")
+        if mode == MODE_NULL or mode not in ControlPanel.MODE_LABELS:
+            return ControlPanel._mode_icon(MODE_NULL), _("Static")
+        return ControlPanel._mode_icon(mode), ControlPanel._mode_text(mode)
+
     def _refresh_sidebar_status(self, server, mode, paused=None):
         dot = getattr(self, "sidebar_dot", None)
         label = getattr(self, "sidebar_status", None)
         eq = getattr(self, "sidebar_eq", None)
         if dot is None or label is None:
             return
-        css, text = self._sidebar_status_text(server is not None, mode)
+        server_ok = server is not None
+        css, srv_text = self._sidebar_server_text(server_ok)
+        srv_dot = getattr(self, "sidebar_server_dot", None)
+        srv_label = getattr(self, "sidebar_server_label", None)
+        if srv_dot is not None:
+            for cls in ("success", "error"):
+                srv_dot.remove_css_class(cls)
+            srv_dot.add_css_class(css)
+        if srv_label is not None:
+            srv_label.set_text(srv_text)
+            srv_label.set_tooltip_text(
+                "Background service unreachable. Start Apricus." if not server_ok else srv_text
+            )
         playing = False
-        if server is not None and mode in (MODE_VIDEO, MODE_STREAM, MODE_PLAYLIST):
+        if server_ok and mode in (MODE_VIDEO, MODE_STREAM, MODE_PLAYLIST):
             if paused is None:
                 try:
                     paused = bool(server.is_paused_by_user)
                 except Exception:  # noqa: BLE001 - unknown state means not playing
                     paused = True
             playing = not paused
+        else:
+            paused = True
+        icon_name, act_text = self._sidebar_activity_state(server_ok, mode, paused)
         show_eq = bool(playing and self._animations_enabled() and eq is not None)
         if eq is not None:
             eq.set_visible(show_eq)
         dot.set_visible(not show_eq)
+        if hasattr(dot, "set_from_icon_name"):
+            dot.set_from_icon_name(icon_name)
         for cls in ("success", "error"):
             dot.remove_css_class(cls)
         dot.add_css_class(css)
-        label.set_text(text)
+        label.set_text(act_text)
         label.set_tooltip_text(
-            "Background service unreachable. Start Apricus." if server is None else text
+            "Background service unreachable. Start Apricus." if not server_ok else act_text
         )
 
     def _show_about(self, *_args):
