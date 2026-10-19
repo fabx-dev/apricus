@@ -168,7 +168,18 @@ class WebWindow(Gtk.ApplicationWindow):
         return False
 
     def _on_load_changed(self, _webview, load_event):
-        if load_event != WebKit2.LoadEvent.FINISHED or self._snapshot_cb is None:
+        if load_event != WebKit2.LoadEvent.FINISHED:
+            return
+        # Page painted (all monitors, not just snapshotted ones): re-assert
+        # bottom stacking in case the WebKit surface mapping restacked us.
+        try:
+            app = self.get_application()
+            request_lower = getattr(app, "request_lower", None)
+            if request_lower is not None:
+                request_lower()
+        except Exception:  # noqa: BLE001 - stacking is best-effort
+            pass
+        if self._snapshot_cb is None:
             return
         token = self._load_token
         for delay_ms in (1500, 4500):

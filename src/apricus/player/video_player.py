@@ -159,6 +159,12 @@ class VLCWidget(Gtk.DrawingArea):
 class PlayerWindow(Gtk.ApplicationWindow):
     def __init__(self, name, width, height, *args, mode=MODE_VIDEO, **kwargs):
         super().__init__(*args, **kwargs)
+        # Keyboard/mouse input is handled by VLC flags below (both disabled):
+        # never take keyboard focus so clicks can't raise us over DING.
+        try:
+            self.set_accept_focus(False)
+        except Exception:  # noqa: BLE001
+            pass
         # Setup a VLC widget given the provided width and height.
         self.width = width
         self.height = height
@@ -390,6 +396,16 @@ class PlayerWindow(Gtk.ApplicationWindow):
             return
         self._first_frame_reported = True
         perf.mark(f"player: first frame [{self.name}]")
+        # First pixels are on screen now (covers playlist transitions and
+        # hot-switches too): re-assert bottom stacking in case VLC's video
+        # subwindow mapping restacked us over DING. Thread-safe via idle.
+        try:
+            app = self.get_application()
+            request_lower = getattr(app, "request_lower", None)
+            if request_lower is not None:
+                request_lower()
+        except Exception:  # noqa: BLE001 - stacking is best-effort
+            pass
 
     def _on_button_press_event(self, widget, event):
         if event.type == Gdk.EventType.BUTTON_PRESS and event.button == 3:
