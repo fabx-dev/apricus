@@ -68,6 +68,20 @@ class _XClientMessageEvent(ctypes.Structure):
     ]
 
 
+class _XPropertyEvent(ctypes.Structure):
+    _fields_ = [
+        ("type", ctypes.c_int),
+        ("serial", ctypes.c_ulong),
+        ("send_event", ctypes.c_int),
+        ("display", ctypes.c_void_p),
+        ("window", ctypes.c_ulong),
+        ("atom", ctypes.c_ulong),
+        ("time", ctypes.c_ulong),
+        ("state", ctypes.c_int),
+        ("pad", ctypes.c_byte * 192),
+    ]
+
+
 def _x11_restack_below(xid):
     """Ask the WM (EWMH) to place window *xid* below its siblings.
 
@@ -228,11 +242,13 @@ class BasePlayer(Gtk.Application):
         return False
 
     def _schedule_lower(self):
-        """Coalesce restack requests: at most one lower per 50 ms tick."""
+        """Coalesce restack requests: run at 60 ms and 320 ms (after DING's
+        idle_add and 250 ms _moveIntoPlace timer)."""
         if getattr(self, "_lower_pending", False):
             return False
         self._lower_pending = True
-        GLib.timeout_add(50, self._do_scheduled_lower)
+        GLib.timeout_add(60, self._do_scheduled_lower)
+        GLib.timeout_add(320, self._do_followup_lower)
         return False
 
     def _do_scheduled_lower(self):
@@ -242,45 +258,85 @@ class BasePlayer(Gtk.Application):
         self._lower_desktop_windows()
         return False
 
+    def _do_followup_lower(self):
+        self._lower_desktop_windows()
+        return False
+
     def request_lower(self):
         """Thread-safe entry point for media-ready hooks (first frame,
         page loaded, hot-switch) to re-assert bottom stacking."""
         GLib.idle_add(self._schedule_lower)
 
     def _watch_stacking(self):
-        """Watch X11 _NET_CLIENT_LIST_STACKING for compositor restacks.
+        """Watch X11 root properties via libX11 + GLib.io_add_watch.
 
-        Mutter rewrites it on every map/destroy/workspace-switch — including
-        right after DING lowers itself below us. The handler re-lowers us
-        (debounced, self-suppressed), so no polling timer is needed and
-        steady-state CPU stays at zero. No-op without an X11 backend.
+        Note: GdkX11.X11Window.add_filter is marked (skip) in GI typelibs
+        and raises AttributeError in PyGObject. Watching the X11 connection
+        FD directly in the GLib main loop is 100% event-driven (zero threads,
+        zero polling) and catches Mutter's _NET_CLIENT_LIST_STACKING /
+        _NET_ACTIVE_WINDOW updates on both X11 and XWayland.
         """
         if getattr(self, "_stacking_watched", False):
             return
         try:
             if not _is_x11_display():
                 return
-            root = Gdk.get_default_root_window()
-            if root is None:
+            lib = _x11_lib()
+            if lib is None:
                 return
-            self._stacking_atom = Gdk.Atom.intern("_NET_CLIENT_LIST_STACKING", False)
-            root.set_events(root.get_events() | Gdk.EventMask.PROPERTY_CHANGE_MASK)
-            root.add_filter(self._on_root_event_filter)
+            lib.XOpenDisplay.argtypes = [ctypes.c_char_p]
+            lib.XOpenDisplay.restype = ctypes.c_void_p
+            dpy = lib.XOpenDisplay(None)
+            if not dpy:
+                return
+            lib.XDefaultRootWindow.argtypes = [ctypes.c_void_p]
+            lib.XDefaultRootWindow.restype = ctypes.c_ulong
+            lib.XInternAtom.argtypes = [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_int]
+            lib.XInternAtom.restype = ctypes.c_ulong
+            lib.XSelectInput.argtypes = [ctypes.c_void_p, ctypes.c_ulong, ctypes.c_long]
+            lib.XSelectInput.restype = ctypes.c_int
+            lib.XConnectionNumber.argtypes = [ctypes.c_void_p]
+            lib.XConnectionNumber.restype = ctypes.c_int
+            lib.XPending.argtypes = [ctypes.c_void_p]
+            lib.XPending.restype = ctypes.c_int
+            lib.XNextEvent.argtypes = [ctypes.c_void_p, ctypes.POINTER(_XPropertyEvent)]
+            lib.XNextEvent.restype = ctypes.c_int
+            lib.XFlush.argtypes = [ctypes.c_void_p]
+            lib.XFlush.restype = ctypes.c_int
+
+            root = lib.XDefaultRootWindow(dpy)
+            self._watch_dpy = dpy
+            self._watch_atoms = {
+                lib.XInternAtom(dpy, b"_NET_CLIENT_LIST_STACKING", False),
+                lib.XInternAtom(dpy, b"_NET_CLIENT_LIST", False),
+                lib.XInternAtom(dpy, b"_NET_ACTIVE_WINDOW", False),
+                lib.XInternAtom(dpy, b"_NET_CURRENT_DESKTOP", False),
+            }
+            lib.XSelectInput(dpy, root, 1 << 22)  # PropertyChangeMask
+            lib.XFlush(dpy)
+            fd = lib.XConnectionNumber(dpy)
+            GLib.io_add_watch(fd, GLib.IOCondition.IN, self._on_x11_fd_ready)
             self._stacking_watched = True
         except Exception as e:  # noqa: BLE001 - stacking guard is best-effort
             logger.debug(f"[Player] stacking watch unavailable: {e}")
 
-    def _on_root_event_filter(self, _gdk_window, event):
+    def _on_x11_fd_ready(self, _fd, _cond):
         try:
-            if (
-                event.type == Gdk.EventType.PROPERTY_NOTIFY
-                and event.atom == self._stacking_atom
-                and time.monotonic() >= getattr(self, "_lower_guard_until", 0)
-            ):
+            lib = _x11_lib()
+            dpy = getattr(self, "_watch_dpy", None)
+            if not lib or not dpy:
+                return False
+            ev = _XPropertyEvent()
+            triggered = False
+            while lib.XPending(dpy) > 0:
+                lib.XNextEvent(dpy, ctypes.byref(ev))
+                if ev.type == 28 and ev.atom in self._watch_atoms:
+                    triggered = True
+            if triggered and time.monotonic() >= getattr(self, "_lower_guard_until", 0):
                 self._schedule_lower()
         except Exception:  # noqa: BLE001 - never break the event stream
             pass
-        return Gdk.FilterReturn.CONTINUE
+        return True
 
     def do_activate(self):
         for monitor in self.windows:
@@ -294,6 +350,7 @@ class BasePlayer(Gtk.Application):
                 # relies on the stacking guard below instead.)
                 window.set_keep_below(True)
                 window.set_focus_on_map(False)
+                window.connect("map-event", lambda *_: self._schedule_lower())
                 rect = monitor.get_geometry()
                 x, y, width, height = rect.x, rect.y, rect.width, rect.height
                 window.set_size_request(width, height)
@@ -305,6 +362,8 @@ class BasePlayer(Gtk.Application):
                 window.show_all()
         self._lower_desktop_windows()
         self._watch_stacking()
+        for delay_ms in (150, 500, 1200):
+            GLib.timeout_add(delay_ms, self._lower_desktop_windows)
         # Workaround for DING extension
         gnome_desktop_icon_workaround()
 

@@ -1676,7 +1676,7 @@ def sidebar_status_text_maps_states():
         "Single video",
     )
     assert app.ControlPanel._sidebar_activity_state(True, "MODE_PLAYLIST", False) == (
-        "list-queue-symbolic",
+        "view-list-symbolic",
         "Playlist",
     )
     assert app.ControlPanel._sidebar_activity_state(True, "MODE_WEBPAGE", True) == (

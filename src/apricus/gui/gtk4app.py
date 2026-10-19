@@ -118,7 +118,7 @@ class ControlPanel(Adw.Application):
         MODE_VIDEO: "media-playback-start-symbolic",
         MODE_STREAM: "network-transmit-receive-symbolic",
         MODE_WEBPAGE: "web-browser-symbolic",
-        MODE_PLAYLIST: "list-queue-symbolic",
+        MODE_PLAYLIST: "view-list-symbolic",
         MODE_NULL: "video-display-symbolic",
     }
 
@@ -137,6 +137,7 @@ class ControlPanel(Adw.Application):
         # single owner per application ID, so parallel instances (e.g. an
         # Xvfb smoke driver next to the live panel) need distinct IDs.
         kwargs.setdefault("application_id", APP_ID)
+        GLib.set_prgname(kwargs["application_id"])
         app_flags = (
             Gio.ApplicationFlags.NON_UNIQUE if is_snap() else Gio.ApplicationFlags.FLAGS_NONE
         )
@@ -255,6 +256,11 @@ class ControlPanel(Adw.Application):
         self.sidebar_dot = Gtk.Image.new_from_icon_name("video-display-symbolic")
         self.sidebar_dot.set_pixel_size(14)
         status_row.append(self.sidebar_dot)
+        self.sidebar_status = Gtk.Label(label="")
+        self.sidebar_status.set_xalign(0)
+        self.sidebar_status.set_ellipsize(Pango.EllipsizeMode.END)
+        self.sidebar_status.set_max_width_chars(12)
+        status_row.append(self.sidebar_status)
         self.sidebar_eq = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=2)
         self.sidebar_eq.set_valign(Gtk.Align.CENTER)
         for _i in range(3):
@@ -263,11 +269,6 @@ class ControlPanel(Adw.Application):
             bar.add_css_class("sb-eq-bar")
             self.sidebar_eq.append(bar)
         status_row.append(self.sidebar_eq)
-        self.sidebar_status = Gtk.Label(label="")
-        self.sidebar_status.set_xalign(0)
-        self.sidebar_status.set_ellipsize(Pango.EllipsizeMode.END)
-        self.sidebar_status.set_max_width_chars(14)
-        status_row.append(self.sidebar_status)
         box.append(status_row)
         self.sidebar_version = Gtk.Label(label=f"Apricus {self.version}")
         self.sidebar_version.add_css_class("dim-label")
@@ -409,9 +410,11 @@ class ControlPanel(Adw.Application):
         show_eq = bool(playing and self._animations_enabled() and eq is not None)
         if eq is not None:
             eq.set_visible(show_eq)
-        dot.set_visible(not show_eq)
         if hasattr(dot, "set_from_icon_name"):
             dot.set_from_icon_name(icon_name)
+            dot.set_visible(True)
+        else:
+            dot.set_visible(not show_eq)
         for cls in ("success", "error"):
             dot.remove_css_class(cls)
         dot.add_css_class(css)
