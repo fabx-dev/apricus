@@ -267,6 +267,27 @@ class BasePlayer(Gtk.Application):
         page loaded, hot-switch) to re-assert bottom stacking."""
         GLib.idle_add(self._schedule_lower)
 
+    def _start_stacking_safety_net(self):
+        """Bounded safety net: re-lower every 2 s.
+
+        The event guard above cannot see pure-Wayland restacks (e.g. DING
+        lowering itself with no X11 client change), and DING always moves
+        last via its low-priority idle handler. A 2 s re-lower guarantees
+        convergence within 2 s of any invisible move at negligible cost
+        (one no-op X round-trip when already at the bottom).
+        """
+        if getattr(self, "_safety_net_installed", False):
+            return
+        self._safety_net_installed = True
+        GLib.timeout_add_seconds(2, self._safety_lower)
+
+    def _safety_lower(self):
+        try:
+            self._lower_desktop_windows()
+        except Exception:  # noqa: BLE001 - best-effort only
+            pass
+        return True
+
     def _watch_stacking(self):
         """Watch X11 root properties via libX11 + GLib.io_add_watch.
 
@@ -317,6 +338,7 @@ class BasePlayer(Gtk.Application):
             fd = lib.XConnectionNumber(dpy)
             GLib.io_add_watch(fd, GLib.IOCondition.IN, self._on_x11_fd_ready)
             self._stacking_watched = True
+            logger.info("[Player] stacking guard armed (X11 root watch)")
         except Exception as e:  # noqa: BLE001 - stacking guard is best-effort
             logger.debug(f"[Player] stacking watch unavailable: {e}")
 
@@ -362,6 +384,7 @@ class BasePlayer(Gtk.Application):
                 window.show_all()
         self._lower_desktop_windows()
         self._watch_stacking()
+        self._start_stacking_safety_net()
         for delay_ms in (150, 500, 1200):
             GLib.timeout_add(delay_ms, self._lower_desktop_windows)
         # Workaround for DING extension

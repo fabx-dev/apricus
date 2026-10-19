@@ -44,7 +44,7 @@
       <description>
         <ul>
           <li>Three-row sidebar status footer: dedicated server status indicator on row 1, live activity with animated equalizer or mode symbolic icon on row 2, and version on row 3</li>
-          <li>Keep live wallpaper strictly below Ubuntu DING desktop icons without polling: no-raise window mapping, EWMH _NET_RESTACK_WINDOW, event-driven stacking guard and media-ready hooks</li>
+          <li>Keep live wallpaper strictly below Ubuntu DING desktop icons: no-raise window mapping, unconditional EWMH _NET_RESTACK_WINDOW, event-driven stacking guard with media-ready hooks and a 2-second safety net (zero polling timers at startup, negligible steady-state cost)</li>
           <li>Fixed GNOME dock generic gear icon by aligning X11 WM_CLASS with StartupWMClass via GLib.set_prgname</li>
         </ul>
       </description>
