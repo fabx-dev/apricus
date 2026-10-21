@@ -14,6 +14,7 @@ from gi.repository import Gdk, Gio, GLib, Gtk
 from pydbus import SessionBus
 
 from apricus.commons import DBUS_NAME_PLAYER, DBUS_PROJECT, LOGGER_NAME
+from apricus.gnome_shell import WALLPAPER_WINDOW_ROLE, integration_active, log_status
 from apricus.utils import _authorize, gnome_desktop_icon_workaround, is_snap
 
 logger = logging.getLogger(LOGGER_NAME)
@@ -244,6 +245,9 @@ class BasePlayer(Gtk.Application):
     def _schedule_lower(self):
         """Coalesce restack requests: run at 60 ms and 320 ms (after DING's
         idle_add and 250 ms _moveIntoPlace timer)."""
+        if getattr(self, "_shell_managed", False):
+            # The Shell extension owns stacking now; stay out of its way.
+            return False
         if getattr(self, "_lower_pending", False):
             return False
         self._lower_pending = True
@@ -265,6 +269,8 @@ class BasePlayer(Gtk.Application):
     def request_lower(self):
         """Thread-safe entry point for media-ready hooks (first frame,
         page loaded, hot-switch) to re-assert bottom stacking."""
+        if getattr(self, "_shell_managed", False):
+            return
         GLib.idle_add(self._schedule_lower)
 
     def _start_stacking_safety_net(self):
@@ -361,15 +367,29 @@ class BasePlayer(Gtk.Application):
         return True
 
     def do_activate(self):
+        # When the Shell extension hosts our windows in the background
+        # layer, it owns stacking: skip the in-app guard, safety net and
+        # the DING reload so the two never compete.
+        self._shell_managed = integration_active()
+        if not getattr(self, "_shell_status_logged", False):
+            log_status()
+            self._shell_status_logged = True
         for monitor in self.windows:
             window = self.windows[monitor]
             if window is None:
                 window = self.new_window(monitor)
                 window.set_type_hint(Gdk.WindowTypeHint.DESKTOP)
+                # Identity for the Shell extension (WM_WINDOW_ROLE): only
+                # wallpaper windows carry it, never the settings window.
+                try:
+                    window.set_role(WALLPAPER_WINDOW_ROLE)
+                except Exception:  # noqa: BLE001 - role is advisory only
+                    pass
                 # Never steal focus or raise above the desktop icons.
                 # (Video windows additionally disable focus themselves;
                 # WebWindow keeps keyboard focus for interactive pages and
-                # relies on the stacking guard below instead.)
+                # relies on the stacking guard below instead, unless the
+                # Shell extension is managing stacking.)
                 window.set_keep_below(True)
                 window.set_focus_on_map(False)
                 window.connect("map-event", lambda *_: self._schedule_lower())
@@ -382,6 +402,9 @@ class BasePlayer(Gtk.Application):
             # over DING. show_all() maps without activating.
             if not window.get_visible():
                 window.show_all()
+        if self._shell_managed:
+            logger.info("[Player] stacking managed by GNOME Shell integration")
+            return
         self._lower_desktop_windows()
         self._watch_stacking()
         self._start_stacking_safety_net()
