@@ -63,11 +63,17 @@ export default class ApricusIntegrationExtension extends Extension {
 
         // The player may already run (started before the extension was
         // enabled, or re-enabled after unlock): adopt matching windows now.
+        let seen = 0, matched = 0;
         for (const actor of global.get_window_actors()) {
-            const window = actor.get_meta_window();
-            if (window)
+            const window = actor ? actor.get_meta_window() : null;
+            if (window) {
+                seen++;
+                if (this._isWallpaperWindow(window))
+                    matched++;
                 this._watchWindow(window);
+            }
         }
+        console.warn(`[${this.uuid}] startup scan: ${seen} windows, ${matched} wallpaper role match(es)`);
     }
 
     disable() {
@@ -80,6 +86,11 @@ export default class ApricusIntegrationExtension extends Extension {
         if (this._windowCreatedId) {
             global.display.disconnect(this._windowCreatedId);
             this._windowCreatedId = 0;
+        }
+
+        if (this._dbgTimer) {
+            GLib.source_remove(this._dbgTimer);
+            this._dbgTimer = 0;
         }
 
         if (this._bgChildAddedId && this._bgGroup) {
@@ -183,9 +194,31 @@ export default class ApricusIntegrationExtension extends Extension {
         // switch. Deliberately NOT window.stick(): that makes the workspace
         // slide animation track the window as a normal sticky window while
         // its actor lives elsewhere. Force visibility instead.
+        // TEMPORARY DIAGNOSTIC (freeze investigation): event counters with a
+        // periodic summary. Removed once the stall mechanism is identified.
+        record.dbg = {raised: 0, focus: 0, hidden: 0};
+        if (!this._dbgTimer) {
+            this._dbgCount = 0;
+            this._dbgTimer = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, 10, () => {
+                if (this._destroyed) {
+                    this._dbgTimer = 0;
+                    return GLib.SOURCE_REMOVE;
+                }
+                this._dbgCount++;
+                for (const [w, r] of this._adopted) {
+                    console.warn(`[${this.uuid}] dbg t=${this._dbgCount * 10}s ` +
+                        `raised=${r.dbg.raised} focus=${r.dbg.focus} hidden=${r.dbg.hidden} ` +
+                        `actorVisible=${r.actor.visible} inBg=${r.actor.get_parent() === this._bgGroup}`);
+                }
+                return GLib.SOURCE_CONTINUE;
+            });
+        }
+
         record.visibleId = actor.connect('notify::visible', () => {
-            if (!actor.visible)
+            if (!actor.visible) {
+                record.dbg.hidden++;
                 actor.show();
+            }
         });
         if (!actor.visible)
             actor.show();
@@ -206,9 +239,11 @@ export default class ApricusIntegrationExtension extends Extension {
         // surface covers the desktop, so desktop clicks land on it. Undo
         // both effects whenever they happen.
         record.raisedId = window.connect_after('raised', () => {
+            record.dbg.raised++;
             window.lower();
         });
         record.focusId = window.connect('focus', () => {
+            record.dbg.focus++;
             this._refocusNormalWindow(window);
         });
 
