@@ -176,7 +176,7 @@ export default class ApricusIntegrationExtension extends Extension {
             });
         }
 
-        const record = {window, actor, unmanagedId: 0, raisedId: 0, focusId: 0, visibleId: 0};
+        const record = {window, actor, unmanagedId: 0, raisedId: 0, focusId: 0, visibleId: 0, destroyId: 0};
 
         // Mutter hides a window's actor when its MetaWindow is not on the
         // active workspace; reparenting alone does not survive a workspace
@@ -192,6 +192,14 @@ export default class ApricusIntegrationExtension extends Extension {
 
         record.unmanagedId = window.connect('unmanaged', () => {
             this._forget(window);
+        });
+
+        // The actor dies with the player process (restart, mode switch).
+        // Drop the record at destroy-time: touching the actor afterwards
+        // (e.g. from 'unmanaged') logs disposed-object warnings, and its
+        // signal handlers die with it, so there is nothing to disconnect.
+        record.destroyId = actor.connect('destroy', () => {
+            this._adopted.delete(window);
         });
 
         // A wallpaper must never hold focus or rise in the stack, yet its
@@ -250,13 +258,17 @@ export default class ApricusIntegrationExtension extends Extension {
                 record[key] = 0;
             }
         }
-        if (record.visibleId) {
+        if (record.visibleId || record.destroyId) {
             try {
-                record.actor.disconnect(record.visibleId);
+                if (record.visibleId)
+                    record.actor.disconnect(record.visibleId);
+                if (record.destroyId)
+                    record.actor.disconnect(record.destroyId);
             } catch (_e) {
                 // Actor already disposed (e.g. from 'unmanaged').
             }
             record.visibleId = 0;
+            record.destroyId = 0;
         }
     }
 
