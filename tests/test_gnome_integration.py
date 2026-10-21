@@ -73,6 +73,39 @@ def test_extension_manages_stacking_in_place():
     assert "owns_window" not in js  # XWayland renderer: role match, not WaylandClient
 
 
+def test_vlc_options_pin_exact_flags_per_session(monkeypatch):
+    """Renderer selection: xcb only on GNOME Wayland, GPU default elsewhere."""
+    from apricus.player.video_player import _vlc_options
+
+    assert _vlc_options(False, True) == [
+        "--no-disable-screensaver",
+        "--no-interact",
+        "--aout=pulse",
+        "--vout=xcb",
+    ]
+    assert _vlc_options(True, True) == [
+        "--no-disable-screensaver",
+        "--no-interact",
+        "--no-audio",
+        "--aout=none",
+        "--vout=xcb",
+    ]
+    plain = _vlc_options(False, False)
+    assert "--vout=xcb" not in plain and "--no-interact" in plain
+    assert "--no-interact" in _vlc_options(True, False)
+
+
+def test_shipped_metadata_declares_only_verified_shell_versions():
+    """The bundled extension must not claim GNOME versions that were never
+    tested live (51+): an over-broad shell-version silently breaks sorting
+    on upgrade instead of cleanly disabling the integration."""
+    with open(EXT_META, encoding="utf-8") as f:
+        meta = json.load(f)
+    declared = set(meta.get("shell-version") or [])
+    assert declared, "extension must declare supported Shell versions"
+    assert declared <= {"50"}, f"untested Shell versions declared: {sorted(declared)}"
+
+
 def test_detection_with_compatible_metadata(tmp_path):
     dirs = _write_fake_extension(str(tmp_path), ("50", "51"))
     assert extension_dir(dirs) is not None
@@ -163,6 +196,47 @@ def test_enabled_check_never_raises_without_schema(monkeypatch):
 
     monkeypatch.setattr(RealGio.Settings, "new", Boom.new)
     assert extension_is_enabled() is False
+
+
+def test_status_matrix_for_setup_ui(tmp_path, monkeypatch):
+    from apricus.gnome_shell import _UNREACHABLE, integration_status
+
+    dirs = _write_fake_extension(str(tmp_path), ("50",))
+    monkeypatch.setattr(gnome_shell, "is_gnome", lambda: True)
+    monkeypatch.setattr(gnome_shell, "is_wayland", lambda: True)
+    monkeypatch.setattr(gnome_shell, "shell_version", lambda: "50.1")
+
+    monkeypatch.setattr(gnome_shell, "extension_dir", lambda *a: None)
+    assert integration_status(dirs)[0] == "not_installed"
+
+    monkeypatch.setattr(gnome_shell, "extension_dir", lambda *a: str(tmp_path))
+    monkeypatch.setattr(gnome_shell, "read_metadata", lambda *a: {"shell-version": ["49"]})
+    assert integration_status(dirs)[0] == "incompatible"
+
+    monkeypatch.setattr(gnome_shell, "read_metadata", lambda *a: {"shell-version": ["50"]})
+    monkeypatch.setattr(gnome_shell, "extension_raw_state", lambda: _UNREACHABLE)
+    assert integration_status(dirs)[0] == "unknown"
+
+    monkeypatch.setattr(gnome_shell, "extension_raw_state", lambda: 1)
+    state, detail = integration_status(dirs)
+    assert state == "active" and detail["shell"] == "50.1"
+
+    monkeypatch.setattr(gnome_shell, "extension_raw_state", lambda: 3)
+    assert integration_status(dirs)[0] == "error"
+
+    monkeypatch.setattr(gnome_shell, "extension_raw_state", lambda: 4)
+    assert integration_status(dirs)[0] == "incompatible"
+
+    monkeypatch.setattr(gnome_shell, "extension_raw_state", lambda: None)
+    monkeypatch.setattr(gnome_shell, "extension_is_enabled", lambda: True)
+    assert integration_status(dirs)[0] == "needs_logout"
+    monkeypatch.setattr(gnome_shell, "extension_is_enabled", lambda: False)
+    assert integration_status(dirs)[0] == "not_discovered"
+    monkeypatch.setattr(gnome_shell, "extension_raw_state", lambda: 2)
+    assert integration_status(dirs)[0] == "disabled"
+
+    monkeypatch.setattr(gnome_shell, "is_wayland", lambda: False)
+    assert integration_status(dirs)[0] == "unknown"
 
 
 def test_log_status_never_raises(tmp_path, monkeypatch):

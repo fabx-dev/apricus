@@ -45,12 +45,35 @@ from apricus.utils import (
     ActiveHandler,
     ConfigUtil,
     _authorize,
+    is_gnome,
+    is_wayland,
     setup_logging,
 )
 from apricus.yt_utils import get_best_audio, get_formats, get_optimal_video
 from apricus.yt_utils import youtube_dl as yt_dlp
 
 logger = logging.getLogger(LOGGER_NAME)
+
+
+def _vlc_options(disable_audio: bool, use_xcb: bool):
+    """VLC instance options for one player window (pure logic, tested).
+
+    Mirrors the option building in :class:`VLCWidget.__init__`: callers
+    pass ``use_xcb=is_gnome() and is_wayland()``. Keeping the logic here
+    lets tests pin the exact flags per session type without a display.
+    """
+    if disable_audio:
+        options = [
+            "--no-disable-screensaver",
+            "--no-interact",
+            "--no-audio",
+            "--aout=none",
+        ]
+    else:
+        options = ["--no-disable-screensaver", "--no-interact", "--aout=pulse"]
+    if use_xcb:
+        options.append("--vout=xcb")
+    return options
 
 
 class Fade:
@@ -121,28 +144,21 @@ class VLCWidget(Gtk.DrawingArea):
         #   plugin segfaults (pw_thread_loop_lock) when multiple instances are
         #   active, e.g. one per monitor. See the Flatpak, which uses Pulse too.
         # --vout=xcb: Force plain X11 (XImage/SHM) presentation into our X
-        #   window pixmap. GPU-direct outputs (VAAPI/DRM, GL) bypass the X
-        #   pixmap via overlay planes that always composite above everything
-        #   — including DING — so no stacking trick can order them, and
-        #   screenshots/XDamage see only black. xcb keeps every frame in
-        #   the pixmap where Mutter (and our Shell integration) can stack it.
+        #   window pixmap, but only on GNOME Wayland sessions. There it is
+        #   required: GPU-direct outputs bypass the pixmap via overlay planes
+        #   that always composite above everything — including DING — so no
+        #   stacking order can place them below the desktop icons (verified
+        #   live: black X pixmap + renderDRI open while the video visibly
+        #   played on top). Everywhere else the default output is kept so
+        #   Xorg sessions retain hardware presentation. Session-based (not
+        #   extension-state-based): the player cannot know whether the user
+        #   will enable the extension later, and pixmap rendering is harmless
+        #   without it.
         # Playlist mode never needs audio: opening/closing the audio output
         # on every transition locks up PipeWire, so it is disabled entirely.
-        if disable_audio:
-            vlc_options = [
-                "--no-disable-screensaver",
-                "--no-interact",
-                "--no-audio",
-                "--aout=none",
-                "--vout=xcb",
-            ]
-        else:
-            vlc_options = [
-                "--no-disable-screensaver",
-                "--no-interact",
-                "--aout=pulse",
-                "--vout=xcb",
-            ]
+        # Option building lives in _vlc_options() (unit-tested).
+        use_xcb = is_gnome() and is_wayland()
+        vlc_options = _vlc_options(disable_audio, use_xcb)
         self.instance = vlc.Instance(vlc_options)
         self.player = self.instance.media_player_new()
 
