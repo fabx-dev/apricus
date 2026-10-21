@@ -5,8 +5,9 @@
 
 On GNOME Wayland, ordinary X11/XWayland restacking cannot place our video
 windows below DING's native Wayland desktop window. The companion extension
-``apricus-integration@fabx-dev`` (shipped under ``gnome-extension/``) adopts
-our wallpaper windows into the Shell's background layer instead.
+``apricus-integration@fabx-dev`` (shipped under ``gnome-extension/``)
+lowers our role-identified wallpaper windows from inside the compositor
+whenever stacking changes.
 
 This module only *detects* the integration; it never talks to the
 compositor. The extension works autonomously by matching the window role

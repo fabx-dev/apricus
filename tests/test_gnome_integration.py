@@ -51,14 +51,22 @@ def test_metadata_is_valid_and_version_pinned():
     assert "user" in meta.get("session-modes", [])
 
 
-def test_extension_adopts_into_background_group():
-    """Structural contract: reparent + re-pin + cleanup + no renderer spawn."""
+def test_extension_manages_stacking_in_place():
+    """Structural contract: lower in place, never reparent.
+
+    XWayland actors stop presenting damage once moved out of the normal
+    window stack (verified live on Mutter 50), so the extension only
+    lowers our role-identified windows on stacking events and never
+    reparents actors into the background group.
+    """
     with open(EXT_JS, encoding="utf-8") as f:
         js = f.read()
-    assert "_backgroundGroup" in js
-    assert "remove_child(actor)" in js and "add_child(actor)" in js
-    assert "set_child_above_sibling(actor, null)" in js
-    assert "child-added" in js
+    assert "_backgroundGroup" not in js
+    assert "remove_child(actor)" not in js and "add_child(actor)" not in js
+    assert "'restacked'" in js
+    assert "'active-workspace-changed'" in js
+    assert "overview" in js
+    assert "window.lower()" in js
     assert "'unmanaged'" in js or '"unmanaged"' in js
     assert "get_tab_list" in js  # focus is returned, never kept
     assert "Gio.Subprocess" not in js  # the player owns playback, not the Shell
