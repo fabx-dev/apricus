@@ -60,6 +60,7 @@ from apricus.utils import (
     ConfigUtil,
     get_video_paths,
     init_translations,
+    is_flatpak,
     is_gnome,
     is_snap,
     is_wayland,
@@ -3733,6 +3734,18 @@ class ControlPanel(Adw.Application):
             "state-set", self._on_settings_flag, CONFIG_KEY_MUTE_WHEN_MAXIMIZED
         )
         box.append(behaviour)
+        if is_gnome() and is_wayland():
+            icons = Adw.PreferencesGroup()
+            icons.set_title(_("Desktop icons"))
+            self.integ_row = Adw.ActionRow()
+            self.integ_row.set_title(_("Keep icons above video"))
+            self.integ_btn = Gtk.Button(label=_("Enable"))
+            self.integ_btn.set_valign(Gtk.Align.CENTER)
+            self.integ_btn.connect("clicked", self._on_integration_enable)
+            self.integ_row.add_suffix(self.integ_btn)
+            icons.add(self.integ_row)
+            box.append(icons)
+            self._refresh_integration_row()
         startup = Adw.PreferencesGroup()
         startup.set_title(_("Startup"))
         self.autostart_row, self.autostart_switch = self._settings_switch_row(
@@ -3777,6 +3790,64 @@ class ControlPanel(Adw.Application):
         info.add(about_row)
         box.append(info)
         return self._scroll_page(self._clamp_page(box))
+
+    def _refresh_integration_row(self):
+        """Show the GNOME Shell integration state (never raises)."""
+        row = getattr(self, "integ_row", None)
+        btn = getattr(self, "integ_btn", None)
+        if row is None:
+            return
+        try:
+            from apricus.gnome_shell import integration_status
+
+            state, detail = integration_status()
+        except Exception:  # noqa: BLE001 - status must never break settings
+            state, detail = "unknown", {}
+        show_btn = False
+        if state == "active":
+            subtitle = _("Active — icons stay above the video")
+        elif state == "disabled":
+            if is_snap() or is_flatpak():
+                subtitle = _("Installed but disabled — enable it manually: gnome-extensions enable")
+            else:
+                subtitle = _("Installed but disabled")
+                show_btn = True
+        elif state == "needs_logout":
+            subtitle = _("Enabled — log out and back in to activate it")
+        elif state == "not_discovered":
+            subtitle = _("Installed — log out and back in so GNOME finds it")
+        elif state == "not_installed":
+            subtitle = _("Not installed — native packages include it; see README")
+        elif state == "incompatible":
+            supported = ", ".join(detail.get("supported") or [])
+            subtitle = _("Unsupported GNOME {shell} (supports {supported})").format(
+                shell=detail.get("shell"), supported=supported
+            )
+        elif state == "error":
+            subtitle = _("Failed to load — check the journal for errors")
+        else:
+            subtitle = _("Status unavailable")
+        row.set_subtitle(subtitle)
+        if btn is not None:
+            btn.set_visible(show_btn)
+
+    def _on_integration_enable(self, _button):
+        """Enable the Shell extension on user request, then refresh."""
+        try:
+            from apricus.gnome_shell import EXTENSION_UUID
+            from apricus.utils import gnome_extension_set_enable
+
+            gnome_extension_set_enable(EXTENSION_UUID)
+        except Exception as e:  # noqa: BLE001 - show the manual fallback
+            row = getattr(self, "integ_row", None)
+            if row is not None:
+                row.set_subtitle(
+                    _("Could not enable automatically ({err}); run: gnome-extensions enable").format(
+                        err=e
+                    )
+                )
+            return
+        self._refresh_integration_row()
 
     @staticmethod
     def _short_config_path():
