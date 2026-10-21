@@ -227,11 +227,21 @@ export default class ApricusIntegrationExtension extends Extension {
         // Instead fight the symptom directly: whenever something hides the
         // actor, show it again immediately.
         record.visibleId = actor.connect('notify::visible', () => {
-            if (!actor.visible)
-                actor.show();
+            if (!actor.visible) {
+                try {
+                    actor.show();
+                } catch (_e) {
+                    // Actor dying; the destroy handler drops the record.
+                }
+            }
         });
-        if (!actor.visible)
-            actor.show();
+        if (!actor.visible) {
+            try {
+                actor.show();
+            } catch (_e) {
+                // Actor dying; the destroy handler drops the record.
+            }
+        }
 
         record.unmanagedId = window.connect('unmanaged', () => {
             this._forget(window);
