@@ -81,6 +81,10 @@ export default class ApricusIntegrationExtension extends Extension {
             const window = actor ? actor.get_meta_window() : null;
             if (window) {
                 seen++;
+                let role = null, title = null;
+                try { role = window.get_role(); title = window.get_title(); } catch (_e) { /* ignore */ }
+                // TEMPORARY DIAGNOSTIC for the enumeration mismatch.
+                console.warn(`[${this.uuid}] scan sees "${title}" role=${role}`);
                 if (this._isWallpaperWindow(window))
                     matched++;
                 this._watchWindow(window);
