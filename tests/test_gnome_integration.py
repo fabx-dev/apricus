@@ -52,22 +52,22 @@ def test_metadata_is_valid_and_version_pinned():
 
 
 def test_extension_manages_stacking_in_place():
-    """Structural contract: lower in place, never reparent.
+    """Structural contract: background-layer adoption with pixmap rendering.
 
-    XWayland actors stop presenting damage once moved out of the normal
-    window stack (verified live on Mutter 50), so the extension only
-    pushes our role-identified actors just above the background group and
-    never reparents them into it.
+    The extension reparents role-identified actors into the Shell's
+    background group and re-pins them above recreated static backgrounds.
+    This requires pixmap rendering (VLC `--vout=xcb`): GPU-direct outputs
+    bypass the pixmap via overlay planes that no stacking order can place
+    below DING (verified live on Mutter 50).
     """
     with open(EXT_JS, encoding="utf-8") as f:
         js = f.read()
-    assert "remove_child(actor)" not in js and "add_child(actor)" not in js
-    assert "'restacked'" in js
-    assert "'active-workspace-changed'" in js
-    assert "overview" in js
-    assert "window.lower()" in js
-    assert "lower_bottom()" in js  # actor-level paint order, no window restack
+    assert "_backgroundGroup" in js
+    assert "remove_child(actor)" in js and "add_child(actor)" in js
+    assert "set_child_above_sibling(actor, null)" in js
+    assert "child-added" in js
     assert "'unmanaged'" in js or '"unmanaged"' in js
+    assert "'destroy'" in js or '"destroy"' in js  # drop record, never touch dead actors
     assert "get_tab_list" in js  # focus is returned, never kept
     assert "Gio.Subprocess" not in js  # the player owns playback, not the Shell
     assert "owns_window" not in js  # XWayland renderer: role match, not WaylandClient

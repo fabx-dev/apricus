@@ -120,6 +120,12 @@ class VLCWidget(Gtk.DrawingArea):
         # --aout=pulse: Force PulseAudio output. VLC's PipeWire audio-output
         #   plugin segfaults (pw_thread_loop_lock) when multiple instances are
         #   active, e.g. one per monitor. See the Flatpak, which uses Pulse too.
+        # --vout=xcb: Force plain X11 (XImage/SHM) presentation into our X
+        #   window pixmap. GPU-direct outputs (VAAPI/DRM, GL) bypass the X
+        #   pixmap via overlay planes that always composite above everything
+        #   — including DING — so no stacking trick can order them, and
+        #   screenshots/XDamage see only black. xcb keeps every frame in
+        #   the pixmap where Mutter (and our Shell integration) can stack it.
         # Playlist mode never needs audio: opening/closing the audio output
         # on every transition locks up PipeWire, so it is disabled entirely.
         if disable_audio:
@@ -128,9 +134,15 @@ class VLCWidget(Gtk.DrawingArea):
                 "--no-interact",
                 "--no-audio",
                 "--aout=none",
+                "--vout=xcb",
             ]
         else:
-            vlc_options = ["--no-disable-screensaver", "--no-interact", "--aout=pulse"]
+            vlc_options = [
+                "--no-disable-screensaver",
+                "--no-interact",
+                "--aout=pulse",
+                "--vout=xcb",
+            ]
         self.instance = vlc.Instance(vlc_options)
         self.player = self.instance.media_player_new()
 
