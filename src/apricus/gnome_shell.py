@@ -6,8 +6,8 @@
 On GNOME Wayland, ordinary X11/XWayland restacking cannot place our video
 windows below DING's native Wayland desktop window. The companion extension
 ``apricus-integration@fabx-dev`` (shipped under ``gnome-extension/``)
-lowers our role-identified wallpaper windows from inside the compositor
-whenever stacking changes.
+hosts our role-identified wallpaper windows in the Shell's background
+layer, which requires pixmap rendering (VLC ``--vout=xcb``).
 
 This module only *detects* the integration; it never talks to the
 compositor. The extension works autonomously by matching the window role
@@ -115,6 +115,39 @@ def extension_is_compatible(shell_version=None, search_dirs=None):
 _EXTENSION_STATE_ENABLED = 1
 
 
+# Raw Shell states we distinguish explicitly (extensionSystem.js).
+_EXTENSION_STATE_ERROR = 3
+_EXTENSION_STATE_OUT_OF_DATE = 4
+
+
+_UNREACHABLE = object()  # Shell D-Bus failure marker (e.g. sandbox denial)
+
+
+def extension_raw_state():
+    """Raw Shell state int for our extension, None, or _UNREACHABLE.
+
+    None when the Shell answers but does not know the extension (not yet
+    discovered: installed after the Shell started, which on Wayland needs
+    a logout/login to pick up; or unparseable reply).
+    _UNREACHABLE when the Shell cannot be reached at all (sandbox).
+    """
+    try:
+        import pydbus
+
+        proxy = pydbus.SessionBus().get(
+            "org.gnome.Shell.Extensions", "/org/gnome/Shell/Extensions"
+        )
+        info = proxy.GetExtensionInfo(EXTENSION_UUID)
+    except Exception as e:  # noqa: BLE001 - sandbox denial: unknown, not off
+        logger.debug(f"[ShellIntegration] Shell state unreachable: {e}")
+        return _UNREACHABLE
+    try:
+        state = dict(info).get("state")
+    except (TypeError, ValueError):
+        return None
+    return int(state) if state is not None else None
+
+
 def extension_load_state():
     """Runtime state of our extension: True / False / None.
 
@@ -126,21 +159,10 @@ def extension_load_state():
     None when the Shell cannot be reached at all (sandboxed D-Bus denial):
     callers must fall back to the GSettings enabled list instead.
     """
-    try:
-        import pydbus
-
-        proxy = pydbus.SessionBus().get(
-            "org.gnome.Shell.Extensions", "/org/gnome/Shell/Extensions"
-        )
-        info = proxy.GetExtensionInfo(EXTENSION_UUID)
-    except Exception as e:  # noqa: BLE001 - sandbox denial: unknown, not off
-        logger.debug(f"[ShellIntegration] Shell state unreachable: {e}")
+    state = extension_raw_state()
+    if state is _UNREACHABLE:
         return None
-    try:
-        state = dict(info).get("state")
-    except (TypeError, ValueError):
-        return False
-    return state is not None and int(state) == _EXTENSION_STATE_ENABLED
+    return state == _EXTENSION_STATE_ENABLED
 
 
 def extension_is_enabled():
@@ -180,6 +202,52 @@ def integration_active(shell_version=None, search_dirs=None, enabled=None, loade
         return False
     is_on = extension_is_enabled() if enabled is None else enabled
     return bool(is_on)
+
+
+def integration_status(search_dirs=None):
+    """Machine-readable integration state for setup UI (never raises).
+
+    Returns ``(state, detail)`` where state is one of: ``active``,
+    ``disabled``, ``needs_logout``, ``not_discovered``, ``not_installed``,
+    ``incompatible``, ``error``, ``unknown`` (Shell unreachable: sandbox).
+    ``detail`` carries paths/versions for user-facing messages.
+    """
+    detail = {}
+    try:
+        if not (is_gnome() and is_wayland()):
+            return "unknown", detail
+        path = extension_dir(search_dirs)
+        if path is None:
+            return "not_installed", detail
+        detail["path"] = path
+        ver = shell_version()
+        detail["shell"] = ver
+        meta = read_metadata(search_dirs)
+        supported = (meta or {}).get("shell-version") or []
+        detail["supported"] = list(supported)
+        if not extension_is_compatible(ver, search_dirs):
+            return "incompatible", detail
+        raw = extension_raw_state()
+        if raw is _UNREACHABLE:
+            return "unknown", detail
+        if raw == _EXTENSION_STATE_ENABLED:
+            return "active", detail
+        if raw == _EXTENSION_STATE_ERROR:
+            return "error", detail
+        if raw == _EXTENSION_STATE_OUT_OF_DATE:
+            return "incompatible", detail
+        if extension_is_enabled():
+            # Enabled but the Shell does not report it loaded: logout/login
+            # pending (or a load error without a state yet).
+            return "needs_logout", detail
+        if raw is None:
+            # Installed, compatible, known-disabled... or known at all?
+            # Unknown-to-Shell + not enabled = installed after Shell start.
+            return "not_discovered", detail
+        return "disabled", detail
+    except Exception as e:  # noqa: BLE001 - status must never break the GUI
+        logger.debug(f"[ShellIntegration] status check failed: {e}")
+        return "unknown", {}
 
 
 def log_status():

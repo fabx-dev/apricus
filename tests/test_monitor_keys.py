@@ -40,6 +40,49 @@ def test_source_for_priority():
     assert VideoPlayer._source_for({}, "X", "Y") == ("", "Default")
 
 
+def test_resolution_change_keeps_stable_keys():
+    """Same model at the same position keeps its key when only the size
+    changes (resolution switch must not reshuffle per-monitor sources)."""
+    before = assign_keys(
+        [
+            {"name": "Dell", "x": 0, "y": 0},
+            {"name": "Dell", "x": 1920, "y": 0},
+        ]
+    )
+    after = assign_keys(
+        [
+            {"name": "Dell", "x": 0, "y": 0},
+            {"name": "Dell", "x": 2560, "y": 0},
+        ]
+    )
+    assert [i["key"] for i in before] == ["Dell#0", "Dell#1"]
+    assert [i["key"] for i in after] == ["Dell#0", "Dell#1"]
+
+
+def test_unplug_replug_keeps_primary_key_stable():
+    """Disconnecting the second monitor must not rename the survivor;
+    reconnecting restores the same pair of keys."""
+    solo = assign_keys([{"name": "eDP", "x": 0, "y": 0}])
+    assert [i["key"] for i in solo] == ["eDP"]
+    duo = assign_keys(
+        [
+            {"name": "eDP", "x": 0, "y": 0},
+            {"name": "HDMI", "x": 1920, "y": 0},
+        ]
+    )
+    assert [i["key"] for i in duo] == ["eDP", "HDMI"]
+
+
+def test_source_for_prefers_stable_key_over_legacy_model():
+    """A monitor whose key changed (Model#i) resolves its own source first,
+    then the legacy bare model, then Default — never another monitor's."""
+    data = {"Default": "d.mp4", "Dell": "legacy.mp4", "Dell#1": "right.mp4"}
+    assert VideoPlayer._source_for(data, "Dell#1", "Dell") == ("right.mp4", "Dell#1")
+    assert VideoPlayer._source_for(data, "Dell#0", "Dell") == ("legacy.mp4", "Dell")
+    assert VideoPlayer._source_for(data, "HDMI", "HDMI") == ("d.mp4", "Default")
+    assert VideoPlayer._source_for({"Default": ""}, "HDMI", "HDMI") == ("", "Default")
+
+
 def test_migrate_legacy_duplicate_keys():
     cu = ConfigUtil()
     cu.save = lambda cfg: None

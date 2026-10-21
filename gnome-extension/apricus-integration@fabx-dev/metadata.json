@@ -2,7 +2,7 @@
   "uuid": "apricus-integration@fabx-dev",
   "name": "Apricus Wallpaper Integration",
   "description": "Keeps Apricus live-wallpaper windows below desktop icons (DING) and application windows. No configuration; disabling restores normal window behavior.",
-  "shell-version": ["50", "51"],
+  "shell-version": ["50"],
   "version": 1,
   "session-modes": ["user"]
 }
