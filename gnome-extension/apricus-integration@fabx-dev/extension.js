@@ -176,7 +176,7 @@ export default class ApricusIntegrationExtension extends Extension {
         if (!actor)
             return false;
 
-        const record = {window, unmanagedId: 0, raisedId: 0, focusId: 0};
+        const record = {window, actor, unmanagedId: 0, raisedId: 0, focusId: 0};
         this._adopted.set(window, record);
         this._lowerOne(window);
 
@@ -205,7 +205,21 @@ export default class ApricusIntegrationExtension extends Extension {
             return;
         try {
             this._inLower = true;
+            // Meta-level order first (keeps X stacking sane) ...
             window.lower();
+            // ... then enforce the paint order at the actor level. The
+            // compositor does not reliably order an XWayland desktop window
+            // below DING's native Wayland one (verified live on Mutter 50),
+            // so push our actor just above the background group, below
+            // everything else. Actor moves never emit window restacks, so
+            // this converges instead of competing.
+            const record = this._adopted.get(window);
+            const actor = record ? record.actor : window.get_compositor_private();
+            const bgGroup = Main.layoutManager._backgroundGroup ?? null;
+            if (actor && bgGroup && actor.get_parent() === bgGroup.get_parent()) {
+                actor.lower_bottom();
+                bgGroup.lower_bottom();
+            }
         } catch (_e) {
             // Best effort: a dying window cannot be restacked.
         } finally {

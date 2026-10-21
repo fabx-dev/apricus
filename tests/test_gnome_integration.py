@@ -67,6 +67,7 @@ def test_extension_manages_stacking_in_place():
     assert "'active-workspace-changed'" in js
     assert "overview" in js
     assert "window.lower()" in js
+    assert "lower_bottom()" in js  # actor-level paint order, no window restack
     assert "'unmanaged'" in js or '"unmanaged"' in js
     assert "get_tab_list" in js  # focus is returned, never kept
     assert "Gio.Subprocess" not in js  # the player owns playback, not the Shell
