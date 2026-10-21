@@ -13,6 +13,7 @@ from apricus.gnome_shell import (
     extension_dir,
     extension_is_compatible,
     extension_is_enabled,
+    extension_load_state,
     integration_active,
     log_status,
     read_metadata,
@@ -93,12 +94,52 @@ def test_integration_active_requires_all_conditions(tmp_path, monkeypatch):
     dirs = _write_fake_extension(str(tmp_path))
     monkeypatch.setattr(gnome_shell, "is_gnome", lambda: True)
     monkeypatch.setattr(gnome_shell, "is_wayland", lambda: True)
-    assert integration_active("50.1", dirs, enabled=True) is True
-    assert integration_active("50.1", dirs, enabled=False) is False
-    assert integration_active("49", dirs, enabled=True) is False
+    # Shell confirms loaded.
+    assert integration_active("50.1", dirs, enabled=True, loaded=True) is True
+    # Listed as enabled but Shell has NOT loaded it (e.g. Wayland session
+    # started before enable): must NOT stand the legacy guard down.
+    assert integration_active("50.1", dirs, enabled=True, loaded=False) is False
+    # Shell unreachable (sandbox): fall back to the enabled list.
+    monkeypatch.setattr(gnome_shell, "extension_is_enabled", lambda: True)
+    assert integration_active("50.1", dirs, loaded=None) is True
+    monkeypatch.setattr(gnome_shell, "extension_is_enabled", lambda: False)
+    assert integration_active("50.1", dirs, loaded=None) is False
+    assert integration_active("49", dirs, enabled=True, loaded=True) is False
     assert integration_active("50.1", [str(tmp_path / "empty")], enabled=True) is False
     monkeypatch.setattr(gnome_shell, "is_wayland", lambda: False)
-    assert integration_active("50.1", dirs, enabled=True) is False
+    assert integration_active("50.1", dirs, enabled=True, loaded=True) is False
+
+
+def test_load_state_true_only_when_shell_reports_enabled(monkeypatch):
+    class FakeProxy:
+        def __init__(self, payload=None, fail=False):
+            self.payload = payload
+            self.fail = fail
+
+        def GetExtensionInfo(self, _uuid):
+            if self.fail:
+                raise Exception("sandbox denial")
+            return self.payload
+
+    import apricus.gnome_shell as mod
+
+    class FakeBus:
+        def __init__(self, proxy):
+            self.proxy = proxy
+
+        def get(self, *_args):
+            return self.proxy
+
+    import pydbus
+
+    monkeypatch.setattr(pydbus, "SessionBus", lambda: FakeBus(FakeProxy({"state": 1})))
+    assert mod.extension_load_state() is True
+    monkeypatch.setattr(pydbus, "SessionBus", lambda: FakeBus(FakeProxy({"state": 3})))
+    assert mod.extension_load_state() is False
+    monkeypatch.setattr(pydbus, "SessionBus", lambda: FakeBus(FakeProxy({})))
+    assert mod.extension_load_state() is False
+    monkeypatch.setattr(pydbus, "SessionBus", lambda: FakeBus(FakeProxy(fail=True)))
+    assert mod.extension_load_state() is None
 
 
 def test_enabled_check_never_raises_without_schema(monkeypatch):

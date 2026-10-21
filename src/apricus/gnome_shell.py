@@ -109,6 +109,39 @@ def extension_is_compatible(shell_version=None, search_dirs=None):
     return _major(shell_version) in {_major(v) for v in supported}
 
 
+# GNOME Shell ExtensionState (extensionSystem.js): only ENABLED means the
+# extension code is actually loaded and running in the compositor.
+_EXTENSION_STATE_ENABLED = 1
+
+
+def extension_load_state():
+    """Runtime state of our extension: True / False / None.
+
+    True only when the Shell reports state ENABLED (loaded and running).
+    False when the Shell answers but the extension is not enabled-state
+    (disabled, error, or unknown to this Shell session — e.g. installed
+    and listed as enabled, but the Shell has not loaded it yet, which on
+    Wayland requires a logout/login).
+    None when the Shell cannot be reached at all (sandboxed D-Bus denial):
+    callers must fall back to the GSettings enabled list instead.
+    """
+    try:
+        import pydbus
+
+        proxy = pydbus.SessionBus().get(
+            "org.gnome.Shell.Extensions", "/org/gnome/Shell/Extensions"
+        )
+        info = proxy.GetExtensionInfo(EXTENSION_UUID)
+    except Exception as e:  # noqa: BLE001 - sandbox denial: unknown, not off
+        logger.debug(f"[ShellIntegration] Shell state unreachable: {e}")
+        return None
+    try:
+        state = dict(info).get("state")
+    except (TypeError, ValueError):
+        return False
+    return state is not None and int(state) == _EXTENSION_STATE_ENABLED
+
+
 def extension_is_enabled():
     """True when the user enabled our extension in GNOME Shell."""
     try:
@@ -122,16 +155,27 @@ def extension_is_enabled():
     return EXTENSION_UUID in (enabled or [])
 
 
-def integration_active(shell_version=None, search_dirs=None, enabled=None):
+_UNSET = object()
+
+
+def integration_active(shell_version=None, search_dirs=None, enabled=None, loaded=_UNSET):
     """True when the Shell-side wallpaper layer is managing our windows.
 
-    Requires GNOME + Wayland + a compatible, enabled extension. Everything
-    else (Xorg, other desktops, sandboxed dconf that hides the setting)
-    falls back to the legacy in-app stacking behavior.
+    Requires GNOME + Wayland + a compatible extension that the Shell
+    confirms as loaded. An extension merely listed as enabled (e.g. before
+    the Wayland logout/login that loads it) does NOT count: standing the
+    legacy guard down with nothing managing stacking would be worse.
+    When the Shell cannot be reached (sandbox), fall back to the enabled
+    list as a best effort; everything else falls back to legacy behavior.
     """
     if not (is_gnome() and is_wayland()):
         return False
     if not extension_is_compatible(shell_version, search_dirs):
+        return False
+    state = extension_load_state() if loaded is _UNSET else loaded
+    if state is True:
+        return True
+    if state is False:
         return False
     is_on = extension_is_enabled() if enabled is None else enabled
     return bool(is_on)
@@ -159,6 +203,13 @@ def log_status():
         logger.info(
             f"[ShellIntegration] installed at {path} but disabled: run "
             f"'gnome-extensions enable {EXTENSION_UUID}' then log out/in"
+        )
+        return
+    if extension_load_state() is False:
+        logger.info(
+            "[ShellIntegration] enabled but not loaded by the Shell: "
+            "log out and back in, then check "
+            f"'journalctl --user -g {EXTENSION_UUID}' for errors"
         )
         return
     logger.info("[ShellIntegration] active: wallpaper hosted in Shell background layer")
