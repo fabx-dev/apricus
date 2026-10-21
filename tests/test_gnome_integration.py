@@ -56,12 +56,11 @@ def test_extension_manages_stacking_in_place():
 
     XWayland actors stop presenting damage once moved out of the normal
     window stack (verified live on Mutter 50), so the extension only
-    lowers our role-identified windows on stacking events and never
-    reparents actors into the background group.
+    pushes our role-identified actors just above the background group and
+    never reparents them into it.
     """
     with open(EXT_JS, encoding="utf-8") as f:
         js = f.read()
-    assert "_backgroundGroup" not in js
     assert "remove_child(actor)" not in js and "add_child(actor)" not in js
     assert "'restacked'" in js
     assert "'active-workspace-changed'" in js
