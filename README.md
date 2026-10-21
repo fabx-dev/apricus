@@ -173,14 +173,15 @@ apricus --systemd-enable    # disable anytime with: apricus --systemd-disable
 
 | Desktop Environment | Session | Playback | Desktop Icons | Static Wallpaper | Auto-Pause on Maximize |
 |---|---|---|---|---|---|
-| **GNOME** (Ubuntu, Fedora, Debian, Zorin OS) | Wayland & X11 | ✅ Full | ⚠️ X11 sessions only (3) | ✅ Supported | ✅ X11 (Wayland planned) |
+| **GNOME** (Ubuntu, Fedora, Debian, Zorin OS) | Wayland & X11 | ✅ Full | ✅ With Shell integration (4) / X11 native | ✅ Supported | ✅ X11 (Wayland planned) |
 | **Budgie / Pantheon** | X11 | ✅ Works | — | ❌ GNOME only | ✅ Supported |
 | **Cinnamon / XFCE / MATE** | X11 | ⚠️ Partial (1) | ⚠️ Conflicts with desktop manager | ❌ GNOME only | ✅ Supported |
 | **KDE Plasma** | Wayland / X11 | ❌ Not supported (2) | — | — | — |
 
 1. On Cinnamon, XFCE and MATE, the file manager (`nemo-desktop`, `xfdesktop`, `caja`) draws its own opaque desktop window; desktop icons must be disabled for the video layer to remain visible.
 2. KDE Plasma's `plasmashell` manages its own background surface and blocks external `_NET_WM_WINDOW_TYPE_DESKTOP` windows (use a native Plasma wallpaper plugin on KDE).
-3. On GNOME **Wayland** sessions the live wallpaper may cover desktop icons (DING / GTK4-DING): the compositor ignores X11 restacking of desktop-layer windows and DING always lowers itself below other desktop windows, so no application-side workaround exists (verified against Mutter 18 and the DING sources). Workaround: log in with an **X11 session** ("Ubuntu on Xorg" at login), where icon stacking works normally. A proper fix requires either compositor support (not available on GNOME, which has no layer-shell protocol) or a DING-side change; tracked for a future release.
+3. On GNOME **Wayland** without the Shell integration below, a live wallpaper may cover desktop icons (DING / GTK4-DING): the compositor ignores X11 restacking of desktop-layer windows and DING always lowers itself below other desktop windows, so no application-side workaround exists (verified against Mutter 18 and the DING sources). Either enable the integration (4) or log in with an **X11 session** ("Ubuntu on Xorg" at login), where icon stacking works natively.
+4. **GNOME Wayland desktop-icons integration** (GNOME Shell 50/51): Apricus ships a tiny companion extension, `apricus-integration@fabx-dev` (source in `gnome-extension/`), that hosts the wallpaper windows in the Shell's background layer — below DING icons and application windows. Native `.deb`/`.rpm` packages install it to `/usr/share/gnome-shell/extensions/` automatically; local `make install` puts it under `~/.local/share/gnome-shell/extensions/`. Enable once with `gnome-extensions enable apricus-integration@fabx-dev`, then log out and back in. Snap/Flatpak cannot install host extensions from their sandbox: copy `gnome-extension/apricus-integration@fabx-dev/` to `~/.local/share/gnome-shell/extensions/` manually and enable it the same way. Without the extension, GNOME Wayland falls back to legacy stacking (icons may be covered); Xorg and other desktops are unaffected. Note: with the integration active, right-clicking the wallpaper reaches DING instead of Apricus — use the control center for wallpaper actions.
 
 ### Additional Notes
 
