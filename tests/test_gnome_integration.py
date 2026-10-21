@@ -95,6 +95,18 @@ def test_vlc_options_pin_exact_flags_per_session(monkeypatch):
     assert "--no-interact" in _vlc_options(True, False)
 
 
+def test_vlc_options_override_via_env(monkeypatch):
+    """APRICUS_VOUT overrides the session default (renderer experiments)."""
+    from apricus.player.video_player import _vlc_options
+
+    monkeypatch.setenv("APRICUS_VOUT", "glx")
+    assert _vlc_options(False, True)[-1] == "--vout=glx"
+    assert _vlc_options(False, False)[-1] == "--vout=glx"
+    monkeypatch.setenv("APRICUS_VOUT", "  ")
+    assert "--vout=xcb" in _vlc_options(False, True)
+    assert all(not o.startswith("--vout") for o in _vlc_options(False, False))
+
+
 def test_shipped_metadata_declares_only_verified_shell_versions():
     """The bundled extension must not claim GNOME versions that were never
     tested live (51+): an over-broad shell-version silently breaks sorting

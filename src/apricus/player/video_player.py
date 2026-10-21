@@ -61,6 +61,10 @@ def _vlc_options(disable_audio: bool, use_xcb: bool):
     Mirrors the option building in :class:`VLCWidget.__init__`: callers
     pass ``use_xcb=is_gnome() and is_wayland()``. Keeping the logic here
     lets tests pin the exact flags per session type without a display.
+
+    ``APRICUS_VOUT`` overrides the video output (empty = session default).
+    Supported for renderer experiments and debugging; the default stays
+    authoritative for correct desktop integration.
     """
     if disable_audio:
         options = [
@@ -71,7 +75,10 @@ def _vlc_options(disable_audio: bool, use_xcb: bool):
         ]
     else:
         options = ["--no-disable-screensaver", "--no-interact", "--aout=pulse"]
-    if use_xcb:
+    forced = os.environ.get("APRICUS_VOUT", "").strip()
+    if forced:
+        options.append(f"--vout={forced}")
+    elif use_xcb:
         options.append("--vout=xcb")
     return options
 
