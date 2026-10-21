@@ -1,0 +1,8 @@
+{
+  "uuid": "apricus-integration@fabx-dev",
+  "name": "Apricus Wallpaper Integration",
+  "description": "Hosts Apricus live-wallpaper windows in GNOME Shell's background layer, below desktop icons (DING) and application windows. No configuration; disabling restores normal window behavior.",
+  "shell-version": ["50", "51"],
+  "version": 1,
+  "session-modes": ["user"]
+}
