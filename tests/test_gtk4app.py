@@ -2392,6 +2392,64 @@ def shell_refresh_reveals_banner_and_badges():
     assert obj._app_logo_image(28).get_pixel_size() == 28
 
 
+@check
+def integration_row_reflects_status():
+    import sys
+    import types
+    from unittest.mock import patch
+
+    import apricus.gui.gtk4app as appmod
+
+    states = {}
+
+    class _Row:
+        def set_subtitle(self, text):
+            states["subtitle"] = text
+
+    class _Btn:
+        def set_visible(self, visible):
+            states["visible"] = visible
+
+    fake_shell = types.ModuleType("apricus.gnome_shell")
+    fake_shell.EXTENSION_UUID = "apricus-integration@fabx-dev"
+    fake_shell.integration_status = lambda: states["status"]
+    old_mod = sys.modules.get("apricus.gnome_shell")
+    sys.modules["apricus.gnome_shell"] = fake_shell
+    try:
+        obj = appmod.ControlPanel.__new__(appmod.ControlPanel)
+        obj.integ_row, obj.integ_btn = _Row(), _Btn()
+        for state, detail, expect_btn, needle in [
+            ("active", {}, False, "Active"),
+            ("disabled", {}, True, "disabled"),
+            ("needs_logout", {}, False, "log out"),
+            ("not_discovered", {}, False, "log out"),
+            ("not_installed", {}, False, "Not installed"),
+            ("incompatible", {"shell": "99", "supported": ["50"]}, False, "99"),
+            ("error", {}, False, "journal"),
+            ("unknown", {}, False, "unavailable"),
+        ]:
+            states["status"] = (state, detail)
+            obj._refresh_integration_row()
+            assert needle in states["subtitle"], (state, states["subtitle"])
+            assert states["visible"] is expect_btn, (state, states["visible"])
+        # Enable path: success refreshes, failure shows the manual command.
+        states["status"] = ("disabled", {})
+        with patch("apricus.utils.gnome_extension_set_enable", return_value=True):
+            states["status"] = ("needs_logout", {})
+            obj._on_integration_enable(None)
+            assert "log out" in states["subtitle"]
+        with patch(
+            "apricus.utils.gnome_extension_set_enable", side_effect=RuntimeError("denied")
+        ):
+            obj._on_integration_enable(None)
+            assert "gnome-extensions enable" in states["subtitle"]
+    finally:
+        if old_mod is not None:
+            sys.modules["apricus.gnome_shell"] = old_mod
+        else:
+            sys.modules.pop("apricus.gnome_shell", None)
+
+
 def main():
     name = sys.argv[1]
     try:
@@ -2763,3 +2821,7 @@ def test_toast_records_message():
 
 def test_shell_refresh_reveals_banner_and_badges():
     _run_display("shell_refresh_reveals_banner_and_badges")
+
+
+def test_integration_row_reflects_status():
+    _run("integration_row_reflects_status")
