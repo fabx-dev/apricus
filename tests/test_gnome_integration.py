@@ -310,3 +310,84 @@ def test_log_status_never_raises(tmp_path, monkeypatch):
     monkeypatch.setattr(gnome_shell, "extension_dir", lambda *a: dirs[0] + "/" + EXTENSION_UUID)
     monkeypatch.setattr(gnome_shell, "shell_version", lambda: "50.1")
     log_status()  # incompatible
+
+
+def test_shell_toggle_recreates_windows_on_activate(monkeypatch):
+    """Enabling mid-session recreates windows (proven window-created path)."""
+    import apricus.player.base_player as mod
+
+    calls = []
+
+    class Stub:
+        _shell_managed = False
+        windows = {}
+
+        def _recreate_wallpaper_windows(self):
+            calls.append("recreate")
+
+        def _start_legacy_stacking(self):
+            calls.append("legacy")
+
+    monkeypatch.setattr(mod, "integration_active", lambda: True)
+    monkeypatch.setattr(mod, "log_status", lambda: None)
+    mod.BasePlayer._on_shell_integration_changed(Stub(), None)
+    assert calls == ["recreate"]
+    monkeypatch.setattr(mod, "integration_active", lambda: False)
+    stub = Stub()
+    stub._shell_managed = True
+    mod.BasePlayer._on_shell_integration_changed(stub, None)
+    assert calls == ["recreate", "legacy"]
+    assert stub._shell_managed is False
+    # No change -> no action.
+    calls.clear()
+    mod.BasePlayer._on_shell_integration_changed(stub, None)
+    assert calls == []
+
+
+def test_shell_toggle_handler_never_raises(monkeypatch):
+    """Detection failures on the settings signal must not break playback."""
+    import apricus.player.base_player as mod
+
+    class Stub:
+        _shell_managed = False
+        windows = {}
+
+        def _recreate_wallpaper_windows(self):
+            raise AssertionError("must not run when state is unknown")
+
+        def _start_legacy_stacking(self):
+            raise AssertionError("must not run when state is unknown")
+
+    def boom():
+        raise RuntimeError("no bus")
+
+    monkeypatch.setattr(mod, "integration_active", boom)
+    mod.BasePlayer._on_shell_integration_changed(Stub(), None)
+
+
+def test_recreate_resets_windows_and_reactivates():
+    """Windows are cleaned up, dropped and rebuilt via do_activate."""
+    from apricus.player.base_player import BasePlayer
+
+    order = []
+
+    class Win:
+        def cleanup(self):
+            order.append("cleanup")
+
+        def destroy(self):
+            order.append("destroy")
+
+    class Stub:
+        def __init__(self):
+            self.windows = {"m0": Win(), "m1": None}
+            self.reactivated = False
+
+        def do_activate(self):
+            self.reactivated = True
+
+    stub = Stub()
+    BasePlayer._recreate_wallpaper_windows(stub)
+    assert order == ["cleanup", "destroy"]
+    assert stub.windows == {"m0": None, "m1": None}
+    assert stub.reactivated is True

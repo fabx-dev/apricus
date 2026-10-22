@@ -3879,7 +3879,7 @@ class ControlPanel(Adw.Application):
                 gnome_extension_set_enable(EXTENSION_UUID)
             else:
                 gnome_extension_set_disable(EXTENSION_UUID)
-                self._toast(_("Integration disabled — restart Apricus to restore normal stacking"))
+                self._toast(_("Integration disabled — using basic stacking"))
         except Exception as e:  # noqa: BLE001 - show the manual fallback
             row = getattr(self, "integ_row", None)
             if row is not None:

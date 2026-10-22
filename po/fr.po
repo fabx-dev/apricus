@@ -824,7 +824,7 @@ msgstr "Statut indisponible"
 
 #: src/apricus/gui/gtk4app.py:3882
 msgid "Integration disabled — restart Apricus to restore normal stacking"
-msgstr "Intégration désactivée — redémarrez Apricus pour restaurer l’empilement normal"
+msgstr "Intégration désactivée — utilisation de l’empilement de base"
 
 #: src/apricus/gui/gtk4app.py:3888
 #, python-brace-format
