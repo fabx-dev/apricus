@@ -2548,17 +2548,21 @@ def host_install_rows_guide_sandbox_setup():
 
 
 @check
-def renderer_selection_persists_and_asks_restart():
+def renderer_selection_applies_live_with_rollback():
     import apricus.gui.gtk4app as appmod
+    from unittest.mock import patch
 
     saved = {}
 
     class _FakeConfigUtil:
+        store = {"video_renderer": "auto", "mode": "MODE_VIDEO"}
+
         def load(self):
-            return {"video_renderer": "auto"}
+            return dict(_FakeConfigUtil.store)
 
         def save(self, config):
             saved.update(config)
+            _FakeConfigUtil.store.update(config)
 
     class _FakeRow:
         def __init__(self, selected):
@@ -2567,21 +2571,118 @@ def renderer_selection_persists_and_asks_restart():
         def get_selected(self):
             return self._selected
 
+    class _InlineThread:
+        def __init__(self, target=None, args=(), kwargs=None, daemon=None):
+            self._target = target
+            self._args = args or ()
+
+        def start(self):
+            self._target(*self._args)
+
+    class _FakeGLib:
+        def __init__(self):
+            self.timers = []
+            self.idles = []
+
+        def idle_add(self, fn, *args):
+            self.idles.append((fn, args))
+            fn(*args)
+            return 1
+
+        def timeout_add_seconds(self, delay, fn, *args):
+            self.timers.append((delay, fn, args))
+            return len(self.timers)
+
+    class _FakeServer:
+        def __init__(self):
+            self.respawns = 0
+
+        def respawn_player(self):
+            self.respawns += 1
+
     toasts = []
     obj = appmod.ControlPanel.__new__(appmod.ControlPanel)
-    obj.config = {"video_renderer": "auto"}
+    obj.config = {"video_renderer": "auto", "mode": "MODE_VIDEO"}
     obj._renderer_ids = ["auto", "gl", "xcb", "xv"]
     obj._toast = lambda message: toasts.append(message)
+    obj._server = lambda: server[0]
+    server = [_FakeServer()]
     old = appmod.ConfigUtil
     appmod.ConfigUtil = _FakeConfigUtil
+    fake_glib = _FakeGLib()
     try:
-        # No change → no save, no toast.
-        obj._on_renderer_changed(_FakeRow(0), None)
-        assert saved == {} and toasts == []
-        # Change → persisted with restart notice.
-        obj._on_renderer_changed(_FakeRow(2), None)
-        assert saved.get("video_renderer") == "xcb", saved
-        assert any("restart" in t.lower() for t in toasts), toasts
+        with patch.object(appmod, "threading") as mock_threading, patch.object(
+            appmod, "GLib", fake_glib
+        ), patch.dict("os.environ", {}, clear=False):
+            mock_threading.Thread = _InlineThread
+            import os
+
+            os.environ.pop("APRICUS_VOUT", None)
+            # No change → no save, no toast, no respawn.
+            obj._on_renderer_changed(_FakeRow(0), None)
+            assert saved == {} and toasts == []
+            assert server[0].respawns == 0
+            # Change to gl → saved, respawning, applying toast.
+            obj._on_renderer_changed(_FakeRow(1), None)
+            assert saved.get("video_renderer") == "gl", saved
+            assert server[0].respawns == 1
+            assert any("Applying" in t for t in toasts), toasts
+            # Timers armed for 8s + final check.
+            assert [t[0] for t in fake_glib.timers] == [8, 25]
+            # Mid check with no error: silent, keeps waiting (patched probe).
+            with patch.object(appmod.ControlPanel, "_renderer_probe", return_value=""):
+                for delay, fn, args in list(fake_glib.timers):
+                    if delay == 8:
+                        assert fn(*args) is False
+            # Final check clean → success toast.
+            with patch.object(appmod.ControlPanel, "_renderer_probe", return_value=""):
+                for delay, fn, args in [t for t in fake_glib.timers if t[0] == 25]:
+                    assert fn(*args) is False
+            assert any("updated" in t for t in toasts), toasts
+            # Failure at final check → single rollback to previous renderer.
+            fake_glib.timers.clear()
+            toasts.clear()
+            # New change to xcb; fail its final check.
+            obj._on_renderer_changed(_FakeRow(2), None)
+            assert saved.get("video_renderer") == "xcb", saved
+            prev_respawns = server[0].respawns
+            assert len([t for t in fake_glib.timers if t[0] == 25]) == 1
+            with patch.object(appmod.ControlPanel, "_renderer_probe", return_value="No video frames received yet"):
+                for delay, fn, args in [t for t in fake_glib.timers if t[0] == 25]:
+                    assert fn(*args) is False
+            assert server[0].respawns == prev_respawns + 1
+            # The rollback's own re-check must succeed before claiming restore.
+            new_timers = [t for t in fake_glib.timers if t[0] == 25][-1:]
+            with patch.object(appmod.ControlPanel, "_renderer_probe", return_value=""):
+                for delay, fn, args in new_timers:
+                    assert fn(*args) is False
+            assert any("restored" in t for t in toasts), toasts
+            # A failure while a rollback is already in flight reports once.
+            obj._renderer_reverting = True
+            respawns_before = server[0].respawns
+            toasts.clear()
+            with patch.object(appmod.ControlPanel, "_renderer_probe", return_value="No video frames received yet"):
+                for delay, fn, args in new_timers:
+                    assert fn(*args) is False
+            assert server[0].respawns == respawns_before, "no rollback loop"
+            print("DBG guard-block passed")
+            assert obj._renderer_reverting is False
+            assert any("Unable" in t for t in toasts), toasts
+            # Env override: saved, announced, but no respawn attempted.
+            with patch.dict("os.environ", {"APRICUS_VOUT": "gl"}):
+                toasts.clear()
+                respawns_before = server[0].respawns
+                obj._on_renderer_changed(_FakeRow(3), None)
+                assert saved.get("video_renderer") == "xv", saved
+                assert server[0].respawns == respawns_before
+                assert any("APRICUS_VOUT" in t for t in toasts), toasts
+            # Non-video mode: saved, no respawn.
+            _FakeConfigUtil.store["mode"] = "MODE_WEBPAGE"
+            toasts.clear()
+            respawns_before = server[0].respawns
+            obj._on_renderer_changed(_FakeRow(1), None)
+            assert saved.get("video_renderer") == "gl", saved
+            assert server[0].respawns == respawns_before
     finally:
         appmod.ConfigUtil = old
 
@@ -2963,8 +3064,8 @@ def test_integration_row_reflects_status():
     _run("integration_row_reflects_status")
 
 
-def test_renderer_selection_persists_and_asks_restart():
-    _run("renderer_selection_persists_and_asks_restart")
+def test_renderer_selection_applies_live_with_rollback():
+    _run("renderer_selection_applies_live_with_rollback")
 
 
 def test_host_install_rows_guide_sandbox_setup():

@@ -3779,7 +3779,7 @@ class ControlPanel(Adw.Application):
         rendering.set_title(_("Video Rendering"))
         self.renderer_row = Adw.ComboRow()
         self.renderer_row.set_title(_("Renderer"))
-        self.renderer_row.set_subtitle(_("Restart Apricus to apply a new renderer"))
+        self.renderer_row.set_subtitle(_("Takes effect immediately"))
         self._renderer_ids = [
             RENDERER_AUTO,
             RENDERER_GL,
@@ -3800,6 +3800,13 @@ class ControlPanel(Adw.Application):
         if current_renderer not in self._renderer_ids:
             current_renderer = RENDERER_AUTO
         self.renderer_row.set_selected(self._renderer_ids.index(current_renderer))
+        forced_vout = (os.environ.get("APRICUS_VOUT") or "").strip()
+        if forced_vout:
+            self.renderer_row.set_subtitle(
+                _("Takes effect immediately. Note: APRICUS_VOUT={value} overrides the saved setting").format(
+                    value=forced_vout
+                )
+            )
         self.renderer_row.connect("notify::selected", self._on_renderer_changed)
         rendering.add(self.renderer_row)
         box.append(rendering)
@@ -3964,8 +3971,13 @@ class ControlPanel(Adw.Application):
         self._refresh_integration_row()
         return False
 
+    # Seconds after a renderer respawn before the result is judged. Must
+    # stay above the player's own first-frame deadline so a missing frame
+    # is a verdict, not a race.
+    _RENDERER_CHECK_FINAL_SEC = 25
+
     def _on_renderer_changed(self, row, _pspec):
-        """Persist the selected video renderer; applies on player restart."""
+        """Apply a new video renderer live, without restarting Apricus."""
         ids = getattr(self, "_renderer_ids", [RENDERER_AUTO])
         try:
             selected = ids[row.get_selected()]
@@ -3974,10 +3986,111 @@ class ControlPanel(Adw.Application):
         current = (self.config.get(CONFIG_KEY_RENDERER) or RENDERER_AUTO).strip().lower()
         if selected == current:
             return
+        if (os.environ.get("APRICUS_VOUT") or "").strip():
+            # The environment wins over any saved selection: persist the
+            # choice for later, but say plainly it cannot take effect now.
+            self.config = ConfigUtil().load()
+            self.config[CONFIG_KEY_RENDERER] = selected
+            ConfigUtil().save(self.config)
+            self._toast(_("Note: APRICUS_VOUT overrides the saved renderer"))
+            return
         self.config = ConfigUtil().load()
         self.config[CONFIG_KEY_RENDERER] = selected
         ConfigUtil().save(self.config)
-        self._toast(_("Renderer saved — restart Apricus to apply it"))
+        mode = (self.config.get(CONFIG_KEY_MODE) or "").strip()
+        if mode not in (MODE_VIDEO, MODE_STREAM, MODE_PLAYLIST):
+            self._toast(_("Renderer saved — applies to video wallpapers"))
+            return
+        token = getattr(self, "_renderer_token", 0) + 1
+        self._renderer_token = token
+        self._renderer_reverting = False
+        self._renderer_previous = current
+        server = self._server()
+        if server is None:
+            self._toast(_("Unable to apply the selected renderer."))
+            return
+        self._toast(_("Applying video renderer…"))
+        threading.Thread(
+            target=self._respawn_for_renderer, args=(server, token), daemon=True
+        ).start()
+
+    def _respawn_for_renderer(self, server, token):
+        """Blocking respawn off the UI thread; verification stays on it."""
+        try:
+            server.respawn_player()
+        except Exception as e:  # noqa: BLE001 - report, do not hang
+            logger.warning(f"[GUI4] Renderer respawn failed: {e}")
+            GLib.idle_add(self._toast, _("Unable to apply the selected renderer."))
+            return
+        GLib.idle_add(self._arm_renderer_checks, token)
+
+    def _arm_renderer_checks(self, token):
+        if token != getattr(self, "_renderer_token", None):
+            return False
+        GLib.timeout_add_seconds(8, self._check_renderer_applied, token, False)
+        GLib.timeout_add_seconds(self._RENDERER_CHECK_FINAL_SEC, self._check_renderer_applied, token, True)
+        return False
+
+    @staticmethod
+    def _renderer_probe():
+        """Return '' when rendering is healthy, else a short reason."""
+        try:
+            from apricus.server import DBUS_NAME_PLAYER, get_instance
+        except Exception:  # noqa: BLE001 - never break settings on import
+            return "unavailable"
+        try:
+            player = get_instance(DBUS_NAME_PLAYER)
+        except Exception:  # noqa: BLE001 - transient bus failure
+            return "unavailable"
+        if player is None:
+            return "gone"
+        try:
+            return player.last_error or ""
+        except Exception:  # noqa: BLE001 - transient bus failure
+            return "unavailable"
+
+    def _check_renderer_applied(self, token, final):
+        if token != getattr(self, "_renderer_token", None):
+            return False
+        problem = self._renderer_probe()
+        if not problem:
+            if final:
+                if getattr(self, "_renderer_reverting", False):
+                    self._renderer_reverting = False
+                    self._toast(_("The previous renderer has been restored."))
+                else:
+                    self._toast(_("Video renderer updated."))
+            return False
+        if not final:
+            # Still within the first-frame window: keep waiting.
+            return False
+        if getattr(self, "_renderer_reverting", False):
+            self._renderer_reverting = False
+            self._toast(_("Unable to apply the selected renderer."))
+            return False
+        # One bounded rollback to the previously working renderer.
+        previous = getattr(self, "_renderer_previous", RENDERER_AUTO)
+        logger.warning(f"[GUI4] Renderer switch failed ({problem}); restoring {previous}")
+        self._renderer_reverting = True
+        token = getattr(self, "_renderer_token", 0) + 1
+        self._renderer_token = token
+        try:
+            self.config = ConfigUtil().load()
+            self.config[CONFIG_KEY_RENDERER] = previous
+            ConfigUtil().save(self.config)
+            server = self._server()
+            if server is None:
+                raise RuntimeError("no server")
+            server.respawn_player()
+        except Exception as e:  # noqa: BLE001 - report, do not loop
+            logger.warning(f"[GUI4] Renderer rollback failed: {e}")
+            self._renderer_reverting = False
+            self._toast(_("Unable to apply the selected renderer."))
+            return False
+        GLib.timeout_add_seconds(
+            self._RENDERER_CHECK_FINAL_SEC, self._check_renderer_applied, token, True
+        )
+        return False
 
     @staticmethod
     def _short_config_path():

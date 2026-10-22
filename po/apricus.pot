@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: apricus\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-22 02:29+0200\n"
+"POT-Creation-Date: 2026-10-22 10:39+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -223,7 +223,7 @@ msgid ""
 msgstr ""
 
 #: src/apricus/gui/gtk4app.py:773 src/apricus/gui/gtk4app.py:3680
-#: src/apricus/gui/gtk4app.py:4000
+#: src/apricus/gui/gtk4app.py:4183
 msgid "OK"
 msgstr ""
 
@@ -686,159 +686,235 @@ msgstr ""
 msgid "Keep icons above video"
 msgstr ""
 
-#: src/apricus/gui/gtk4app.py:3755
-msgid "Video Rendering"
+#: src/apricus/gui/gtk4app.py:3754
+msgid "Prepare host installation"
 msgstr ""
 
-#: src/apricus/gui/gtk4app.py:3757
-msgid "Renderer"
+#: src/apricus/gui/gtk4app.py:3756
+msgid "Export the extension files, then run one command on the host"
 msgstr ""
 
 #: src/apricus/gui/gtk4app.py:3758
-msgid "Restart Apricus to apply a new renderer"
+msgid "Prepare"
 msgstr ""
 
-#: src/apricus/gui/gtk4app.py:3768
-msgid "Automatic (Recommended)"
+#: src/apricus/gui/gtk4app.py:3764
+msgid "Run on the host"
 msgstr ""
 
-#: src/apricus/gui/gtk4app.py:3769
-msgid "OpenGL"
+#: src/apricus/gui/gtk4app.py:3765
+msgid "Log out and back in afterwards"
 msgstr ""
 
-#: src/apricus/gui/gtk4app.py:3770
-msgid "Compatibility (XCB)"
+#: src/apricus/gui/gtk4app.py:3767
+msgid "Copy"
 msgstr ""
 
 #: src/apricus/gui/gtk4app.py:3771
-msgid "XVideo (Experimental)"
+msgid "Check again"
 msgstr ""
 
-#: src/apricus/gui/gtk4app.py:3783
-msgid "Startup"
+#: src/apricus/gui/gtk4app.py:3779
+msgid "Video Rendering"
 msgstr ""
 
-#: src/apricus/gui/gtk4app.py:3786
-msgid "Start wallpaper at login"
+#: src/apricus/gui/gtk4app.py:3781
+msgid "Renderer"
 msgstr ""
 
-#: src/apricus/gui/gtk4app.py:3787
-msgid "Start only the wallpaper service at login"
+#: src/apricus/gui/gtk4app.py:3782
+msgid "Takes effect immediately"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:3792
+msgid "Automatic (Recommended)"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:3793
+msgid "OpenGL"
 msgstr ""
 
 #: src/apricus/gui/gtk4app.py:3794
-msgid "System"
+msgid "Compatibility (XCB)"
 msgstr ""
 
-#: src/apricus/gui/gtk4app.py:3796
-msgid "Open configuration"
-msgstr ""
-
-#: src/apricus/gui/gtk4app.py:3798 src/apricus/gui/gtk4app.py:3819
-msgid "Open"
-msgstr ""
-
-#: src/apricus/gui/gtk4app.py:3804 src/apricus/gui/gtk4app.py:3991
-msgid "How to select videos"
-msgstr ""
-
-#: src/apricus/gui/gtk4app.py:3805
-msgid "Selection shortcuts for the library"
+#: src/apricus/gui/gtk4app.py:3795
+msgid "XVideo (Experimental)"
 msgstr ""
 
 #: src/apricus/gui/gtk4app.py:3806
-msgid "Show"
+#, python-brace-format
+msgid ""
+"Takes effect immediately. Note: APRICUS_VOUT={value} overrides the saved "
+"setting"
 msgstr ""
 
-#: src/apricus/gui/gtk4app.py:3813
-msgid "Info"
-msgstr ""
-
-#: src/apricus/gui/gtk4app.py:3815
-msgid "About Apricus"
+#: src/apricus/gui/gtk4app.py:3814
+msgid "Startup"
 msgstr ""
 
 #: src/apricus/gui/gtk4app.py:3817
+msgid "Start wallpaper at login"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:3818
+msgid "Start only the wallpaper service at login"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:3825
+msgid "System"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:3827
+msgid "Open configuration"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:3829 src/apricus/gui/gtk4app.py:3850
+msgid "Open"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:3835 src/apricus/gui/gtk4app.py:4174
+msgid "How to select videos"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:3836
+msgid "Selection shortcuts for the library"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:3837
+msgid "Show"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:3844
+msgid "Info"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:3846
+msgid "About Apricus"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:3848
 #, python-brace-format
 msgid "Version {version} · GPL-3.0-or-later"
 msgstr ""
 
-#: src/apricus/gui/gtk4app.py:3841
+#: src/apricus/gui/gtk4app.py:3872
 msgid "Active — icons stay above the video"
 msgstr ""
 
-#: src/apricus/gui/gtk4app.py:3845
+#: src/apricus/gui/gtk4app.py:3876
 msgid "Installed but disabled — enable it manually: gnome-extensions enable"
 msgstr ""
 
-#: src/apricus/gui/gtk4app.py:3847
+#: src/apricus/gui/gtk4app.py:3878
 msgid "Installed but disabled — turn on to keep icons above video"
 msgstr ""
 
-#: src/apricus/gui/gtk4app.py:3850
+#: src/apricus/gui/gtk4app.py:3881
 msgid "Enabled — log out and back in to activate it"
 msgstr ""
 
-#: src/apricus/gui/gtk4app.py:3853
+#: src/apricus/gui/gtk4app.py:3884
 msgid "Installed — log out and back in so GNOME finds it"
 msgstr ""
 
-#: src/apricus/gui/gtk4app.py:3856
+#: src/apricus/gui/gtk4app.py:3887
 msgid "Not installed — native packages include it; see README"
 msgstr ""
 
-#: src/apricus/gui/gtk4app.py:3859
+#: src/apricus/gui/gtk4app.py:3890
 #, python-brace-format
 msgid "Unsupported GNOME {shell} (supports {supported})"
 msgstr ""
 
-#: src/apricus/gui/gtk4app.py:3863
+#: src/apricus/gui/gtk4app.py:3894
 msgid "Failed to load — check the journal for errors"
 msgstr ""
 
-#: src/apricus/gui/gtk4app.py:3865
+#: src/apricus/gui/gtk4app.py:3896
 msgid "Status unavailable"
 msgstr ""
 
-#: src/apricus/gui/gtk4app.py:3882
-msgid "Integration disabled — restart Apricus to restore normal stacking"
+#. noqa: BLE001 - show the failure inline
+#: src/apricus/gui/gtk4app.py:3923
+#, python-brace-format
+msgid "Could not prepare installation files ({err})"
 msgstr ""
 
-#: src/apricus/gui/gtk4app.py:3888
+#: src/apricus/gui/gtk4app.py:3927
+msgid "Files ready — run the command on the host"
+msgstr ""
+
+#. noqa: BLE001 - clipboard best effort
+#: src/apricus/gui/gtk4app.py:3939
+#, python-brace-format
+msgid "Could not copy ({err})"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:3941
+msgid "Command copied"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:3959
+msgid "Integration disabled — using basic stacking"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:3966
 #, python-brace-format
 msgid ""
 "Could not {action} automatically ({err}); run: gnome-extensions {action}"
 msgstr ""
 
-#: src/apricus/gui/gtk4app.py:3910
-msgid "Renderer saved — restart Apricus to apply it"
+#: src/apricus/gui/gtk4app.py:3995
+msgid "Note: APRICUS_VOUT overrides the saved renderer"
 msgstr ""
 
-#: src/apricus/gui/gtk4app.py:3929
+#: src/apricus/gui/gtk4app.py:4002
+msgid "Renderer saved — applies to video wallpapers"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:4010 src/apricus/gui/gtk4app.py:4023
+#: src/apricus/gui/gtk4app.py:4069 src/apricus/gui/gtk4app.py:4088
+msgid "Unable to apply the selected renderer."
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:4012
+msgid "Applying video renderer…"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:4060
+msgid "The previous renderer has been restored."
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:4062
+msgid "Video renderer updated."
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:4112
 msgid "Wallpaper service starts at login"
 msgstr ""
 
-#: src/apricus/gui/gtk4app.py:3931
+#: src/apricus/gui/gtk4app.py:4114
 msgid "Starts only the wallpaper service at login"
 msgstr ""
 
-#: src/apricus/gui/gtk4app.py:3944 src/apricus/gui/gtk4app.py:3955
+#: src/apricus/gui/gtk4app.py:4127 src/apricus/gui/gtk4app.py:4138
 msgid "Could not change the startup setting."
 msgstr ""
 
-#: src/apricus/gui/gtk4app.py:3958
+#: src/apricus/gui/gtk4app.py:4141
 msgid "Startup enabled"
 msgstr ""
 
-#: src/apricus/gui/gtk4app.py:3958
+#: src/apricus/gui/gtk4app.py:4141
 msgid "Startup disabled"
 msgstr ""
 
-#: src/apricus/gui/gtk4app.py:3987
+#: src/apricus/gui/gtk4app.py:4170
 msgid "Could not open the configuration file."
 msgstr ""
 
-#: src/apricus/gui/gtk4app.py:3994
+#: src/apricus/gui/gtk4app.py:4177
 msgid ""
 "Click to select a video.\n"
 "Ctrl+click or Shift+click selects more than one.\n"

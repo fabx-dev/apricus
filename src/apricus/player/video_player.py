@@ -541,6 +541,10 @@ class VideoPlayer(BasePlayer):
         # via playback_error()/last_error so the GUI banner fires instead of
         # leaving a silent black monitor. Reset on every _apply_source().
         self._resolve_error = None
+        # Monotonic timestamp (seconds) of the last media (re)start, used to
+        # report "no frames yet" when playback runs but nothing is ever
+        # displayed (e.g. an unusable video output). None disables the check.
+        self._media_started_at = None
         GLib.idle_add(self._deferred_capture_original)
 
     def _deferred_capture_original(self):
@@ -652,10 +656,16 @@ class VideoPlayer(BasePlayer):
         perf.mark(f"player: switched [{mode}]")
         return False
 
+    # Seconds without a first frame before playback_error() reports
+    # "No video frames received yet". Generous on purpose: slow streams may
+    # legitimately take a while; this guards renderer/mode transitions.
+    FIRST_FRAME_TIMEOUT_SEC = 20
+
     def _apply_source(self, data_source, setup_handlers):
         # New media, new verdict: drop the previous resolution failure so a
         # stale error can never mask the fresh attempt (and vice versa).
         self._resolve_error = None
+        self._media_started_at = time.monotonic()
 
         # Stable config keys for live monitors (unique models keep the bare
         # model; duplicates get Model#i). Order matches self.windows.
@@ -841,6 +851,7 @@ class VideoPlayer(BasePlayer):
             window.set_media(media)
             window.play()
             window.centercrop(width, height)
+            self._media_started_at = time.monotonic()
         finally:
             window._transitioning = False
 
@@ -893,10 +904,19 @@ class VideoPlayer(BasePlayer):
         """
         if getattr(self, "_resolve_error", None):
             return self._resolve_error
+        first_frame_seen = False
         for window in self.windows.values():
             err = window.playback_error()
             if err is not None:
                 return err
+            if getattr(window, "_first_frame_reported", False):
+                first_frame_seen = True
+        if (
+            not first_frame_seen
+            and getattr(self, "_media_started_at", None) is not None
+            and (time.monotonic() - self._media_started_at) > self.FIRST_FRAME_TIMEOUT_SEC
+        ):
+            return "No video frames received yet"
         return None
 
     @property
