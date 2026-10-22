@@ -117,6 +117,13 @@ CONFIG_KEY_STREAM_HISTORY = "stream_history"
 CONFIG_KEY_STREAM_FAVORITES = "stream_favorites"
 CONFIG_KEY_WEB_HISTORY = "web_history"
 CONFIG_KEY_WEB_FAVORITES = "web_favorites"
+CONFIG_KEY_RENDERER = "video_renderer"
+# Video renderer ids (stored in config, never translated).
+RENDERER_AUTO = "auto"
+RENDERER_GL = "gl"
+RENDERER_XCB = "xcb"
+RENDERER_XV = "xv"
+VALID_RENDERERS = frozenset({RENDERER_AUTO, RENDERER_GL, RENDERER_XCB, RENDERER_XV})
 CONFIG_TEMPLATE = {
     CONFIG_KEY_VERSION: CONFIG_VERSION,
     CONFIG_KEY_MODE: MODE_NULL,
@@ -145,6 +152,7 @@ CONFIG_TEMPLATE = {
     # Web pick-list, same policy (entries may also be local .html paths).
     CONFIG_KEY_WEB_HISTORY: [],
     CONFIG_KEY_WEB_FAVORITES: [],
+    CONFIG_KEY_RENDERER: RENDERER_AUTO,
 }
 
 

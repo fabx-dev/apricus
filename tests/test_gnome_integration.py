@@ -73,49 +73,99 @@ def test_extension_manages_stacking_in_place():
     assert "owns_window" not in js  # XWayland renderer: role match, not WaylandClient
 
 
-def test_vlc_options_pin_exact_flags_per_session(monkeypatch):
-    """Renderer selection: xcb only on GNOME Wayland, GPU default elsewhere."""
+def test_vlc_options_pin_exact_flags_per_renderer():
+    """Renderer selection: exact flags per vout, none by default."""
     from apricus.player.video_player import _vlc_options
 
-    assert _vlc_options(False, True) == [
+    assert _vlc_options(False, "xcb") == [
         "--no-disable-screensaver",
         "--no-interact",
         "--aout=pulse",
         "--vout=xcb",
     ]
-    assert _vlc_options(True, True) == [
+    assert _vlc_options(True, "xcb") == [
         "--no-disable-screensaver",
         "--no-interact",
         "--no-audio",
         "--aout=none",
         "--vout=xcb",
     ]
-    plain = _vlc_options(False, False)
-    assert "--vout=xcb" not in plain and "--no-interact" in plain
-    assert "--no-interact" in _vlc_options(True, False)
+    assert _vlc_options(False, "gl")[-1] == "--vout=gl"
+    assert _vlc_options(False, "xv")[-1] == "--vout=xv"
+    plain = _vlc_options(False, None)
+    assert not any(o.startswith("--vout") for o in plain)
+    assert "--no-interact" in plain
+    assert "--no-interact" in _vlc_options(True, None)
+    # Unknown vout names are never passed through to VLC.
+    assert not any(o.startswith("--vout") for o in _vlc_options(False, "bogus"))
 
 
-def test_vlc_options_override_via_env(monkeypatch):
-    """APRICUS_VOUT overrides the session default (renderer experiments)."""
-    from apricus.player.video_player import _vlc_options
+def test_renderer_resolution_precedence(monkeypatch):
+    """APRICUS_VOUT > saved selection > automatic policy."""
+    import apricus.player.video_player as player_mod
+    from apricus.player.video_player import resolve_renderer_vout
 
-    monkeypatch.setenv("APRICUS_VOUT", "glx")
-    assert _vlc_options(False, True)[-1] == "--vout=glx"
-    assert _vlc_options(False, False)[-1] == "--vout=glx"
+    monkeypatch.setenv("APRICUS_VOUT", "gl")
+    assert resolve_renderer_vout("xcb") == "gl"
+    assert resolve_renderer_vout("auto") == "gl"
     monkeypatch.setenv("APRICUS_VOUT", "  ")
-    assert "--vout=xcb" in _vlc_options(False, True)
-    assert all(not o.startswith("--vout") for o in _vlc_options(False, False))
+    monkeypatch.setattr(player_mod, "integration_active", lambda: True)
+    monkeypatch.setattr(player_mod, "is_gnome", lambda: True)
+    monkeypatch.setattr(player_mod, "is_wayland", lambda: True)
+    assert resolve_renderer_vout("auto") == "gl"
+    assert resolve_renderer_vout("xcb") == "xcb"
+    assert resolve_renderer_vout("xv") == "xv"
+    assert resolve_renderer_vout("gl") == "gl"
+    monkeypatch.delenv("APRICUS_VOUT", raising=False)
+    assert resolve_renderer_vout("xcb") == "xcb"
 
 
-def test_shipped_metadata_declares_only_verified_shell_versions():
-    """The bundled extension must not claim GNOME versions that were never
-    tested live (51+): an over-broad shell-version silently breaks sorting
-    on upgrade instead of cleanly disabling the integration."""
+def test_renderer_automatic_policy_matrix(monkeypatch):
+    """Automatic policy per session/backend state."""
+    import apricus.player.video_player as player_mod
+    from apricus.player.video_player import resolve_renderer_vout
+
+    monkeypatch.delenv("APRICUS_VOUT", raising=False)
+
+    def env(gnome, wayland, active):
+        monkeypatch.setattr(player_mod, "is_gnome", lambda: gnome)
+        monkeypatch.setattr(player_mod, "is_wayland", lambda: wayland)
+        monkeypatch.setattr(player_mod, "integration_active", lambda: active)
+
+    env(True, True, True)
+    assert resolve_renderer_vout("auto") == "gl"
+    env(True, True, False)
+    assert resolve_renderer_vout("auto") == "xcb"
+    env(True, False, False)
+    assert resolve_renderer_vout("auto") is None
+    env(False, True, False)
+    assert resolve_renderer_vout("auto") is None
+    env(False, False, False)
+    assert resolve_renderer_vout("auto") is None
+    # Explicit selection wins over the policy everywhere.
+    env(False, False, False)
+    assert resolve_renderer_vout("xv") == "xv"
+    # Unknown saved values fall back to automatic, never to VLC.
+    env(True, True, True)
+    assert resolve_renderer_vout("bogus") == "gl"
+    env(True, True, False)
+    assert resolve_renderer_vout("bogus") == "xcb"
+    # Unknown env values are ignored (with warning), never passed to VLC.
+    monkeypatch.setenv("APRICUS_VOUT", "bogus-vout")
+    assert resolve_renderer_vout("auto") == "xcb"
+
+
+def test_shipped_metadata_declares_only_reviewed_shell_versions():
+    """The bundled extension must only declare versions covered by static
+    API review (49/50/51: background group, restacked, _isOverviewWindow,
+    tab-list/app-system APIs confirmed identical). Runtime verified on 50
+    only; 49/51 stay labeled as such. An over-broad shell-version would
+    silently break sorting on upgrade instead of cleanly disabling."""
     with open(EXT_META, encoding="utf-8") as f:
         meta = json.load(f)
     declared = set(meta.get("shell-version") or [])
     assert declared, "extension must declare supported Shell versions"
-    assert declared <= {"50"}, f"untested Shell versions declared: {sorted(declared)}"
+    assert declared <= {"49", "50", "51"}, f"unreviewed Shell versions: {sorted(declared)}"
 
 
 def test_detection_with_compatible_metadata(tmp_path):
