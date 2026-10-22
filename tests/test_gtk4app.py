@@ -2470,6 +2470,84 @@ def integration_row_reflects_status():
 
 
 @check
+def host_install_rows_guide_sandbox_setup():
+    import sys
+    import types
+    from unittest.mock import patch
+
+    import apricus.gui.gtk4app as appmod
+
+    states = {}
+
+    class _Row:
+        def __init__(self, name):
+            self._name = name
+
+        def set_subtitle(self, text):
+            states[self._name] = text
+
+        def set_visible(self, visible):
+            states[self._name + ":visible"] = visible
+
+    class _Switch:
+        def set_active(self, active):
+            states["active"] = active
+
+        def set_sensitive(self, sensitive):
+            states["sensitive"] = sensitive
+
+    def _toasts(self, message):
+        states.setdefault("toasts", []).append(message)
+
+    fake_shell = types.ModuleType("apricus.gnome_shell")
+    fake_shell.EXTENSION_UUID = "apricus-integration@fabx-dev"
+    fake_shell.integration_status = lambda: states["status"]
+    fake_shell.prepare_host_install = lambda: ("/tmp/x", "bash /tmp/x/install.sh")
+    old_mod = sys.modules.get("apricus.gnome_shell")
+    sys.modules["apricus.gnome_shell"] = fake_shell
+    try:
+        obj = appmod.ControlPanel.__new__(appmod.ControlPanel)
+        obj.integ_row, obj.integ_switch = _Row("statusline"), _Switch()
+        obj.prep_row, obj.cmd_row = _Row("prepline"), _Row("cmdline")
+        obj._toast = _toasts.__get__(obj)
+        with patch.object(appmod, "is_snap", return_value=True), patch.object(
+            appmod, "is_flatpak", return_value=False
+        ):
+            # Missing extension in a sandbox: prepare row shown, no command yet.
+            states["status"] = ("not_installed", {})
+            obj._host_cmd = None
+            obj._refresh_integration_row()
+            assert states["prepline:visible"] is True
+            assert states["cmdline:visible"] is False
+            # Prepare exports files and reveals the exact host command.
+            obj._on_prepare_host_install(None)
+            assert states["cmdline"] == "bash /tmp/x/install.sh"
+            assert states["cmdline:visible"] is True
+            assert any("host" in t for t in states.get("toasts", []))
+            # Copy without a display reports the failure instead of crashing.
+            obj._on_copy_host_command(None)
+            assert any("copy" in t.lower() for t in states.get("toasts", []))
+            # Once installed, the guided rows disappear again.
+            states["status"] = ("disabled", {})
+            obj._refresh_integration_row()
+            assert states["prepline:visible"] is False
+            assert states["cmdline:visible"] is False
+        # Outside a sandbox the rows never appear.
+        with patch.object(appmod, "is_snap", return_value=False), patch.object(
+            appmod, "is_flatpak", return_value=False
+        ):
+            states["status"] = ("not_installed", {})
+            obj._host_cmd = None
+            obj._refresh_integration_row()
+            assert states["prepline:visible"] is False
+    finally:
+        if old_mod is not None:
+            sys.modules["apricus.gnome_shell"] = old_mod
+        else:
+            sys.modules.pop("apricus.gnome_shell", None)
+
+
+@check
 def renderer_selection_persists_and_asks_restart():
     import apricus.gui.gtk4app as appmod
 
@@ -2887,3 +2965,7 @@ def test_integration_row_reflects_status():
 
 def test_renderer_selection_persists_and_asks_restart():
     _run("renderer_selection_persists_and_asks_restart")
+
+
+def test_host_install_rows_guide_sandbox_setup():
+    _run("host_install_rows_guide_sandbox_setup")

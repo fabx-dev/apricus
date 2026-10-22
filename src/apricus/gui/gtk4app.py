@@ -3749,6 +3749,30 @@ class ControlPanel(Adw.Application):
             self.integ_switch.connect("state-set", self._on_integration_toggled)
             self.integ_row.add_suffix(self.integ_switch)
             icons.add(self.integ_row)
+            self._host_cmd = None
+            self.prep_row = Adw.ActionRow()
+            self.prep_row.set_title(_("Prepare host installation"))
+            self.prep_row.set_subtitle(
+                _("Export the extension files, then run one command on the host")
+            )
+            self.prep_btn = Gtk.Button(label=_("Prepare"))
+            self.prep_btn.set_valign(Gtk.Align.CENTER)
+            self.prep_btn.connect("clicked", self._on_prepare_host_install)
+            self.prep_row.add_suffix(self.prep_btn)
+            icons.add(self.prep_row)
+            self.cmd_row = Adw.ActionRow()
+            self.cmd_row.set_title(_("Run on the host"))
+            self.cmd_row.set_subtitle(_("Log out and back in afterwards"))
+            self.cmd_row.set_subtitle_selectable(True)
+            self.copy_btn = Gtk.Button(label=_("Copy"))
+            self.copy_btn.set_valign(Gtk.Align.CENTER)
+            self.copy_btn.connect("clicked", self._on_copy_host_command)
+            self.cmd_row.add_suffix(self.copy_btn)
+            self.check_btn = Gtk.Button(label=_("Check again"))
+            self.check_btn.set_valign(Gtk.Align.CENTER)
+            self.check_btn.connect("clicked", self._on_check_integration)
+            self.cmd_row.add_suffix(self.check_btn)
+            icons.add(self.cmd_row)
             box.append(icons)
             self._refresh_integration_row()
         rendering = Adw.PreferencesGroup()
@@ -3867,6 +3891,52 @@ class ControlPanel(Adw.Application):
         if switch is not None:
             switch.set_active(switch_on)
             switch.set_sensitive(sensitive)
+        self._refresh_host_install_rows(state)
+
+    def _refresh_host_install_rows(self, state):
+        """Show the guided host install only where the sandbox needs it."""
+        prep = getattr(self, "prep_row", None)
+        cmd_row = getattr(self, "cmd_row", None)
+        if prep is None or cmd_row is None:
+            return
+        show = state == "not_installed" and (is_snap() or is_flatpak())
+        prep.set_visible(show)
+        cmd = getattr(self, "_host_cmd", None)
+        cmd_row.set_visible(bool(show and cmd))
+        if cmd:
+            cmd_row.set_subtitle(cmd)
+
+    def _on_prepare_host_install(self, _button):
+        """Export ZIP + installer for the host (never executes anything)."""
+        try:
+            from apricus.gnome_shell import prepare_host_install
+
+            _export_dir, cmd = prepare_host_install()
+        except Exception as e:  # noqa: BLE001 - show the failure inline
+            self._toast(_("Could not prepare installation files ({err})").format(err=e))
+            return
+        self._host_cmd = cmd
+        self._refresh_integration_row()
+        self._toast(_("Files ready — run the command on the host"))
+
+    def _on_copy_host_command(self, _button):
+        cmd = getattr(self, "_host_cmd", None)
+        if not cmd:
+            return
+        try:
+            display = Gdk.Display.get_default()
+            if display is None:
+                raise RuntimeError("no display")
+            display.get_clipboard().set_text(cmd)
+        except Exception as e:  # noqa: BLE001 - clipboard best effort
+            self._toast(_("Could not copy ({err})").format(err=e))
+            return
+        self._toast(_("Command copied"))
+
+    def _on_check_integration(self, _button):
+        """Re-read the real extension status (e.g. after a host install)."""
+        self._host_cmd = getattr(self, "_host_cmd", None)
+        self._refresh_integration_row()
 
     def _on_integration_toggled(self, switch, _state):
         """Enable/disable the Shell extension on explicit user action."""

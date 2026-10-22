@@ -30,3 +30,13 @@ install_subdir('apricus',
   install_dir: pkgdatadir,
   exclude_directories: ['__pycache__', 'gui/__pycache__', 'player/__pycache__'],
 )
+
+# Install the GNOME Shell host-integration helpers (extension sources
+# plus install-host.sh / build-zip.sh) so every package — including the
+# Snap and Flatpak sandboxes, which cannot write host extension dirs —
+# carries the files the guided host install needs. Nothing here runs at
+# install time; the user explicitly copies them out to the host.
+install_subdir('../gnome-extension',
+  install_dir: pkgdatadir,
+  exclude_files: ['build-zip.sh'],
+)

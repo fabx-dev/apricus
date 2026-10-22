@@ -23,6 +23,7 @@ import json
 import logging
 import os
 import subprocess
+import sys
 
 from apricus.commons import LOGGER_NAME
 from apricus.utils import is_gnome, is_wayland
@@ -55,6 +56,130 @@ def extension_dir(search_dirs=None):
         if os.path.isfile(os.path.join(candidate, "metadata.json")):
             return candidate
     return None
+
+
+HOST_INSTALLER = "install-host.sh"
+APP_ID_FLATPAK = "io.github.fabx_dev.Apricus"
+APP_DIR_SNAP = "apricus"
+
+
+def _bundled_helpers_dirs(search_roots=None):
+    """Directories that may hold the shipped host-integration helpers.
+
+    Layout (installed by meson into pkgdatadir/gnome-extension/):
+    ``<dir>/apricus-integration@fabx-dev/{metadata.json,extension.js}``
+    plus ``<dir>/install-host.sh``.
+    """
+    if search_roots is not None:
+        return list(search_roots)
+    roots = []
+    snap = os.environ.get("SNAP")
+    if snap:
+        roots.append(os.path.join(snap, "usr", "share", "apricus", "gnome-extension"))
+        roots.append(os.path.join(snap, "share", "apricus", "gnome-extension"))
+    flatpak_id = os.environ.get("FLATPAK_ID")
+    if flatpak_id or os.path.isfile("/.flatpak-info"):
+        roots.append("/app/share/apricus/gnome-extension")
+    roots.append(os.path.join(sys.prefix, "share", "apricus", "gnome-extension"))
+    home = os.path.expanduser("~")
+    roots.append(os.path.join(home, ".local", "share", "apricus", "gnome-extension"))
+    roots.append("/usr/share/apricus/gnome-extension")
+    roots.append("/usr/local/share/apricus/gnome-extension")
+    return roots
+
+
+def bundled_extension_source(search_roots=None):
+    """Shipped (uninstalled-on-host) extension dir, or None.
+
+    Unlike :func:`extension_dir`, which finds extensions GNOME Shell can
+    load, this finds the copy bundled *inside* our own package (system,
+    Snap or Flatpak install) that the guided host install copies out.
+    """
+    for base in _bundled_helpers_dirs(search_roots):
+        candidate = os.path.join(base, EXTENSION_UUID)
+        if os.path.isfile(os.path.join(candidate, "metadata.json")) and os.path.isfile(
+            os.path.join(candidate, "extension.js")
+        ):
+            return candidate
+    return None
+
+
+def bundled_installer_path(search_roots=None):
+    """Shipped ``install-host.sh`` path, or None when not packaged."""
+    for base in _bundled_helpers_dirs(search_roots):
+        candidate = os.path.join(base, HOST_INSTALLER)
+        if os.path.isfile(candidate):
+            return candidate
+    return None
+
+
+def host_export_dir():
+    """User-visible directory for the host install files.
+
+    Chosen so the *same* path works inside the sandbox and on the host:
+    Snap user dirs (``~/snap/<app>/common``) and the Flatpak app-data
+    dir (``~/.var/app/<id>``) are the same location on both sides.
+    """
+    from apricus.utils import is_flatpak, is_snap
+
+    if is_snap():
+        base = os.environ.get("SNAP_USER_COMMON") or os.path.expanduser(
+            os.path.join("~", "snap", APP_DIR_SNAP, "common")
+        )
+    elif is_flatpak():
+        base = os.path.join(
+            os.path.expanduser("~"), ".var", "app", APP_ID_FLATPAK, "data"
+        )
+    else:
+        base = os.path.join(os.path.expanduser("~"), ".cache", "apricus")
+    return os.path.join(base, "gnome-integration")
+
+
+def host_install_command(export_dir):
+    """The one host command the user runs (displayed, never executed)."""
+    return (
+        f'bash "{os.path.join(export_dir, HOST_INSTALLER)}" '
+        f'--zip "{os.path.join(export_dir, EXTENSION_UUID + ".zip")}" --enable'
+    )
+
+
+def _write_extension_zip(source_dir, zip_path):
+    """Create the distributable extension ZIP (stdlib only, no binaries)."""
+    import zipfile
+
+    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+        for name in ("metadata.json", "extension.js"):
+            with open(os.path.join(source_dir, name), "rb") as f:
+                zf.writestr(f"{EXTENSION_UUID}/{name}", f.read())
+
+
+def prepare_host_install(dest_dir=None, search_roots=None):
+    """Export the host install files; return ``(export_dir, command)``.
+
+    Writes the extension ZIP plus a copy of ``install-host.sh``. Never
+    executes anything on the host and never touches sandbox-external
+    paths beyond the user-visible export dir. Raises RuntimeError with a
+    human-readable message when the bundled files are missing.
+    """
+    source = bundled_extension_source(search_roots)
+    if source is None:
+        raise RuntimeError("bundled extension files not found in this package")
+    installer = bundled_installer_path(search_roots)
+    if installer is None:
+        raise RuntimeError("bundled installer script not found in this package")
+    export_dir = dest_dir or host_export_dir()
+    os.makedirs(export_dir, exist_ok=True)
+    _write_extension_zip(source, os.path.join(export_dir, EXTENSION_UUID + ".zip"))
+    with open(installer, "rb") as f:
+        payload = f.read()
+    installer_dest = os.path.join(export_dir, HOST_INSTALLER)
+    with open(installer_dest, "wb") as f:
+        f.write(payload)
+    try:
+        os.chmod(installer_dest, 0o755)
+    except OSError:  # noqa: BLE001 - best effort (e.g. noexec mounts)
+        pass
+    return export_dir, host_install_command(export_dir)
 
 
 def read_metadata(search_dirs=None):
