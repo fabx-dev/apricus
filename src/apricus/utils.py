@@ -906,7 +906,8 @@ class ConfigUtil:
                     # video_dir was added after v4 without a version bump:
                     # default it instead of wiping the whole config.
                     config.setdefault(CONFIG_KEY_VIDEO_DIR, None)
-                    # Video renderer selection (same no-bump policy):
+                    # Stored renderer id (same no-bump policy): no UI
+                    # exposes it anymore, but old configs may carry it —
                     # sanitize to a known id, defaulting to automatic.
                     if config.get(CONFIG_KEY_RENDERER) not in VALID_RENDERERS:
                         config[CONFIG_KEY_RENDERER] = RENDERER_AUTO

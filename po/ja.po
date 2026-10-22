@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: apricus 2.0.1\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-22 22:18+0200\n"
+"POT-Creation-Date: 2026-10-22 23:47+0200\n"
 "PO-Revision-Date: 2026-10-15 23:55+0200\n"
 "Last-Translator: fabx-dev <https://github.com/fabx-dev>\n"
 "Language-Team: Japanese\n"
@@ -16,72 +16,68 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=1; plural=0;\n"
 
-#: src/apricus/gui/gtk4app.py:176 src/apricus/gui/gtk4app.py:1888
+#: src/apricus/gui/gtk4app.py:171 src/apricus/gui/gtk4app.py:1883
 msgid "Library"
 msgstr "ライブラリ"
 
-#: src/apricus/gui/gtk4app.py:177 src/apricus/gui/gtk4app.py:381
-#: src/apricus/gui/gtk4app.py:1889
+#: src/apricus/gui/gtk4app.py:172 src/apricus/gui/gtk4app.py:376
+#: src/apricus/gui/gtk4app.py:1884
 msgid "Playlist"
 msgstr "プレイリスト"
 
-#: src/apricus/gui/gtk4app.py:178 src/apricus/gui/gtk4app.py:1890
+#: src/apricus/gui/gtk4app.py:173 src/apricus/gui/gtk4app.py:1885
 msgid "Now Playing"
 msgstr "再生中"
 
-#: src/apricus/gui/gtk4app.py:179 src/apricus/gui/gtk4app.py:1884
-#: src/apricus/gui/gtk4app.py:1974 src/apricus/gui/gtk4app.py:2271
-#: src/apricus/gui/gtk4app.py:2275
+#: src/apricus/gui/gtk4app.py:174 src/apricus/gui/gtk4app.py:1879
+#: src/apricus/gui/gtk4app.py:1969 src/apricus/gui/gtk4app.py:2266
+#: src/apricus/gui/gtk4app.py:2270
 msgid "Streaming"
 msgstr "ストリーミング"
 
-#: src/apricus/gui/gtk4app.py:180 src/apricus/gui/gtk4app.py:1891
-#: src/apricus/gui/gtk4app.py:3039 src/apricus/gui/gtk4app.py:3380
+#: src/apricus/gui/gtk4app.py:175 src/apricus/gui/gtk4app.py:1886
+#: src/apricus/gui/gtk4app.py:3034 src/apricus/gui/gtk4app.py:3375
 msgid "Web Page"
 msgstr "ウェブページ"
 
-#: src/apricus/gui/gtk4app.py:181 src/apricus/gui/gtk4app.py:1892
+#: src/apricus/gui/gtk4app.py:176 src/apricus/gui/gtk4app.py:1887
 msgid "Settings"
 msgstr "設定"
 
-#: src/apricus/gui/gtk4app.py:200
+#: src/apricus/gui/gtk4app.py:195
 msgid "Background service unreachable"
 msgstr "バックグラウンドサービスに接続できません"
 
-#: src/apricus/gui/gtk4app.py:201 src/apricus/gui/gtk4app.py:206
+#: src/apricus/gui/gtk4app.py:196 src/apricus/gui/gtk4app.py:201
 msgid "Retry"
 msgstr "再試行"
 
-#: src/apricus/gui/gtk4app.py:205
+#: src/apricus/gui/gtk4app.py:200
 msgid "Playback failed"
 msgstr "再生に失敗しました"
 
-#: src/apricus/player/video_player.py
-msgid "No video frames received yet"
-msgstr "まだビデオフレームを受信していません"
-
-#: src/apricus/gui/gtk4app.py:357 src/apricus/gui/gtk4app.py:369
+#: src/apricus/gui/gtk4app.py:352 src/apricus/gui/gtk4app.py:364
 msgid "Server down"
 msgstr "サービス停止中"
 
-#: src/apricus/gui/gtk4app.py:358 src/apricus/gui/gtk4app.py:370
+#: src/apricus/gui/gtk4app.py:353 src/apricus/gui/gtk4app.py:365
 #, python-brace-format
 msgid "Ready — {mode}"
 msgstr "準備完了 — {mode}"
 
-#: src/apricus/gui/gtk4app.py:377 src/apricus/gui/gtk4app.py:1374
+#: src/apricus/gui/gtk4app.py:372 src/apricus/gui/gtk4app.py:1369
 msgid "Nothing playing"
 msgstr "再生中の項目はありません"
 
-#: src/apricus/gui/gtk4app.py:379 src/apricus/gui/gtk4app.py:1422
+#: src/apricus/gui/gtk4app.py:374 src/apricus/gui/gtk4app.py:1417
 msgid "Paused"
 msgstr "一時停止中"
 
-#: src/apricus/gui/gtk4app.py:383 src/apricus/gui/gtk4app.py:1423
+#: src/apricus/gui/gtk4app.py:378 src/apricus/gui/gtk4app.py:1418
 msgid "Static"
 msgstr "静止画"
 
-#: src/apricus/gui/gtk4app.py:443
+#: src/apricus/gui/gtk4app.py:438
 msgid ""
 "Modern live wallpaper for Linux — local videos, looping playlists, live "
 "streams and interactive web pages.\n"
@@ -93,116 +89,116 @@ msgstr ""
 "Hidamari から発展した独立フォークであり、ネイティブ GTK4 + Libadwaita コント"
 "ロールセンターとギャップレス再生エンジンを搭載しています。"
 
-#: src/apricus/gui/gtk4app.py:454
+#: src/apricus/gui/gtk4app.py:449
 msgid "Releases and Flatpak Bundles"
 msgstr "リリースと Flatpak バンドル"
 
-#: src/apricus/gui/gtk4app.py:457
+#: src/apricus/gui/gtk4app.py:452
 msgid "Contact via Email"
 msgstr "メールでお問い合わせ"
 
-#: src/apricus/gui/gtk4app.py:458
+#: src/apricus/gui/gtk4app.py:453
 msgid "Original Hidamari Project"
 msgstr "オリジナルの Hidamari プロジェクト"
 
-#: src/apricus/gui/gtk4app.py:471
+#: src/apricus/gui/gtk4app.py:466
 msgid "Apricus 2.0 application icon — Fabrizio (fabx-dev)"
 msgstr "Apricus 2.0 アプリケーションアイコン — Fabrizio (fabx-dev)"
 
-#: src/apricus/gui/gtk4app.py:478
+#: src/apricus/gui/gtk4app.py:473
 msgid "Original Upstream Project (Hidamari)"
 msgstr "フォーク元のプロジェクト (Hidamari)"
 
-#: src/apricus/gui/gtk4app.py:484
+#: src/apricus/gui/gtk4app.py:479
 msgid "Powered by Open Source"
 msgstr "オープンソース技術"
 
-#: src/apricus/gui/gtk4app.py:548
+#: src/apricus/gui/gtk4app.py:543
 msgid "Click to select. Ctrl+click or Shift+click selects more than one."
 msgstr "クリックで選択。Ctrl+クリックまたはShift+クリックで複数選択できます。"
 
-#: src/apricus/gui/gtk4app.py:567 src/apricus/gui/gtk4app.py:669
+#: src/apricus/gui/gtk4app.py:562 src/apricus/gui/gtk4app.py:664
 msgid "No folder chosen"
 msgstr "フォルダーが選択されていません"
 
-#: src/apricus/gui/gtk4app.py:568 src/apricus/gui/gtk4app.py:570
-#: src/apricus/gui/gtk4app.py:670
+#: src/apricus/gui/gtk4app.py:563 src/apricus/gui/gtk4app.py:565
+#: src/apricus/gui/gtk4app.py:665
 msgid "Choose the folder scanned for local videos"
 msgstr "ローカル動画をスキャンするフォルダーを選択"
 
-#: src/apricus/gui/gtk4app.py:569 src/apricus/gui/gtk4app.py:3089
+#: src/apricus/gui/gtk4app.py:564 src/apricus/gui/gtk4app.py:3084
 msgid "Choose…"
 msgstr "選択…"
 
-#: src/apricus/gui/gtk4app.py:576
+#: src/apricus/gui/gtk4app.py:571
 msgid "Open the video folder in the file manager"
 msgstr "ファイルマネージャーで動画フォルダーを開く"
 
-#: src/apricus/gui/gtk4app.py:584
+#: src/apricus/gui/gtk4app.py:579
 msgid "Apply selected"
 msgstr "選択項目を適用"
 
-#: src/apricus/gui/gtk4app.py:586
+#: src/apricus/gui/gtk4app.py:581
 msgid "Use the selected video as live wallpaper"
 msgstr "選択した動画をライブ壁紙として使用"
 
-#: src/apricus/gui/gtk4app.py:590
+#: src/apricus/gui/gtk4app.py:585
 msgid "Add to playlist"
 msgstr "プレイリストに追加"
 
-#: src/apricus/gui/gtk4app.py:591
+#: src/apricus/gui/gtk4app.py:586
 msgid "Add the selected videos to the playlist queue"
 msgstr "選択した動画をプレイリストのキューに追加"
 
-#: src/apricus/gui/gtk4app.py:595
+#: src/apricus/gui/gtk4app.py:590
 msgid "Add selected"
 msgstr "選択項目を追加"
 
-#: src/apricus/gui/gtk4app.py:598
+#: src/apricus/gui/gtk4app.py:593
 msgid "Add all"
 msgstr "すべて追加"
 
-#: src/apricus/gui/gtk4app.py:600
+#: src/apricus/gui/gtk4app.py:595
 msgid "Add every video in the library to the playlist queue"
 msgstr "ライブラリ内のすべての動画をプレイリストに追加"
 
-#: src/apricus/gui/gtk4app.py:613
+#: src/apricus/gui/gtk4app.py:608
 msgid "Play/Pause"
 msgstr "再生/一時停止"
 
-#: src/apricus/gui/gtk4app.py:614
+#: src/apricus/gui/gtk4app.py:609
 msgid "Toggle playback"
 msgstr "再生を切り替え"
 
-#: src/apricus/gui/gtk4app.py:617
+#: src/apricus/gui/gtk4app.py:612
 msgid "Quit"
 msgstr "終了"
 
-#: src/apricus/gui/gtk4app.py:618
+#: src/apricus/gui/gtk4app.py:613
 msgid "Close the panel. Wallpaper keeps running"
 msgstr "パネルを閉じます。壁紙は引き続き動作します"
 
-#: src/apricus/gui/gtk4app.py:623
+#: src/apricus/gui/gtk4app.py:618
 msgid "More library actions"
 msgstr "その他のライブラリ操作"
 
-#: src/apricus/gui/gtk4app.py:626
+#: src/apricus/gui/gtk4app.py:621
 msgid "Refresh"
 msgstr "更新"
 
-#: src/apricus/gui/gtk4app.py:628
+#: src/apricus/gui/gtk4app.py:623
 msgid "Rescan the source folder"
 msgstr "ソースフォルダーを再スキャン"
 
-#: src/apricus/gui/gtk4app.py:652
+#: src/apricus/gui/gtk4app.py:647
 msgid "1 video selected"
 msgstr "1 件の動画を選択中"
 
-#: src/apricus/gui/gtk4app.py:652
+#: src/apricus/gui/gtk4app.py:647
 msgid "{} videos selected"
 msgstr "{} 件の動画を選択中"
 
-#: src/apricus/gui/gtk4app.py:679
+#: src/apricus/gui/gtk4app.py:674
 msgid ""
 "Background service unreachable.\n"
 "Start Apricus to apply wallpapers."
@@ -210,20 +206,20 @@ msgstr ""
 "バックグラウンドサービスに接続できません。\n"
 "壁紙を適用するには Apricus を起動してください。"
 
-#: src/apricus/gui/gtk4app.py:709
+#: src/apricus/gui/gtk4app.py:704
 msgid "Set for all monitors"
 msgstr "すべてのモニターに設定"
 
-#: src/apricus/gui/gtk4app.py:710
+#: src/apricus/gui/gtk4app.py:705
 #, python-brace-format
 msgid "Set for {monitor}"
 msgstr "{monitor} に設定"
 
-#: src/apricus/gui/gtk4app.py:764
+#: src/apricus/gui/gtk4app.py:759
 msgid "Apply needs a single video"
 msgstr "適用には 1 つの動画が必要です"
 
-#: src/apricus/gui/gtk4app.py:767
+#: src/apricus/gui/gtk4app.py:762
 #, python-brace-format
 msgid ""
 "You selected {count} videos, but Apply sets one wallpaper.\n"
@@ -234,61 +230,61 @@ msgstr ""
 "1 つの動画だけを選択して適用するか、プレイリストに追加してループ再生してくだ"
 "さい。"
 
-#: src/apricus/gui/gtk4app.py:773 src/apricus/gui/gtk4app.py:3680
-#: src/apricus/gui/gtk4app.py:4191
+#: src/apricus/gui/gtk4app.py:768 src/apricus/gui/gtk4app.py:3675
+#: src/apricus/gui/gtk4app.py:4022
 msgid "OK"
 msgstr "OK"
 
-#: src/apricus/gui/gtk4app.py:822
+#: src/apricus/gui/gtk4app.py:817
 msgid "Choose video folder"
 msgstr "動画フォルダーを選択"
 
-#: src/apricus/gui/gtk4app.py:877
+#: src/apricus/gui/gtk4app.py:872
 msgid "Apply playlist"
 msgstr "プレイリストを適用"
 
-#: src/apricus/gui/gtk4app.py:879
+#: src/apricus/gui/gtk4app.py:874
 msgid "Apply current order to playback"
 msgstr "現在の順序を再生に適用"
 
-#: src/apricus/gui/gtk4app.py:885
+#: src/apricus/gui/gtk4app.py:880
 msgid "Shuffle"
 msgstr "シャッフル"
 
-#: src/apricus/gui/gtk4app.py:886
+#: src/apricus/gui/gtk4app.py:881
 msgid "Shuffle playlist order randomly"
 msgstr "プレイリストの順序をランダムに並べ替え"
 
-#: src/apricus/gui/gtk4app.py:888
+#: src/apricus/gui/gtk4app.py:883
 msgid "Remove selected"
 msgstr "選択項目を削除"
 
-#: src/apricus/gui/gtk4app.py:889
+#: src/apricus/gui/gtk4app.py:884
 msgid "Remove the selected video from the playlist"
 msgstr "選択した動画をプレイリストから削除"
 
-#: src/apricus/gui/gtk4app.py:892 src/apricus/gui/gtk4app.py:1193
-#: src/apricus/gui/gtk4app.py:2029 src/apricus/gui/gtk4app.py:3155
+#: src/apricus/gui/gtk4app.py:887 src/apricus/gui/gtk4app.py:1188
+#: src/apricus/gui/gtk4app.py:2024 src/apricus/gui/gtk4app.py:3150
 msgid "Clear"
 msgstr "クリア"
 
-#: src/apricus/gui/gtk4app.py:894
+#: src/apricus/gui/gtk4app.py:889
 msgid "Remove all videos from the playlist"
 msgstr "プレイリストからすべての動画を削除"
 
-#: src/apricus/gui/gtk4app.py:950
+#: src/apricus/gui/gtk4app.py:945
 msgid "More actions"
 msgstr "その他の操作"
 
-#: src/apricus/gui/gtk4app.py:1175
+#: src/apricus/gui/gtk4app.py:1170
 msgid "Undo"
 msgstr "元に戻す"
 
-#: src/apricus/gui/gtk4app.py:1184
+#: src/apricus/gui/gtk4app.py:1179
 msgid "Clear playlist?"
 msgstr "プレイリストをクリアしますか？"
 
-#: src/apricus/gui/gtk4app.py:1187
+#: src/apricus/gui/gtk4app.py:1182
 #, python-brace-format
 msgid ""
 "This will remove all {n} videos from the playlist. This action cannot be "
@@ -296,228 +292,228 @@ msgid ""
 msgstr ""
 "プレイリストから {n} 件の動画すべてを削除します。この操作は元に戻せません。"
 
-#: src/apricus/gui/gtk4app.py:1192 src/apricus/gui/gtk4app.py:2914
+#: src/apricus/gui/gtk4app.py:1187 src/apricus/gui/gtk4app.py:2909
 msgid "Cancel"
 msgstr "キャンセル"
 
-#: src/apricus/gui/gtk4app.py:1205
+#: src/apricus/gui/gtk4app.py:1200
 msgid "Playlist cleared"
 msgstr "プレイリストをクリアしました"
 
-#: src/apricus/gui/gtk4app.py:1233
+#: src/apricus/gui/gtk4app.py:1228
 msgid "Queue empty — add videos from Library"
 msgstr "キューが空です — ライブラリから動画を追加してください"
 
-#: src/apricus/gui/gtk4app.py:1235
+#: src/apricus/gui/gtk4app.py:1230
 #, python-brace-format
 msgid "{n} videos in queue (muted by design)"
 msgstr "キューに {n} 件の動画（仕様によりミュート）"
 
-#: src/apricus/gui/gtk4app.py:1237
+#: src/apricus/gui/gtk4app.py:1232
 #, python-brace-format
 msgid "{n} videos in queue (paused)"
 msgstr "キューに {n} 件の動画（一時停止中）"
 
-#: src/apricus/gui/gtk4app.py:1314
+#: src/apricus/gui/gtk4app.py:1309
 msgid "Play / Pause"
 msgstr "再生 / 一時停止"
 
-#: src/apricus/gui/gtk4app.py:1319
+#: src/apricus/gui/gtk4app.py:1314
 msgid "Mute / Unmute"
 msgstr "ミュート / ミュート解除"
 
-#: src/apricus/gui/gtk4app.py:1323 src/apricus/gui/gtk4app.py:1490
-#: src/apricus/gui/gtk4app.py:1492 src/apricus/gui/gtk4app.py:1520
-#: src/apricus/gui/gtk4app.py:1521
+#: src/apricus/gui/gtk4app.py:1318 src/apricus/gui/gtk4app.py:1485
+#: src/apricus/gui/gtk4app.py:1487 src/apricus/gui/gtk4app.py:1515
+#: src/apricus/gui/gtk4app.py:1516
 msgid "Mute"
 msgstr "ミュート"
 
-#: src/apricus/gui/gtk4app.py:1331
+#: src/apricus/gui/gtk4app.py:1326
 msgid "Volume"
 msgstr "音量"
 
-#: src/apricus/gui/gtk4app.py:1342 src/apricus/gui/gtk4app.py:3122
+#: src/apricus/gui/gtk4app.py:1337 src/apricus/gui/gtk4app.py:3117
 msgid "Details"
 msgstr "詳細"
 
-#: src/apricus/gui/gtk4app.py:1346 src/apricus/gui/gtk4app.py:1717
+#: src/apricus/gui/gtk4app.py:1341 src/apricus/gui/gtk4app.py:1712
 msgid "Resolution"
 msgstr "解像度"
 
-#: src/apricus/gui/gtk4app.py:1347 src/apricus/gui/gtk4app.py:1721
+#: src/apricus/gui/gtk4app.py:1342 src/apricus/gui/gtk4app.py:1716
 msgid "Duration"
 msgstr "長さ"
 
-#: src/apricus/gui/gtk4app.py:1348 src/apricus/gui/gtk4app.py:1723
+#: src/apricus/gui/gtk4app.py:1343 src/apricus/gui/gtk4app.py:1718
 msgid "Format"
 msgstr "フォーマット"
 
-#: src/apricus/gui/gtk4app.py:1349 src/apricus/gui/gtk4app.py:1728
+#: src/apricus/gui/gtk4app.py:1344 src/apricus/gui/gtk4app.py:1723
 msgid "Folder"
 msgstr "フォルダー"
 
-#: src/apricus/gui/gtk4app.py:1360
+#: src/apricus/gui/gtk4app.py:1355
 msgid "Open the containing folder"
 msgstr "保存先フォルダーを開く"
 
-#: src/apricus/gui/gtk4app.py:1366
+#: src/apricus/gui/gtk4app.py:1361
 msgid "Up next"
 msgstr "次に再生"
 
-#: src/apricus/gui/gtk4app.py:1375
+#: src/apricus/gui/gtk4app.py:1370
 msgid "Choose a video from the library to start watching."
 msgstr "ライブラリから動画を選択して再生を開始してください。"
 
-#: src/apricus/gui/gtk4app.py:1376
+#: src/apricus/gui/gtk4app.py:1371
 msgid "Open library"
 msgstr "ライブラリを開く"
 
-#: src/apricus/gui/gtk4app.py:1418
+#: src/apricus/gui/gtk4app.py:1413
 msgid "Playlist in loop"
 msgstr "プレイリストをループ再生中"
 
-#: src/apricus/gui/gtk4app.py:1420 src/apricus/gui/gtk4app.py:1700
-#: src/apricus/gui/gtk4app.py:1885
+#: src/apricus/gui/gtk4app.py:1415 src/apricus/gui/gtk4app.py:1695
+#: src/apricus/gui/gtk4app.py:1880
 msgid "Web page"
 msgstr "ウェブページ"
 
-#: src/apricus/gui/gtk4app.py:1422
+#: src/apricus/gui/gtk4app.py:1417
 msgid "Playing"
 msgstr "再生中"
 
-#: src/apricus/gui/gtk4app.py:1490 src/apricus/gui/gtk4app.py:1521
+#: src/apricus/gui/gtk4app.py:1485 src/apricus/gui/gtk4app.py:1516
 msgid "Unmute"
 msgstr "ミュート解除"
 
-#: src/apricus/gui/gtk4app.py:1492 src/apricus/gui/gtk4app.py:1520
+#: src/apricus/gui/gtk4app.py:1487 src/apricus/gui/gtk4app.py:1515
 msgid "Muted"
 msgstr "ミュート中"
 
-#: src/apricus/gui/gtk4app.py:1681
+#: src/apricus/gui/gtk4app.py:1676
 msgid "Title"
 msgstr "タイトル"
 
-#: src/apricus/gui/gtk4app.py:1682
+#: src/apricus/gui/gtk4app.py:1677
 msgid "Site"
 msgstr "サイト"
 
-#: src/apricus/gui/gtk4app.py:1683
+#: src/apricus/gui/gtk4app.py:1678
 msgid "Link"
 msgstr "リンク"
 
-#: src/apricus/gui/gtk4app.py:1684
+#: src/apricus/gui/gtk4app.py:1679
 msgid "Type"
 msgstr "種類"
 
-#: src/apricus/gui/gtk4app.py:1691 src/apricus/gui/gtk4app.py:3083
+#: src/apricus/gui/gtk4app.py:1686 src/apricus/gui/gtk4app.py:3078
 msgid "Local web page"
 msgstr "ローカルウェブページ"
 
-#: src/apricus/gui/gtk4app.py:1860
+#: src/apricus/gui/gtk4app.py:1855
 #, python-brace-format
 msgid "n. {pos} of {total}"
 msgstr "{pos} / {total}"
 
-#: src/apricus/gui/gtk4app.py:1883
+#: src/apricus/gui/gtk4app.py:1878
 msgid "Single video"
 msgstr "単一動画"
 
-#: src/apricus/gui/gtk4app.py:1886
+#: src/apricus/gui/gtk4app.py:1881
 msgid "Playlist (muted)"
 msgstr "プレイリスト（ミュート）"
 
-#: src/apricus/gui/gtk4app.py:1887 src/apricus/gui/gtk4app.py:3708
+#: src/apricus/gui/gtk4app.py:1882 src/apricus/gui/gtk4app.py:3703
 msgid "Static wallpaper"
 msgstr "静止画壁紙"
 
-#: src/apricus/gui/gtk4app.py:1893
+#: src/apricus/gui/gtk4app.py:1888
 msgid "Playback failed before the first frame was shown"
 msgstr "最初のフレームが表示される前に再生に失敗しました"
 
-#: src/apricus/gui/gtk4app.py:1975 src/apricus/gui/gtk4app.py:2272
+#: src/apricus/gui/gtk4app.py:1970 src/apricus/gui/gtk4app.py:2267
 msgid "Paste a link to stream it as wallpaper"
 msgstr "リンクを貼り付けて壁紙としてストリーミング再生"
 
-#: src/apricus/gui/gtk4app.py:1982
+#: src/apricus/gui/gtk4app.py:1977
 msgid "https://… — YouTube, Twitch, live, direct video"
 msgstr "https://… — YouTube、Twitch、ライブ、直接動画"
 
-#: src/apricus/gui/gtk4app.py:1990 src/apricus/gui/gtk4app.py:2043
-#: src/apricus/gui/gtk4app.py:3055
+#: src/apricus/gui/gtk4app.py:1985 src/apricus/gui/gtk4app.py:2038
+#: src/apricus/gui/gtk4app.py:3050
 msgid "Paste from clipboard"
 msgstr "クリップボードから貼り付け"
 
-#: src/apricus/gui/gtk4app.py:1997 src/apricus/gui/gtk4app.py:3062
+#: src/apricus/gui/gtk4app.py:1992 src/apricus/gui/gtk4app.py:3057
 msgid "Detected"
 msgstr "検出結果"
 
-#: src/apricus/gui/gtk4app.py:1998 src/apricus/gui/gtk4app.py:2247
-#: src/apricus/gui/gtk4app.py:3063
+#: src/apricus/gui/gtk4app.py:1993 src/apricus/gui/gtk4app.py:2242
+#: src/apricus/gui/gtk4app.py:3058
 msgid "Paste a link to detect its type"
 msgstr "リンクを貼り付けると種類を自動検出します"
 
-#: src/apricus/gui/gtk4app.py:2007 src/apricus/gui/gtk4app.py:2878
-#: src/apricus/gui/gtk4app.py:3072
+#: src/apricus/gui/gtk4app.py:2002 src/apricus/gui/gtk4app.py:2873
+#: src/apricus/gui/gtk4app.py:3067
 msgid "Apply"
 msgstr "適用"
 
-#: src/apricus/gui/gtk4app.py:2012
+#: src/apricus/gui/gtk4app.py:2007
 msgid "Try 10s"
 msgstr "10秒試す"
 
-#: src/apricus/gui/gtk4app.py:2013
+#: src/apricus/gui/gtk4app.py:2008
 msgid "Preview for 10 seconds, then pause"
 msgstr "10秒間プレビューしてから一時停止します"
 
-#: src/apricus/gui/gtk4app.py:2018
+#: src/apricus/gui/gtk4app.py:2013
 msgid "Saved sources"
 msgstr "保存済みのソース"
 
-#: src/apricus/gui/gtk4app.py:2025 src/apricus/gui/gtk4app.py:3151
+#: src/apricus/gui/gtk4app.py:2020 src/apricus/gui/gtk4app.py:3146
 msgid "Recent"
 msgstr "最近の履歴"
 
-#: src/apricus/gui/gtk4app.py:2039
+#: src/apricus/gui/gtk4app.py:2034
 msgid "No saved sources yet"
 msgstr "保存済みのソースはまだありません"
 
-#: src/apricus/gui/gtk4app.py:2041
+#: src/apricus/gui/gtk4app.py:2036
 msgid ""
 "Paste a YouTube, Twitch or direct video link above. You will find it here."
 msgstr ""
 "上に YouTube、Twitch、または動画の直接リンクを貼り付けると、ここに表示されま"
 "す。"
 
-#: src/apricus/gui/gtk4app.py:2333
+#: src/apricus/gui/gtk4app.py:2328
 msgid "LIVE"
 msgstr "ライブ"
 
-#: src/apricus/gui/gtk4app.py:2345 src/apricus/gui/gtk4app.py:3199
+#: src/apricus/gui/gtk4app.py:2340 src/apricus/gui/gtk4app.py:3194
 msgid "Remove from saved"
 msgstr "保存済みから削除"
 
-#: src/apricus/gui/gtk4app.py:2345 src/apricus/gui/gtk4app.py:3199
+#: src/apricus/gui/gtk4app.py:2340 src/apricus/gui/gtk4app.py:3194
 msgid "Save"
 msgstr "保存"
 
-#: src/apricus/gui/gtk4app.py:2352
+#: src/apricus/gui/gtk4app.py:2347
 msgid "Apply this source now"
 msgstr "このソースを今すぐ適用"
 
-#: src/apricus/gui/gtk4app.py:2359
+#: src/apricus/gui/gtk4app.py:2354
 msgid "Remove from saved (kept in recent)"
 msgstr "保存済みから削除（履歴には残ります）"
 
-#: src/apricus/gui/gtk4app.py:2591
+#: src/apricus/gui/gtk4app.py:2586
 msgid "Stream history cleared"
 msgstr "ストリーミング履歴を消去しました"
 
-#: src/apricus/gui/gtk4app.py:2599 src/apricus/gui/gtk4app.py:2886
-#: src/apricus/gui/gtk4app.py:3585
+#: src/apricus/gui/gtk4app.py:2594 src/apricus/gui/gtk4app.py:2881
+#: src/apricus/gui/gtk4app.py:3580
 msgid "Not a valid http(s) URL."
 msgstr "有効な http(s) URL ではありません。"
 
-#: src/apricus/gui/gtk4app.py:2616 src/apricus/gui/gtk4app.py:2936
+#: src/apricus/gui/gtk4app.py:2611 src/apricus/gui/gtk4app.py:2931
 #, python-brace-format
 msgid ""
 "Failed to stream {url}.\n"
@@ -528,27 +524,27 @@ msgstr ""
 "エラー:\n"
 "{error}"
 
-#: src/apricus/gui/gtk4app.py:2629
+#: src/apricus/gui/gtk4app.py:2624
 msgid "Previewing for 10 seconds"
 msgstr "10秒間プレビュー中"
 
-#: src/apricus/gui/gtk4app.py:2630
+#: src/apricus/gui/gtk4app.py:2625
 msgid "Stop now"
 msgstr "今すぐ停止"
 
-#: src/apricus/gui/gtk4app.py:2645
+#: src/apricus/gui/gtk4app.py:2640
 msgid "Preview finished — Apply to keep watching"
 msgstr "プレビュー終了 — 続けて視聴するには「適用」を押してください"
 
-#: src/apricus/gui/gtk4app.py:2878
+#: src/apricus/gui/gtk4app.py:2873
 msgid "Checking…"
 msgstr "確認中…"
 
-#: src/apricus/gui/gtk4app.py:2906
+#: src/apricus/gui/gtk4app.py:2901
 msgid "Playlist links aren't supported"
 msgstr "プレイリストのリンクはサポートされていません"
 
-#: src/apricus/gui/gtk4app.py:2909
+#: src/apricus/gui/gtk4app.py:2904
 msgid ""
 "That link points to a playlist or channel. Apricus plays single videos — use "
 "the video's own link."
@@ -556,101 +552,101 @@ msgstr ""
 "このリンクはプレイリストまたはチャンネルを指しています。Apricus は単一動画を"
 "再生します — 動画自体のリンクを使用してください。"
 
-#: src/apricus/gui/gtk4app.py:2915
+#: src/apricus/gui/gtk4app.py:2910
 msgid "Use video anyway"
 msgstr "とにかく動画を再生"
 
-#: src/apricus/gui/gtk4app.py:3040
+#: src/apricus/gui/gtk4app.py:3035
 msgid "Display a website or HTML file as wallpaper"
 msgstr "ウェブサイトまたは HTML ファイルを壁紙として表示"
 
-#: src/apricus/gui/gtk4app.py:3075 src/apricus/gui/gtk4app.py:3214
+#: src/apricus/gui/gtk4app.py:3070 src/apricus/gui/gtk4app.py:3209
 msgid "Open in browser"
 msgstr "ブラウザーで開く"
 
-#: src/apricus/gui/gtk4app.py:3076
+#: src/apricus/gui/gtk4app.py:3071
 msgid "Open the entered address in the browser"
 msgstr "入力したアドレスをブラウザーで開く"
 
-#: src/apricus/gui/gtk4app.py:3085 src/apricus/gui/gtk4app.py:3472
+#: src/apricus/gui/gtk4app.py:3080 src/apricus/gui/gtk4app.py:3467
 msgid "No page chosen"
 msgstr "ページが選択されていません"
 
-#: src/apricus/gui/gtk4app.py:3086 src/apricus/gui/gtk4app.py:3473
+#: src/apricus/gui/gtk4app.py:3081 src/apricus/gui/gtk4app.py:3468
 msgid "Choose an HTML web page on this PC"
 msgstr "この PC 上の HTML ウェブページを選択"
 
-#: src/apricus/gui/gtk4app.py:3090
+#: src/apricus/gui/gtk4app.py:3085
 msgid "Choose local HTML web page"
 msgstr "ローカル HTML ウェブページを選択"
 
-#: src/apricus/gui/gtk4app.py:3096
+#: src/apricus/gui/gtk4app.py:3091
 msgid "Show the file in the file manager"
 msgstr "ファイルマネージャーでファイルを表示"
 
-#: src/apricus/gui/gtk4app.py:3106
+#: src/apricus/gui/gtk4app.py:3101
 msgid "Inspiration"
 msgstr "サンプル"
 
-#: src/apricus/gui/gtk4app.py:3138
+#: src/apricus/gui/gtk4app.py:3133
 msgid "Copy link"
 msgstr "リンクをコピー"
 
-#: src/apricus/gui/gtk4app.py:3144
+#: src/apricus/gui/gtk4app.py:3139
 msgid "Saved pages"
 msgstr "保存済みのページ"
 
-#: src/apricus/gui/gtk4app.py:3165
+#: src/apricus/gui/gtk4app.py:3160
 msgid "No saved pages yet"
 msgstr "保存済みのページはまだありません"
 
-#: src/apricus/gui/gtk4app.py:3166
+#: src/apricus/gui/gtk4app.py:3161
 msgid "Apply a link or file above. You will find it here."
 msgstr "上でリンクまたはファイルを適用すると、ここに表示されます。"
 
-#: src/apricus/gui/gtk4app.py:3207
+#: src/apricus/gui/gtk4app.py:3202
 msgid "Apply this file now"
 msgstr "このファイルを今すぐ適用"
 
-#: src/apricus/gui/gtk4app.py:3221
+#: src/apricus/gui/gtk4app.py:3216
 msgid "Remove from recent (kept in saved)"
 msgstr "履歴から削除（保存済みには残ります）"
 
-#: src/apricus/gui/gtk4app.py:3296
+#: src/apricus/gui/gtk4app.py:3291
 msgid "Web history cleared"
 msgstr "ウェブ履歴を消去しました"
 
-#: src/apricus/gui/gtk4app.py:3384
+#: src/apricus/gui/gtk4app.py:3379
 msgid "Type an address above to load a preview"
 msgstr "上にアドレスを入力してプレビューを読み込みます"
 
-#: src/apricus/gui/gtk4app.py:3390
+#: src/apricus/gui/gtk4app.py:3385
 msgid "Example loaded"
 msgstr "サンプルを読み込みました"
 
-#: src/apricus/gui/gtk4app.py:3456
+#: src/apricus/gui/gtk4app.py:3451
 msgid "Link copied"
 msgstr "リンクをコピーしました"
 
-#: src/apricus/gui/gtk4app.py:3508
+#: src/apricus/gui/gtk4app.py:3503
 #, python-brace-format
 msgid "Local web page — {size}"
 msgstr "ローカルウェブページ — {size}"
 
-#: src/apricus/gui/gtk4app.py:3514
+#: src/apricus/gui/gtk4app.py:3509
 #, python-brace-format
 msgid "Remote — {domain}"
 msgstr "リモート — {domain}"
 
-#: src/apricus/gui/gtk4app.py:3522
+#: src/apricus/gui/gtk4app.py:3517
 msgid "Current wallpaper"
 msgstr "現在の壁紙"
 
-#: src/apricus/gui/gtk4app.py:3522
+#: src/apricus/gui/gtk4app.py:3517
 msgid "Not applied"
 msgstr "未適用"
 
-#: src/apricus/gui/gtk4app.py:3609
+#: src/apricus/gui/gtk4app.py:3604
 #, python-brace-format
 msgid ""
 "Failed to access {url}.\n"
@@ -661,238 +657,201 @@ msgstr ""
 "エラー:\n"
 "{error}"
 
-#: src/apricus/gui/gtk4app.py:3651
+#: src/apricus/gui/gtk4app.py:3646
 msgid "Choose a local HTML web page"
 msgstr "ローカル HTML ウェブページを選択"
 
-#: src/apricus/gui/gtk4app.py:3679
+#: src/apricus/gui/gtk4app.py:3674
 msgid "Error"
 msgstr "エラー"
 
-#: src/apricus/gui/gtk4app.py:3705
+#: src/apricus/gui/gtk4app.py:3700
 msgid "Behaviour"
 msgstr "動作"
 
-#: src/apricus/gui/gtk4app.py:3709
+#: src/apricus/gui/gtk4app.py:3704
 msgid "Keep the last video frame as wallpaper"
 msgstr "最後の動画フレームを静止画壁紙として保持"
 
-#: src/apricus/gui/gtk4app.py:3714
+#: src/apricus/gui/gtk4app.py:3709
 msgid "Only on GNOME"
 msgstr "GNOME のみ"
 
-#: src/apricus/gui/gtk4app.py:3719
+#: src/apricus/gui/gtk4app.py:3714
 msgid "Pause when maximized"
 msgstr "最大化時に一時停止"
 
-#: src/apricus/gui/gtk4app.py:3720
+#: src/apricus/gui/gtk4app.py:3715
 msgid "Pause playback when a window is maximized"
 msgstr "ウィンドウが最大化されたときに再生を一時停止"
 
-#: src/apricus/gui/gtk4app.py:3725 src/apricus/gui/gtk4app.py:3737
+#: src/apricus/gui/gtk4app.py:3720 src/apricus/gui/gtk4app.py:3732
 msgid "Requires X11"
 msgstr "X11 が必要"
 
-#: src/apricus/gui/gtk4app.py:3731
+#: src/apricus/gui/gtk4app.py:3726
 msgid "Mute when maximized"
 msgstr "最大化時にミュート"
 
-#: src/apricus/gui/gtk4app.py:3732
+#: src/apricus/gui/gtk4app.py:3727
 msgid "Mute audio when a window is maximized"
 msgstr "ウィンドウが最大化されたときに音声をミュート"
 
-#: src/apricus/gui/gtk4app.py:3744
+#: src/apricus/gui/gtk4app.py:3739
 msgid "Desktop icons"
 msgstr "デスクトップアイコン"
 
-#: src/apricus/gui/gtk4app.py:3746
+#: src/apricus/gui/gtk4app.py:3741
 msgid "Keep icons above video"
 msgstr "アイコンを動画の前面に保つ"
 
-#: src/apricus/gui/gtk4app.py:3754
+#: src/apricus/gui/gtk4app.py:3749
 msgid "Prepare host installation"
 msgstr "ホストインストールを準備する"
 
-#: src/apricus/gui/gtk4app.py:3756
+#: src/apricus/gui/gtk4app.py:3751
 msgid "Export the extension files, then run one command on the host"
 msgstr ""
 "拡張機能のファイルをエクスポートし、ホストでコマンドを1つ実行してください"
 
-#: src/apricus/gui/gtk4app.py:3758
+#: src/apricus/gui/gtk4app.py:3753
 msgid "Prepare"
 msgstr "準備"
 
-#: src/apricus/gui/gtk4app.py:3764
+#: src/apricus/gui/gtk4app.py:3759
 msgid "Run on the host"
 msgstr "ホストで実行"
 
-#: src/apricus/gui/gtk4app.py:3765
+#: src/apricus/gui/gtk4app.py:3760
 msgid "Log out and back in afterwards"
 msgstr "その後ログアウトして再ログインしてください"
 
-#: src/apricus/gui/gtk4app.py:3767
+#: src/apricus/gui/gtk4app.py:3762
 msgid "Copy"
 msgstr "コピー"
 
-#: src/apricus/gui/gtk4app.py:3771
+#: src/apricus/gui/gtk4app.py:3766
 msgid "Check again"
 msgstr "再確認"
 
-#: src/apricus/gui/gtk4app.py:3779
-msgid "Video Rendering"
-msgstr "動画レンダリング"
-
-#: src/apricus/gui/gtk4app.py:3781
-msgid "Renderer"
-msgstr "レンダラー"
-
-#: src/apricus/gui/gtk4app.py:3782
-msgid "Takes effect immediately"
-msgstr "すぐに有効になります"
-
-#: src/apricus/gui/gtk4app.py:3792
-msgid "Automatic (Recommended)"
-msgstr "自動（推奨）"
-
-#: src/apricus/gui/gtk4app.py:3793
-msgid "OpenGL"
-msgstr "OpenGL"
-
-#: src/apricus/gui/gtk4app.py:3794
-msgid "Compatibility (XCB)"
-msgstr "互換性 (XCB)"
-
-#: src/apricus/gui/gtk4app.py:3795
-msgid "XVideo (Experimental)"
-msgstr "XVideo（実験的）"
-
-#: src/apricus/gui/gtk4app.py:3807
-#, python-brace-format
-msgid ""
-"Takes effect immediately. Note: APRICUS_VOUT={value} overrides the saved "
-"setting"
-msgstr ""
-"すぐに有効になります。注意: APRICUS_VOUT={value} が保存された設定より優先され"
-"ます"
-
-#: src/apricus/gui/gtk4app.py:3814
+#: src/apricus/gui/gtk4app.py:3774
 msgid "Startup"
 msgstr "起動"
 
-#: src/apricus/gui/gtk4app.py:3817
+#: src/apricus/gui/gtk4app.py:3777
 msgid "Start wallpaper at login"
 msgstr "ログイン時に壁紙を起動"
 
-#: src/apricus/gui/gtk4app.py:3818
+#: src/apricus/gui/gtk4app.py:3778
 msgid "Start only the wallpaper service at login"
 msgstr "ログイン時に壁紙サービスのみを起動"
 
-#: src/apricus/gui/gtk4app.py:3825
+#: src/apricus/gui/gtk4app.py:3785
 msgid "System"
 msgstr "システム"
 
-#: src/apricus/gui/gtk4app.py:3827
+#: src/apricus/gui/gtk4app.py:3787
 msgid "Open configuration"
 msgstr "設定ファイルを開く"
 
-#: src/apricus/gui/gtk4app.py:3829 src/apricus/gui/gtk4app.py:3850
+#: src/apricus/gui/gtk4app.py:3789 src/apricus/gui/gtk4app.py:3810
 msgid "Open"
 msgstr "開く"
 
-#: src/apricus/gui/gtk4app.py:3835 src/apricus/gui/gtk4app.py:4182
+#: src/apricus/gui/gtk4app.py:3795 src/apricus/gui/gtk4app.py:4013
 msgid "How to select videos"
 msgstr "動画の選択方法"
 
-#: src/apricus/gui/gtk4app.py:3836
+#: src/apricus/gui/gtk4app.py:3796
 msgid "Selection shortcuts for the library"
 msgstr "ライブラリの選択ショートカット"
 
-#: src/apricus/gui/gtk4app.py:3837
+#: src/apricus/gui/gtk4app.py:3797
 msgid "Show"
 msgstr "表示"
 
-#: src/apricus/gui/gtk4app.py:3844
+#: src/apricus/gui/gtk4app.py:3804
 msgid "Info"
 msgstr "情報"
 
-#: src/apricus/gui/gtk4app.py:3846
+#: src/apricus/gui/gtk4app.py:3806
 msgid "About Apricus"
 msgstr "Apricus について"
 
-#: src/apricus/gui/gtk4app.py:3848
+#: src/apricus/gui/gtk4app.py:3808
 #, python-brace-format
 msgid "Version {version} · GPL-3.0-or-later"
 msgstr "バージョン {version} · GPL-3.0-or-later"
 
-#: src/apricus/gui/gtk4app.py:3872
+#: src/apricus/gui/gtk4app.py:3832
 msgid "Active — icons stay above the video"
 msgstr "有効 — アイコンは動画の前面に表示されます"
 
-#: src/apricus/gui/gtk4app.py:3876
+#: src/apricus/gui/gtk4app.py:3836
 msgid "Installed but disabled — enable it manually: gnome-extensions enable"
 msgstr ""
 "インストール済みですが無効です — 手動で有効化してください: gnome-extensions "
 "enable"
 
-#: src/apricus/gui/gtk4app.py:3878
+#: src/apricus/gui/gtk4app.py:3838
 msgid "Installed but disabled — turn on to keep icons above video"
 msgstr ""
 "インストール済みですが無効です — アイコンを動画の前面に保つには有効にしてくだ"
 "さい"
 
-#: src/apricus/gui/gtk4app.py:3881
+#: src/apricus/gui/gtk4app.py:3841
 msgid "Enabled — log out and back in to activate it"
 msgstr "有効 — 有効化するにはログアウトして再ログインしてください"
 
-#: src/apricus/gui/gtk4app.py:3884
+#: src/apricus/gui/gtk4app.py:3844
 msgid "Installed — log out and back in so GNOME finds it"
 msgstr ""
 "インストール済み — GNOME が認識できるようログアウトして再ログインしてください"
 
-#: src/apricus/gui/gtk4app.py:3887
+#: src/apricus/gui/gtk4app.py:3847
 msgid "Not installed — native packages include it; see README"
 msgstr ""
 "未インストール — ネイティブパッケージに同梱されています。README を参照してく"
 "ださい"
 
-#: src/apricus/gui/gtk4app.py:3890
+#: src/apricus/gui/gtk4app.py:3850
 #, python-brace-format
 msgid "Unsupported GNOME {shell} (supports {supported})"
 msgstr "GNOME {shell} はサポートされていません（対応: {supported}）"
 
-#: src/apricus/gui/gtk4app.py:3894
+#: src/apricus/gui/gtk4app.py:3854
 msgid "Failed to load — check the journal for errors"
 msgstr "読み込みに失敗しました — journalctl でエラーを確認してください"
 
-#: src/apricus/gui/gtk4app.py:3896
+#: src/apricus/gui/gtk4app.py:3856
 msgid "Status unavailable"
 msgstr "ステータスを利用できません"
 
 #. noqa: BLE001 - show the failure inline
-#: src/apricus/gui/gtk4app.py:3923
+#: src/apricus/gui/gtk4app.py:3883
 #, python-brace-format
 msgid "Could not prepare installation files ({err})"
 msgstr "インストール用ファイルを準備できませんでした（{err}）"
 
-#: src/apricus/gui/gtk4app.py:3927
+#: src/apricus/gui/gtk4app.py:3887
 msgid "Files ready — run the command on the host"
 msgstr "ファイルの準備ができました — ホストでコマンドを実行してください"
 
 #. noqa: BLE001 - clipboard best effort
-#: src/apricus/gui/gtk4app.py:3939
+#: src/apricus/gui/gtk4app.py:3899
 #, python-brace-format
 msgid "Could not copy ({err})"
 msgstr "コピーできませんでした（{err}）"
 
-#: src/apricus/gui/gtk4app.py:3941
+#: src/apricus/gui/gtk4app.py:3901
 msgid "Command copied"
 msgstr "コマンドをコピーしました"
 
-#: src/apricus/gui/gtk4app.py:3959
+#: src/apricus/gui/gtk4app.py:3919
 msgid "Integration disabled — using basic stacking"
 msgstr "統合を無効にしました — 基本的な重なり順を使用します"
 
-#: src/apricus/gui/gtk4app.py:3966
+#: src/apricus/gui/gtk4app.py:3926
 #, python-brace-format
 msgid ""
 "Could not {action} automatically ({err}); run: gnome-extensions {action}"
@@ -900,56 +859,31 @@ msgstr ""
 "自動で{action}できませんでした（{err}）。gnome-extensions {action} を実行して"
 "ください"
 
-#: src/apricus/gui/gtk4app.py:3995
-msgid "Note: APRICUS_VOUT overrides the saved renderer"
-msgstr "注意：APRICUS_VOUT が保存されたレンダラーを上書きします"
-
-#: src/apricus/gui/gtk4app.py:4002
-msgid "Renderer saved — applies to video wallpapers"
-msgstr "レンダラーを保存しました — 動画の壁紙に適用されます"
-
-#: src/apricus/gui/gtk4app.py:4010 src/apricus/gui/gtk4app.py:4023
-#: src/apricus/gui/gtk4app.py:4071 src/apricus/gui/gtk4app.py:4096
-msgid "Unable to apply the selected renderer."
-msgstr "選択されたレンダラーを適用できませんでした。"
-
-#: src/apricus/gui/gtk4app.py:4012
-msgid "Applying video renderer…"
-msgstr "動画レンダラーを適用しています…"
-
-#: src/apricus/gui/gtk4app.py:4062
-msgid "The previous renderer has been restored."
-msgstr "以前のレンダラーに戻しました。"
-
-#: src/apricus/gui/gtk4app.py:4064
-msgid "Video renderer updated."
-msgstr "動画レンダラーを更新しました。"
-
-#: src/apricus/gui/gtk4app.py:4120
+#: src/apricus/gui/gtk4app.py:3951
 msgid "Wallpaper service starts at login"
 msgstr "ログイン時に壁紙サービスが起動します"
 
-#: src/apricus/gui/gtk4app.py:4122
+#: src/apricus/gui/gtk4app.py:3953
 msgid "Starts only the wallpaper service at login"
 msgstr "ログイン時に壁紙サービスのみを起動します"
 
-#: src/apricus/gui/gtk4app.py:4135 src/apricus/gui/gtk4app.py:4146
+#: src/apricus/gui/gtk4app.py:3966 src/apricus/gui/gtk4app.py:3977
 msgid "Could not change the startup setting."
 msgstr "自動起動の設定を変更できませんでした。"
 
-#: src/apricus/gui/gtk4app.py:4149
+#: src/apricus/gui/gtk4app.py:3980
 msgid "Startup enabled"
 msgstr "自動起動を有効にしました"
 
-#: src/apricus/gui/gtk4app.py:4149
+#: src/apricus/gui/gtk4app.py:3980
 msgid "Startup disabled"
 msgstr "自動起動を無効にしました"
 
-#: src/apricus/gui/gtk4app.py:4178
+#: src/apricus/gui/gtk4app.py:4009
 msgid "Could not open the configuration file."
 msgstr "設定ファイルを開けませんでした。"
 
-#: src/apricus/gui/gtk4app.py:4185
+#: src/apricus/gui/gtk4app.py:4016
 msgid ""
 "Click to select a video.\n"
 "Ctrl+click or Shift+click selects more than one.\n"
@@ -983,6 +917,56 @@ msgstr "再読み込み"
 #: src/apricus/menu.py:105
 msgid "Quit Apricus"
 msgstr "Apricus を終了"
+
+#~ msgid "No video frames received yet"
+#~ msgstr "まだビデオフレームを受信していません"
+
+#~ msgid "Video Rendering"
+#~ msgstr "動画レンダリング"
+
+#~ msgid "Renderer"
+#~ msgstr "レンダラー"
+
+#~ msgid "Takes effect immediately"
+#~ msgstr "すぐに有効になります"
+
+#~ msgid "Automatic (Recommended)"
+#~ msgstr "自動（推奨）"
+
+#~ msgid "OpenGL"
+#~ msgstr "OpenGL"
+
+#~ msgid "Compatibility (XCB)"
+#~ msgstr "互換性 (XCB)"
+
+#~ msgid "XVideo (Experimental)"
+#~ msgstr "XVideo（実験的）"
+
+#, python-brace-format
+#~ msgid ""
+#~ "Takes effect immediately. Note: APRICUS_VOUT={value} overrides the saved "
+#~ "setting"
+#~ msgstr ""
+#~ "すぐに有効になります。注意: APRICUS_VOUT={value} が保存された設定より優先"
+#~ "されます"
+
+#~ msgid "Note: APRICUS_VOUT overrides the saved renderer"
+#~ msgstr "注意：APRICUS_VOUT が保存されたレンダラーを上書きします"
+
+#~ msgid "Renderer saved — applies to video wallpapers"
+#~ msgstr "レンダラーを保存しました — 動画の壁紙に適用されます"
+
+#~ msgid "Unable to apply the selected renderer."
+#~ msgstr "選択されたレンダラーを適用できませんでした。"
+
+#~ msgid "Applying video renderer…"
+#~ msgstr "動画レンダラーを適用しています…"
+
+#~ msgid "The previous renderer has been restored."
+#~ msgstr "以前のレンダラーに戻しました。"
+
+#~ msgid "Video renderer updated."
+#~ msgstr "動画レンダラーを更新しました。"
 
 #~ msgid "Restart Apricus to apply a new renderer"
 #~ msgstr "新しいレンダラーを適用するには Apricus を再起動してください"

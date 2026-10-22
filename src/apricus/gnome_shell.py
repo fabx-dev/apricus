@@ -8,9 +8,9 @@ windows below DING's native Wayland desktop window. The companion extension
 ``apricus-integration@fabx-dev`` (shipped under ``gnome-extension/``)
 hosts our role-identified wallpaper windows in the Shell's background
 layer; icons stay above the video because the Shell parents our windows
-into its background group, whatever output module VLC picks (verified
-live: libvlc 3 ignores --vout for embedded playback and always uses its
-automatic pick).
+into its background group, whatever output module VLC picks (verdict C:
+under LibVLC 3 the embedded player always uses VLC's automatic pick —
+see docs/notes/vlc3-vout-investigation.md).
 
 This module only *detects* the integration; it never talks to the
 compositor. The extension works autonomously by matching the window role

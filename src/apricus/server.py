@@ -206,8 +206,8 @@ class ApricusServer:
 
         # Reuse the live player when staying inside the VLC family: no
         # unmap/respawn gap, the windows (and their covers) survive.
-        # Forced respawns (e.g. video renderer changes) always recreate
-        # the player so the new VLC instance picks up fresh options.
+        # Forced respawns always recreate the player so a fresh VLC
+        # instance picks up changed options.
         if not force_respawn and self._try_switch_media(mode):
             perf.mark(f"server: player switched in place [{mode}]")
             self._refresh_systray(mode)
@@ -396,9 +396,9 @@ class ApricusServer:
 
         Unlike reload(), this always recreates the player process (no
         in-place media switch), so a new VLC instance picks up changed
-        options such as the video renderer. Volume, mute, playlists and
-        per-monitor assignments are preserved from the config; the
-        playlist position restarts from the queue head.
+        options. Volume, mute, playlists and per-monitor assignments are
+        preserved from the config; the playlist position restarts from
+        the queue head.
         """
         _authorize("player.respawn", dbus_context)
         self._load_config()

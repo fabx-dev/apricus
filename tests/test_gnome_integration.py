@@ -74,7 +74,12 @@ def test_extension_manages_stacking_in_place():
 
 
 def test_vlc_options_pin_exact_flags_per_renderer():
-    """Renderer selection: exact flags per vout, none by default."""
+    """Canonical flags per stored renderer id, none by default.
+
+    These values are inert under LibVLC 3 (verdict C: the media player
+    shadows "vout", so VLC always uses its automatic pick), but they
+    are still passed in canonical form for forward compatibility.
+    """
     from apricus.player.video_player import _vlc_options
 
     assert _vlc_options(False, "opengl") == [
@@ -101,7 +106,7 @@ def test_vlc_options_pin_exact_flags_per_renderer():
 
 
 def test_renderer_resolution_precedence(monkeypatch):
-    """APRICUS_VOUT > saved selection > automatic policy."""
+    """APRICUS_VOUT > saved selection > automatic policy (forward-compat values)."""
     import apricus.player.video_player as player_mod
     from apricus.player.video_player import resolve_renderer_vout
 

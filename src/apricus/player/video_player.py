@@ -65,6 +65,9 @@ def _vlc_options(disable_audio: bool, vout):
 
     *vout* is ``None`` (VLC default) or a canonical module name from
     :data:`VOUT_MODULES`. Use :func:`resolve_renderer_vout` to compute it.
+    NOTE: under LibVLC 3 the value is currently inert for embedded
+    playback (see docs/notes/vlc3-vout-investigation.md); it is still
+    passed in canonical form so a future libvlc gets a valid name.
     Keeping the option building here lets tests pin the exact flags per
     renderer without a display.
     """
@@ -116,13 +119,13 @@ def resolve_renderer_vout(explicit=RENDERER_AUTO):
     Shell integration is active, ``xcb_x11`` on GNOME Wayland without it,
     and leaves VLC's default elsewhere (Xorg keeps hardware presentation).
     Unknown values fall back to automatic with a warning: raw strings are
-    never passed to VLC, whose fuzzy matching could otherwise select an
-    overlay-plane output that covers the desktop icons.
+    never passed to VLC.
 
-    NOTE (verified live, VLC 3.0.23): libvlc ignores --vout for embedded
-    set_xwindow playback (probe filter always "any"), so every renderer
-    currently yields VLC's automatic pick. Values are still canonical so
-    a future libvlc gets a valid module name.
+    NOTE (verdict C, see docs/notes/vlc3-vout-investigation.md): under
+    LibVLC 3 the media player shadows the "vout" variable with its own
+    empty one, so every renderer currently yields VLC's automatic pick
+    for embedded playback. Values are still canonical so a future
+    libvlc gets a valid module name.
     """
     env = _canonical_vout(os.environ.get("APRICUS_VOUT", ""))
     if env is not None:
@@ -211,17 +214,13 @@ class VLCWidget(Gtk.DrawingArea):
         #   plugin segfaults (pw_thread_loop_lock) when multiple instances are
         #   active, e.g. one per monitor. See the Flatpak, which uses Pulse too.
         # Video output (--vout): resolved by resolve_renderer_vout() from the
-        # saved selection, APRICUS_VOUT and the automatic policy (opengl
-        # with active GNOME integration, xcb_x11 on GNOME Wayland, VLC
-        # default elsewhere so Xorg keeps hardware presentation). NOTE
-        # (verified live, VLC 3.0.23): libvlc IGNORES --vout for embedded
-        # playback via set_xwindow — the vout-display probe always runs
-        # with filter "any" (Instance options, :vout media options and
-        # vlcrc are all ignored there; only the cvlc CLI honors --vout).
-        # So today every renderer resolves to VLC's automatic pick (gl
-        # on this stack). The option is still passed in canonical form
-        # so a future libvlc that honors it gets a valid module name,
-        # and the respawn/verify/rollback machinery stays exercised.
+        # saved selection, APRICUS_VOUT and the automatic policy.
+        # NOTE (verdict C, see docs/notes/vlc3-vout-investigation.md):
+        # under LibVLC 3 this value is inert for embedded playback via
+        # set_xwindow — the media player shadows the "vout" variable
+        # with its own empty one, so the vout-display probe always runs
+        # with filter "any" and VLC uses its automatic pick. The option
+        # is still passed in canonical form for forward compatibility.
         # Icons stay above video via the GNOME Shell companion extension
         # (background-layer adoption), not via the vout choice.
         # Playlist mode never needs audio: opening/closing the audio output
@@ -700,7 +699,7 @@ class VideoPlayer(BasePlayer):
 
     # Seconds without a first frame before playback_error() reports
     # "No video frames received yet". Generous on purpose: slow streams may
-    # legitimately take a while; this guards renderer/mode transitions.
+    # legitimately take a while; this guards mode transitions.
     FIRST_FRAME_TIMEOUT_SEC = 20
 
     def _apply_source(self, data_source, setup_handlers):
@@ -809,7 +808,7 @@ class VideoPlayer(BasePlayer):
                     continue
                 window._queue = queue
                 # Resume where the queue left off (persisted across player
-                # respawns, e.g. renderer switches); shuffles restart.
+                # respawns); shuffles restart.
                 saved_pos = self.config.get(CONFIG_KEY_PLAYLIST_POS) or {}
                 if shuffle:
                     window._queue_index = 0

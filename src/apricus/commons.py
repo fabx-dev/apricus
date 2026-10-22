@@ -119,17 +119,20 @@ CONFIG_KEY_STREAM_FAVORITES = "stream_favorites"
 CONFIG_KEY_WEB_HISTORY = "web_history"
 CONFIG_KEY_WEB_FAVORITES = "web_favorites"
 CONFIG_KEY_RENDERER = "video_renderer"
-# Video renderer ids (stored in config, never translated).
+# Video renderer ids (stored in config for backward compatibility;
+# no UI exposes them anymore — see docs/notes/vlc3-vout-investigation.md).
+# Values are never translated.
 RENDERER_AUTO = "auto"
 RENDERER_GL = "gl"
 RENDERER_XCB = "xcb"
 RENDERER_XV = "xv"
 VALID_RENDERERS = frozenset({RENDERER_AUTO, RENDERER_GL, RENDERER_XCB, RENDERER_XV})
-# Canonical VLC video-output module names for each renderer id. These are
-# the only values ever passed to --vout: unknown strings (including older
-# shorthand) are rejected by resolve_renderer_vout() instead of being
-# handed to VLC, whose fuzzy matching could otherwise pick an
-# overlay-plane output that covers the desktop icons.
+# Canonical VLC video-output module names for each renderer id,
+# kept for forward compatibility (see
+# docs/notes/vlc3-vout-investigation.md). Under LibVLC 3 these values
+# are inert: the media player shadows the "vout" variable with its own
+# empty one, so VLC always uses its automatic pick. Unknown strings
+# are rejected instead of being handed to VLC.
 VOUT_MODULES = {
     RENDERER_GL: "opengl",
     RENDERER_XCB: "xcb_x11",
@@ -156,8 +159,8 @@ CONFIG_TEMPLATE = {
     CONFIG_KEY_PLAYLIST: None,  # seeded per-process, see ensure_template_monitors()
     CONFIG_KEY_SHUFFLE: False,
     # Per-monitor playlist positions ({monitor_key: index}) so a player
-    # respawn (renderer switch, mode reload) resumes the current item
-    # instead of restarting the queue. Backfilled like video_dir.
+    # respawn (mode reload) resumes the current item instead of
+    # restarting the queue. Backfilled like video_dir.
     CONFIG_KEY_PLAYLIST_POS: {},
     # Stream pick-list (no version bump: backfilled like video_dir).
     # History entries: {url, title, site, kind, last_used}.
