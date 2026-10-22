@@ -55,7 +55,6 @@ if [ -n "$ZIP" ]; then
     command -v unzip >/dev/null 2>&1 || { echo "unzip not found (install 'unzip')" >&2; exit 1; }
     [ -f "$ZIP" ] || { echo "ZIP not found: $ZIP" >&2; exit 1; }
     TMPDIR_WORK="$(mktemp -d)"
-    trap 'rm -rf "$TMPDIR_WORK"' EXIT
     unzip -q -o "$ZIP" -d "$TMPDIR_WORK"
     if [ -d "$TMPDIR_WORK/$UUID" ]; then
         SRC_DIR="$TMPDIR_WORK/$UUID"
@@ -80,7 +79,18 @@ if command -v gnome-shell >/dev/null 2>&1; then
 fi
 
 mkdir -p "$DEST_DIR"
-cp "$SRC_DIR/metadata.json" "$SRC_DIR/extension.js" "$DEST_DIR/"
+# Replace each file atomically (temp copy + rename) so the Shell never
+# observes a half-written metadata.json/extension.js, e.g. when this
+# script re-runs as an update while the extension is loaded. Cleanup of
+# the ZIP workdir and leftover temp files on interruption.
+trap 'if [ -n "${TMPDIR_WORK:-}" ]; then rm -rf "$TMPDIR_WORK"; fi; rm -f "$DEST_DIR"/*.tmp.$$' EXIT
+install_file() {
+    tmp="$2.tmp.$$"
+    cp "$1" "$tmp"
+    mv -f "$tmp" "$2"
+}
+install_file "$SRC_DIR/metadata.json" "$DEST_DIR/metadata.json"
+install_file "$SRC_DIR/extension.js" "$DEST_DIR/extension.js"
 echo "Installed $UUID to $DEST_DIR"
 
 if [ "$ENABLE" -eq 1 ]; then

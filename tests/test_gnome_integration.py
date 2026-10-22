@@ -455,6 +455,22 @@ def test_host_zip_and_installer_roundtrip(tmp_path):
     for name in ("metadata.json", "extension.js"):
         src = (repo / "gnome-extension" / EXTENSION_UUID / name).read_bytes()
         assert (installed / name).read_bytes() == src
+    # Re-running over an existing install (the update flow) is idempotent.
+    proc = subprocess.run(
+        ["bash", installer, "--zip", str(out_zip)],
+        capture_output=True,
+        text=True,
+        timeout=60,
+        env=env,
+    )
+    assert proc.returncode == 0, proc.stderr
+    for name in ("metadata.json", "extension.js"):
+        src = (repo / "gnome-extension" / EXTENSION_UUID / name).read_bytes()
+        assert (installed / name).read_bytes() == src
+    assert sorted(p.name for p in installed.iterdir()) == [
+        "extension.js",
+        "metadata.json",
+    ]
     proc = subprocess.run(
         ["bash", installer, "--bogus"], capture_output=True, text=True, timeout=60, env=env
     )

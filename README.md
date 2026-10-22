@@ -191,6 +191,7 @@ apricus --systemd-enable    # disable anytime with: apricus --systemd-disable
      | 50 | yes | yes, Wayland + DING | yes |
      | 51 | yes (same APIs on main branch) | no | yes (pending runtime test) |
    - **Setup status**: on GNOME Wayland, Settings shows a *Desktop icons* row with an ON/OFF switch (Active / disabled / needs logout-login / not installed / incompatible / error / unavailable) plus, for Snap/Flatpak without the extension, guided host installation (Prepare → copy the shown command → Check again). The row never appears on other sessions.
+   - **Updating the host extension**: re-run the same install command (Settings shows it, or `install-host.sh --zip <file.zip> --enable`): files are overwritten in place, then log out/in. Removing Apricus (Snap/Flatpak/deb/rpm) never touches `~/.local/share/gnome-shell/extensions/` — to remove it manually: `gnome-extensions disable apricus-integration@fabx-dev` (if enabled), log out/in, then delete `~/.local/share/gnome-shell/extensions/apricus-integration@fabx-dev`. No `sudo` is ever needed for the per-user install.
    - **Troubleshooting**: after install+enable, the video stays behind the icons only once the Shell loads the extension (logout/login required). Confirm with `journalctl --user -g apricus-integration` (expect `enabled, code revision N` and `adopted "…" into the background layer`). If the extension disappears after a GNOME upgrade, it was fenced by `shell-version`: wait for an Apricus update that declares the new Shell.
 
 ### Additional Notes
