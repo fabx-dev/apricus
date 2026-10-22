@@ -30,6 +30,7 @@ from apricus.commons import (
     CONFIG_KEY_MUTE_WHEN_MAXIMIZED,
     CONFIG_KEY_PAUSE_WHEN_MAXIMIZED,
     CONFIG_KEY_PLAYLIST,
+    CONFIG_KEY_PLAYLIST_POS,
     CONFIG_KEY_RENDERER,
     CONFIG_KEY_SHUFFLE,
     CONFIG_KEY_STATIC_WALLPAPER,
@@ -766,12 +767,20 @@ class VideoPlayer(BasePlayer):
                     logger.warning(f"[Playlist] No videos for {mkey}, monitor stays blank")
                     continue
                 window._queue = queue
-                window._queue_index = 0
+                # Resume where the queue left off (persisted across player
+                # respawns, e.g. renderer switches); shuffles restart.
+                saved_pos = self.config.get(CONFIG_KEY_PLAYLIST_POS) or {}
+                if shuffle:
+                    window._queue_index = 0
+                else:
+                    window._queue_index = self._restored_queue_index(
+                        saved_pos, mkey, monitor.get_model(), len(queue)
+                    )
                 window._transitioning = False
                 if not getattr(window, "_end_attached", False):
                     window.attach_end_reached(lambda w=window: self._on_media_end(w))
                     window._end_attached = True
-                self._play_queue_item(window)
+                self._play_queue_item(window, mkey, monitor.get_model())
         else:
             raise ValueError("Invalid mode")
 
@@ -832,7 +841,7 @@ class VideoPlayer(BasePlayer):
                 return queue[0]
         return None
 
-    def _play_queue_item(self, window):
+    def _play_queue_item(self, window, mkey=None, model=None):
         """Play window._queue[window._queue_index]. Main thread only."""
         if getattr(window, "_transitioning", False):
             logger.debug("[Playlist] Transition already in progress, skipping")
@@ -852,6 +861,7 @@ class VideoPlayer(BasePlayer):
             window.play()
             window.centercrop(width, height)
             self._media_started_at = time.monotonic()
+            self._save_queue_index(mkey or model, window._queue_index)
         finally:
             window._transitioning = False
 
@@ -861,8 +871,68 @@ class VideoPlayer(BasePlayer):
         if not queue:
             return False
         window._queue_index = (window._queue_index + 1) % len(queue)
-        self._play_queue_item(window)
+        monitor = next((m for m, w in self.windows.items() if w is window), None)
+        if monitor is not None:
+            try:
+                model = monitor.get_model()
+            except Exception:  # noqa: BLE001 - best effort only
+                model = ""
+            self._play_queue_item(window, self._stable_monitor_key(monitor), model)
+        else:
+            self._play_queue_item(window)
         return False
+
+    @staticmethod
+    def _restored_queue_index(saved, key, model, length):
+        """Resume position for a playlist, clamped into the current queue."""
+        if not isinstance(length, int) or length <= 0:
+            return 0
+        try:
+            position = (saved or {}).get(key, (saved or {}).get(model, 0))
+        except AttributeError:
+            return 0
+        if not isinstance(position, int) or isinstance(position, bool) or position < 0:
+            return 0
+        return position % length
+
+    def _stable_monitor_key(self, monitor):
+        """Stable per-monitor key for persisting playlist position."""
+        try:
+            from apricus.monitor import assign_keys
+
+            infos = []
+            monitors = []
+            for m in self.windows:
+                infos.append(
+                    {
+                        "name": m.get_model(),
+                        "x": m.get_geometry().x,
+                        "y": m.get_geometry().y,
+                    }
+                )
+                monitors.append(m)
+            for m, info in zip(monitors, assign_keys(infos), strict=True):
+                if m is monitor:
+                    return info["key"]
+            return monitor.get_model()
+        except Exception:  # noqa: BLE001 - best effort, fall back to model
+            try:
+                return monitor.get_model()
+            except Exception:  # noqa: BLE001 - last resort
+                return "Default"
+
+    def _save_queue_index(self, key, index):
+        """Persist the current playlist position (survives respawns)."""
+        if not key:
+            return
+        try:
+            positions = self.config.setdefault(CONFIG_KEY_PLAYLIST_POS, {})
+            if not isinstance(positions, dict):
+                positions = self.config[CONFIG_KEY_PLAYLIST_POS] = {}
+            positions[key] = int(index)
+            ConfigUtil().save(self.config)
+        except Exception as e:  # noqa: BLE001 - static frame matters more
+            logger.debug(f"[Playlist] position save skipped: {e}")
 
     @property
     def volume(self):
@@ -915,9 +985,26 @@ class VideoPlayer(BasePlayer):
             not first_frame_seen
             and getattr(self, "_media_started_at", None) is not None
             and (time.monotonic() - self._media_started_at) > self.FIRST_FRAME_TIMEOUT_SEC
+            and self._is_actually_playing()
         ):
+            # Decoding claims to play but shows nothing: broken output,
+            # not a pause (paused players report is_playing() False) and
+            # not startup buffering (deadline is generous on purpose).
+            # A first frame arriving later clears this automatically.
             return "No video frames received yet"
         return None
+
+    def _is_actually_playing(self):
+        """True when libVLC itself reports playback on any window.
+
+        Unlike ``is_playing`` (the user-pause flag), this is False for
+        manual pauses, screen-lock pauses and auto-pause on maximize, so
+        the no-frames verdict never fires when no frames are expected.
+        """
+        try:
+            return any(w.is_playing() for w in self.windows.values())
+        except Exception:  # noqa: BLE001 - never break error reporting
+            return False
 
     @property
     def last_error(self):

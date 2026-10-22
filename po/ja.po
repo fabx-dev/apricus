@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: apricus 2.0.1\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-22 10:39+0200\n"
+"POT-Creation-Date: 2026-10-22 22:18+0200\n"
 "PO-Revision-Date: 2026-10-15 23:55+0200\n"
 "Last-Translator: fabx-dev <https://github.com/fabx-dev>\n"
 "Language-Team: Japanese\n"
@@ -55,6 +55,10 @@ msgstr "再試行"
 #: src/apricus/gui/gtk4app.py:205
 msgid "Playback failed"
 msgstr "再生に失敗しました"
+
+#: src/apricus/player/video_player.py
+msgid "No video frames received yet"
+msgstr "まだビデオフレームを受信していません"
 
 #: src/apricus/gui/gtk4app.py:357 src/apricus/gui/gtk4app.py:369
 msgid "Server down"
@@ -231,7 +235,7 @@ msgstr ""
 "さい。"
 
 #: src/apricus/gui/gtk4app.py:773 src/apricus/gui/gtk4app.py:3680
-#: src/apricus/gui/gtk4app.py:4183
+#: src/apricus/gui/gtk4app.py:4191
 msgid "OK"
 msgstr "OK"
 
@@ -711,7 +715,8 @@ msgstr "ホストインストールを準備する"
 
 #: src/apricus/gui/gtk4app.py:3756
 msgid "Export the extension files, then run one command on the host"
-msgstr "拡張機能のファイルをエクスポートし、ホストでコマンドを1つ実行してください"
+msgstr ""
+"拡張機能のファイルをエクスポートし、ホストでコマンドを1つ実行してください"
 
 #: src/apricus/gui/gtk4app.py:3758
 msgid "Prepare"
@@ -761,10 +766,14 @@ msgstr "互換性 (XCB)"
 msgid "XVideo (Experimental)"
 msgstr "XVideo（実験的）"
 
-#: src/apricus/gui/gtk4app.py:3806
+#: src/apricus/gui/gtk4app.py:3807
 #, python-brace-format
-msgid "Takes effect immediately. Note: APRICUS_VOUT={value} overrides the saved setting"
-msgstr "すぐに有効になります。注意: APRICUS_VOUT={value} が保存された設定より優先されます"
+msgid ""
+"Takes effect immediately. Note: APRICUS_VOUT={value} overrides the saved "
+"setting"
+msgstr ""
+"すぐに有効になります。注意: APRICUS_VOUT={value} が保存された設定より優先され"
+"ます"
 
 #: src/apricus/gui/gtk4app.py:3814
 msgid "Startup"
@@ -790,7 +799,7 @@ msgstr "設定ファイルを開く"
 msgid "Open"
 msgstr "開く"
 
-#: src/apricus/gui/gtk4app.py:3835 src/apricus/gui/gtk4app.py:4174
+#: src/apricus/gui/gtk4app.py:3835 src/apricus/gui/gtk4app.py:4182
 msgid "How to select videos"
 msgstr "動画の選択方法"
 
@@ -900,7 +909,7 @@ msgid "Renderer saved — applies to video wallpapers"
 msgstr "レンダラーを保存しました — 動画の壁紙に適用されます"
 
 #: src/apricus/gui/gtk4app.py:4010 src/apricus/gui/gtk4app.py:4023
-#: src/apricus/gui/gtk4app.py:4069 src/apricus/gui/gtk4app.py:4088
+#: src/apricus/gui/gtk4app.py:4071 src/apricus/gui/gtk4app.py:4096
 msgid "Unable to apply the selected renderer."
 msgstr "選択されたレンダラーを適用できませんでした。"
 
@@ -908,39 +917,39 @@ msgstr "選択されたレンダラーを適用できませんでした。"
 msgid "Applying video renderer…"
 msgstr "動画レンダラーを適用しています…"
 
-#: src/apricus/gui/gtk4app.py:4060
+#: src/apricus/gui/gtk4app.py:4062
 msgid "The previous renderer has been restored."
 msgstr "以前のレンダラーに戻しました。"
 
-#: src/apricus/gui/gtk4app.py:4062
+#: src/apricus/gui/gtk4app.py:4064
 msgid "Video renderer updated."
 msgstr "動画レンダラーを更新しました。"
 
-#: src/apricus/gui/gtk4app.py:4112
+#: src/apricus/gui/gtk4app.py:4120
 msgid "Wallpaper service starts at login"
 msgstr "ログイン時に壁紙サービスが起動します"
 
-#: src/apricus/gui/gtk4app.py:4114
+#: src/apricus/gui/gtk4app.py:4122
 msgid "Starts only the wallpaper service at login"
 msgstr "ログイン時に壁紙サービスのみを起動します"
 
-#: src/apricus/gui/gtk4app.py:4127 src/apricus/gui/gtk4app.py:4138
+#: src/apricus/gui/gtk4app.py:4135 src/apricus/gui/gtk4app.py:4146
 msgid "Could not change the startup setting."
 msgstr "自動起動の設定を変更できませんでした。"
 
-#: src/apricus/gui/gtk4app.py:4141
+#: src/apricus/gui/gtk4app.py:4149
 msgid "Startup enabled"
 msgstr "自動起動を有効にしました"
 
-#: src/apricus/gui/gtk4app.py:4141
+#: src/apricus/gui/gtk4app.py:4149
 msgid "Startup disabled"
 msgstr "自動起動を無効にしました"
 
-#: src/apricus/gui/gtk4app.py:4170
+#: src/apricus/gui/gtk4app.py:4178
 msgid "Could not open the configuration file."
 msgstr "設定ファイルを開けませんでした。"
 
-#: src/apricus/gui/gtk4app.py:4177
+#: src/apricus/gui/gtk4app.py:4185
 msgid ""
 "Click to select a video.\n"
 "Ctrl+click or Shift+click selects more than one.\n"

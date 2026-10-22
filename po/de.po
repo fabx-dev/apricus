@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: apricus 2.0.1\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-22 10:39+0200\n"
+"POT-Creation-Date: 2026-10-22 22:18+0200\n"
 "PO-Revision-Date: 2026-10-15 23:55+0200\n"
 "Last-Translator: fabx-dev <https://github.com/fabx-dev>\n"
 "Language-Team: German\n"
@@ -54,6 +54,10 @@ msgstr "Erneut versuchen"
 #: src/apricus/gui/gtk4app.py:205
 msgid "Playback failed"
 msgstr "Wiedergabe fehlgeschlagen"
+
+#: src/apricus/player/video_player.py
+msgid "No video frames received yet"
+msgstr "Noch keine Videoframes empfangen"
 
 #: src/apricus/gui/gtk4app.py:357 src/apricus/gui/gtk4app.py:369
 msgid "Server down"
@@ -232,7 +236,7 @@ msgstr ""
 "alle in Schleife abzuspielen."
 
 #: src/apricus/gui/gtk4app.py:773 src/apricus/gui/gtk4app.py:3680
-#: src/apricus/gui/gtk4app.py:4183
+#: src/apricus/gui/gtk4app.py:4191
 msgid "OK"
 msgstr "OK"
 
@@ -713,7 +717,8 @@ msgstr "Host-Installation vorbereiten"
 
 #: src/apricus/gui/gtk4app.py:3756
 msgid "Export the extension files, then run one command on the host"
-msgstr "Erweiterungsdateien exportieren, dann einen Befehl auf dem Host ausführen"
+msgstr ""
+"Erweiterungsdateien exportieren, dann einen Befehl auf dem Host ausführen"
 
 #: src/apricus/gui/gtk4app.py:3758
 msgid "Prepare"
@@ -763,10 +768,14 @@ msgstr "Kompatibilität (XCB)"
 msgid "XVideo (Experimental)"
 msgstr "XVideo (experimentell)"
 
-#: src/apricus/gui/gtk4app.py:3806
+#: src/apricus/gui/gtk4app.py:3807
 #, python-brace-format
-msgid "Takes effect immediately. Note: APRICUS_VOUT={value} overrides the saved setting"
-msgstr "Wird sofort wirksam. Hinweis: APRICUS_VOUT={value} setzt die gespeicherte Einstellung außer Kraft"
+msgid ""
+"Takes effect immediately. Note: APRICUS_VOUT={value} overrides the saved "
+"setting"
+msgstr ""
+"Wird sofort wirksam. Hinweis: APRICUS_VOUT={value} setzt die gespeicherte "
+"Einstellung außer Kraft"
 
 #: src/apricus/gui/gtk4app.py:3814
 msgid "Startup"
@@ -792,7 +801,7 @@ msgstr "Konfiguration öffnen"
 msgid "Open"
 msgstr "Öffnen"
 
-#: src/apricus/gui/gtk4app.py:3835 src/apricus/gui/gtk4app.py:4174
+#: src/apricus/gui/gtk4app.py:3835 src/apricus/gui/gtk4app.py:4182
 msgid "How to select videos"
 msgstr "Videos auswählen"
 
@@ -898,7 +907,7 @@ msgid "Renderer saved — applies to video wallpapers"
 msgstr "Renderer gespeichert — gilt für Videohintergründe"
 
 #: src/apricus/gui/gtk4app.py:4010 src/apricus/gui/gtk4app.py:4023
-#: src/apricus/gui/gtk4app.py:4069 src/apricus/gui/gtk4app.py:4088
+#: src/apricus/gui/gtk4app.py:4071 src/apricus/gui/gtk4app.py:4096
 msgid "Unable to apply the selected renderer."
 msgstr "Der gewählte Renderer konnte nicht angewendet werden."
 
@@ -906,39 +915,39 @@ msgstr "Der gewählte Renderer konnte nicht angewendet werden."
 msgid "Applying video renderer…"
 msgstr "Video-Renderer wird angewendet …"
 
-#: src/apricus/gui/gtk4app.py:4060
+#: src/apricus/gui/gtk4app.py:4062
 msgid "The previous renderer has been restored."
 msgstr "Der vorherige Renderer wurde wiederhergestellt."
 
-#: src/apricus/gui/gtk4app.py:4062
+#: src/apricus/gui/gtk4app.py:4064
 msgid "Video renderer updated."
 msgstr "Video-Renderer aktualisiert."
 
-#: src/apricus/gui/gtk4app.py:4112
+#: src/apricus/gui/gtk4app.py:4120
 msgid "Wallpaper service starts at login"
 msgstr "Hintergrunddienst startet bei der Anmeldung"
 
-#: src/apricus/gui/gtk4app.py:4114
+#: src/apricus/gui/gtk4app.py:4122
 msgid "Starts only the wallpaper service at login"
 msgstr "Startet bei der Anmeldung nur den Hintergrunddienst"
 
-#: src/apricus/gui/gtk4app.py:4127 src/apricus/gui/gtk4app.py:4138
+#: src/apricus/gui/gtk4app.py:4135 src/apricus/gui/gtk4app.py:4146
 msgid "Could not change the startup setting."
 msgstr "Starteinstellung konnte nicht geändert werden."
 
-#: src/apricus/gui/gtk4app.py:4141
+#: src/apricus/gui/gtk4app.py:4149
 msgid "Startup enabled"
 msgstr "Autostart aktiviert"
 
-#: src/apricus/gui/gtk4app.py:4141
+#: src/apricus/gui/gtk4app.py:4149
 msgid "Startup disabled"
 msgstr "Autostart deaktiviert"
 
-#: src/apricus/gui/gtk4app.py:4170
+#: src/apricus/gui/gtk4app.py:4178
 msgid "Could not open the configuration file."
 msgstr "Konfigurationsdatei konnte nicht geöffnet werden."
 
-#: src/apricus/gui/gtk4app.py:4177
+#: src/apricus/gui/gtk4app.py:4185
 msgid ""
 "Click to select a video.\n"
 "Ctrl+click or Shift+click selects more than one.\n"

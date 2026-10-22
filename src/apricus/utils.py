@@ -41,6 +41,7 @@ from apricus.commons import (
     CONFIG_KEY_FADE_INTERVAL,
     CONFIG_KEY_MUTE_WHEN_MAXIMIZED,
     CONFIG_KEY_PLAYLIST,
+    CONFIG_KEY_PLAYLIST_POS,
     CONFIG_KEY_RENDERER,
     CONFIG_KEY_SHUFFLE,
     CONFIG_KEY_STREAM_FAVORITES,
@@ -909,6 +910,16 @@ class ConfigUtil:
                     # sanitize to a known id, defaulting to automatic.
                     if config.get(CONFIG_KEY_RENDERER) not in VALID_RENDERERS:
                         config[CONFIG_KEY_RENDERER] = RENDERER_AUTO
+                    # Per-monitor playlist positions: same no-bump backfill,
+                    # sanitized to non-negative ints.
+                    pos = config.get(CONFIG_KEY_PLAYLIST_POS)
+                    if not isinstance(pos, dict):
+                        pos = {}
+                    config[CONFIG_KEY_PLAYLIST_POS] = {
+                        str(k): v
+                        for k, v in pos.items()
+                        if isinstance(v, int) and not isinstance(v, bool) and v >= 0
+                    }
                     # Stream pick-list, same no-bump policy (sanitized).
                     config[CONFIG_KEY_STREAM_HISTORY] = self._sanitize_stream_entries(
                         config.get(CONFIG_KEY_STREAM_HISTORY)

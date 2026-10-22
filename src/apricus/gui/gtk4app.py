@@ -4080,6 +4080,12 @@ class ControlPanel(Adw.Application):
             self.config = ConfigUtil().load()
             self.config[CONFIG_KEY_RENDERER] = previous
             ConfigUtil().save(self.config)
+            row = getattr(self, "renderer_row", None)
+            if row is not None:
+                try:
+                    row.set_selected(self._renderer_ids.index(previous))
+                except (ValueError, AttributeError):
+                    pass
             server = self._server()
             if server is None:
                 raise RuntimeError("no server")

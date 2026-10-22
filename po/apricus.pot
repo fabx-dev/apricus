@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: apricus\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-22 10:39+0200\n"
+"POT-Creation-Date: 2026-10-22 22:18+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -223,7 +223,7 @@ msgid ""
 msgstr ""
 
 #: src/apricus/gui/gtk4app.py:773 src/apricus/gui/gtk4app.py:3680
-#: src/apricus/gui/gtk4app.py:4183
+#: src/apricus/gui/gtk4app.py:4191
 msgid "OK"
 msgstr ""
 
@@ -742,7 +742,7 @@ msgstr ""
 msgid "XVideo (Experimental)"
 msgstr ""
 
-#: src/apricus/gui/gtk4app.py:3806
+#: src/apricus/gui/gtk4app.py:3807
 #, python-brace-format
 msgid ""
 "Takes effect immediately. Note: APRICUS_VOUT={value} overrides the saved "
@@ -773,7 +773,7 @@ msgstr ""
 msgid "Open"
 msgstr ""
 
-#: src/apricus/gui/gtk4app.py:3835 src/apricus/gui/gtk4app.py:4174
+#: src/apricus/gui/gtk4app.py:3835 src/apricus/gui/gtk4app.py:4182
 msgid "How to select videos"
 msgstr ""
 
@@ -874,7 +874,7 @@ msgid "Renderer saved — applies to video wallpapers"
 msgstr ""
 
 #: src/apricus/gui/gtk4app.py:4010 src/apricus/gui/gtk4app.py:4023
-#: src/apricus/gui/gtk4app.py:4069 src/apricus/gui/gtk4app.py:4088
+#: src/apricus/gui/gtk4app.py:4071 src/apricus/gui/gtk4app.py:4096
 msgid "Unable to apply the selected renderer."
 msgstr ""
 
@@ -882,39 +882,39 @@ msgstr ""
 msgid "Applying video renderer…"
 msgstr ""
 
-#: src/apricus/gui/gtk4app.py:4060
+#: src/apricus/gui/gtk4app.py:4062
 msgid "The previous renderer has been restored."
 msgstr ""
 
-#: src/apricus/gui/gtk4app.py:4062
+#: src/apricus/gui/gtk4app.py:4064
 msgid "Video renderer updated."
 msgstr ""
 
-#: src/apricus/gui/gtk4app.py:4112
+#: src/apricus/gui/gtk4app.py:4120
 msgid "Wallpaper service starts at login"
 msgstr ""
 
-#: src/apricus/gui/gtk4app.py:4114
+#: src/apricus/gui/gtk4app.py:4122
 msgid "Starts only the wallpaper service at login"
 msgstr ""
 
-#: src/apricus/gui/gtk4app.py:4127 src/apricus/gui/gtk4app.py:4138
+#: src/apricus/gui/gtk4app.py:4135 src/apricus/gui/gtk4app.py:4146
 msgid "Could not change the startup setting."
 msgstr ""
 
-#: src/apricus/gui/gtk4app.py:4141
+#: src/apricus/gui/gtk4app.py:4149
 msgid "Startup enabled"
 msgstr ""
 
-#: src/apricus/gui/gtk4app.py:4141
+#: src/apricus/gui/gtk4app.py:4149
 msgid "Startup disabled"
 msgstr ""
 
-#: src/apricus/gui/gtk4app.py:4170
+#: src/apricus/gui/gtk4app.py:4178
 msgid "Could not open the configuration file."
 msgstr ""
 
-#: src/apricus/gui/gtk4app.py:4177
+#: src/apricus/gui/gtk4app.py:4185
 msgid ""
 "Click to select a video.\n"
 "Ctrl+click or Shift+click selects more than one.\n"

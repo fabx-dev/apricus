@@ -450,42 +450,6 @@ def test_host_zip_and_installer_roundtrip(tmp_path):
     assert proc.returncode != 0
 
 
-def _deadline_player(*, resolve_error=None, first_frame=False, started_ago=None):
-    """VideoPlayer-shaped stub for playback_error() (no display needed)."""
-
-    import time
-
-    from apricus.player.video_player import VideoPlayer
-
-    class Win:
-        def playback_error(self):
-            return None
-
-        _first_frame_reported = first_frame
-
-    class Stub:
-        FIRST_FRAME_TIMEOUT_SEC = VideoPlayer.FIRST_FRAME_TIMEOUT_SEC
-        _resolve_error = resolve_error
-        windows = {"m": Win()}
-        _media_started_at = None if started_ago is None else time.monotonic() - started_ago
-
-    return Stub()
-
-
-def test_no_frames_reported_only_after_timeout():
-    from apricus.player.video_player import VideoPlayer
-
-    fresh = _deadline_player()
-    assert VideoPlayer.playback_error(fresh) is None
-    old = _deadline_player(started_ago=VideoPlayer.FIRST_FRAME_TIMEOUT_SEC + 5)
-    assert VideoPlayer.playback_error(old) == "No video frames received yet"
-    framed = _deadline_player(first_frame=True, started_ago=VideoPlayer.FIRST_FRAME_TIMEOUT_SEC + 5)
-    assert VideoPlayer.playback_error(framed) is None
-    resolving = _deadline_player(
-        resolve_error="boom", started_ago=VideoPlayer.FIRST_FRAME_TIMEOUT_SEC + 5
-    )
-    assert VideoPlayer.playback_error(resolving) == "boom"
-
 
 def test_respawn_player_forces_fresh_instance():
     from apricus import server as srv
@@ -523,7 +487,7 @@ def test_respawn_player_noop_without_media_mode():
     assert calls == []
 
 
-def _deadline_player(*, resolve_error=None, first_frame=False, started_ago=None):
+def _deadline_player(*, resolve_error=None, first_frame=False, started_ago=None, playing=True):
     """VideoPlayer-shaped stub for playback_error (no display needed)."""
     import time
 
@@ -535,11 +499,20 @@ def _deadline_player(*, resolve_error=None, first_frame=False, started_ago=None)
 
         _first_frame_reported = first_frame
 
+        def is_playing(self):
+            return playing
+
     class Stub:
         FIRST_FRAME_TIMEOUT_SEC = VideoPlayer.FIRST_FRAME_TIMEOUT_SEC
         _resolve_error = resolve_error
         windows = {"m": Win()}
         _media_started_at = None if started_ago is None else time.monotonic() - started_ago
+
+        def is_playing(self):
+            return playing
+
+        def _is_actually_playing(self):
+            return playing
 
     return Stub()
 
@@ -556,3 +529,84 @@ def test_no_frames_reported_only_after_timeout():
         resolve_error="boom", started_ago=VideoPlayer.FIRST_FRAME_TIMEOUT_SEC + 5
     )
     assert VideoPlayer.playback_error(resolving) == "boom"
+
+
+def test_no_frames_silent_when_paused():
+    """Manual pauses, auto-pause and buffering must never trip the watchdog."""
+    from apricus.player.video_player import VideoPlayer
+
+    paused = _deadline_player(
+        playing=False, started_ago=VideoPlayer.FIRST_FRAME_TIMEOUT_SEC + 60
+    )
+    assert VideoPlayer.playback_error(paused) is None
+
+
+def test_restored_queue_index_clamps_and_prefers_key():
+    from apricus.player.video_player import VideoPlayer
+
+    saved = {"M#1": 5, "M#0": 2}
+    assert VideoPlayer._restored_queue_index(saved, "M#1", "M", 3) == 2
+    assert VideoPlayer._restored_queue_index(saved, "M#9", "M", 3) == 0
+    assert VideoPlayer._restored_queue_index(saved, "M#9", "M#0", 3) == 2
+    assert VideoPlayer._restored_queue_index(None, "M#1", "M", 3) == 0
+    assert VideoPlayer._restored_queue_index({"M#1": -1}, "M#1", "M", 3) == 0
+    assert VideoPlayer._restored_queue_index({"M#1": "x"}, "M#1", "M", 3) == 0
+    assert VideoPlayer._restored_queue_index({"M#1": 7}, "M#1", "M", 0) == 0
+    assert VideoPlayer._restored_queue_index({"M#1": 7}, "M#1", "M", None) == 0
+
+
+def test_stable_monitor_key_matches_apply_source_keys():
+    from apricus.player.video_player import VideoPlayer
+
+    class Mon:
+        def __init__(self, name, x):
+            self._name = name
+            self._x = x
+
+        def get_model(self):
+            return self._name
+
+        def get_geometry(self):
+            class G:
+                pass
+
+            g = G()
+            g.x = self._x
+            g.y = 0
+            return g
+
+    class P:
+        def __init__(self):
+            m1, m2 = Mon("Dell", 0), Mon("Dell", 1920)
+            self.windows = {m1: object(), m2: object()}
+
+    p = P()
+    assert VideoPlayer._stable_monitor_key(p, list(p.windows)[1]) == "Dell#1"
+    assert VideoPlayer._stable_monitor_key(p, list(p.windows)[0]) == "Dell#0"
+
+
+def test_save_queue_index_persists_and_sanitizes():
+    from apricus.player.video_player import VideoPlayer
+
+    saved = {}
+
+    class FakeConfigUtil:
+        def save(self, config):
+            saved.update(config)
+
+    import apricus.player.video_player as player_mod
+
+    real_configutil = player_mod.ConfigUtil
+    player_mod.ConfigUtil = FakeConfigUtil
+    try:
+
+        class P:
+            config = {}
+
+        p = P()
+        VideoPlayer._save_queue_index(p, "M#1", 4)
+        assert saved.get("playlist_position") == {"M#1": 4}
+        VideoPlayer._save_queue_index(p, "", 4)
+        assert saved.get("playlist_position") == {"M#1": 4}
+    finally:
+        player_mod.ConfigUtil = real_configutil

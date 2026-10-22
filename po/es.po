@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: apricus 2.0.1\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-22 10:39+0200\n"
+"POT-Creation-Date: 2026-10-22 22:18+0200\n"
 "PO-Revision-Date: 2026-10-15 23:55+0200\n"
 "Last-Translator: fabx-dev <https://github.com/fabx-dev>\n"
 "Language-Team: Spanish\n"
@@ -54,6 +54,10 @@ msgstr "Reintentar"
 #: src/apricus/gui/gtk4app.py:205
 msgid "Playback failed"
 msgstr "Error de reproducción"
+
+#: src/apricus/player/video_player.py
+msgid "No video frames received yet"
+msgstr "Aún no se han recibido fotogramas de vídeo"
 
 #: src/apricus/gui/gtk4app.py:357 src/apricus/gui/gtk4app.py:369
 msgid "Server down"
@@ -230,7 +234,7 @@ msgstr ""
 "reproducirlos en bucle."
 
 #: src/apricus/gui/gtk4app.py:773 src/apricus/gui/gtk4app.py:3680
-#: src/apricus/gui/gtk4app.py:4183
+#: src/apricus/gui/gtk4app.py:4191
 msgid "OK"
 msgstr "Aceptar"
 
@@ -761,10 +765,14 @@ msgstr "Compatibilidad (XCB)"
 msgid "XVideo (Experimental)"
 msgstr "XVideo (experimental)"
 
-#: src/apricus/gui/gtk4app.py:3806
+#: src/apricus/gui/gtk4app.py:3807
 #, python-brace-format
-msgid "Takes effect immediately. Note: APRICUS_VOUT={value} overrides the saved setting"
-msgstr "Tiene efecto inmediato. Nota: APRICUS_VOUT={value} prevalece sobre el ajuste guardado"
+msgid ""
+"Takes effect immediately. Note: APRICUS_VOUT={value} overrides the saved "
+"setting"
+msgstr ""
+"Tiene efecto inmediato. Nota: APRICUS_VOUT={value} prevalece sobre el ajuste "
+"guardado"
 
 #: src/apricus/gui/gtk4app.py:3814
 msgid "Startup"
@@ -790,7 +798,7 @@ msgstr "Abrir configuración"
 msgid "Open"
 msgstr "Abrir"
 
-#: src/apricus/gui/gtk4app.py:3835 src/apricus/gui/gtk4app.py:4174
+#: src/apricus/gui/gtk4app.py:3835 src/apricus/gui/gtk4app.py:4182
 msgid "How to select videos"
 msgstr "Cómo seleccionar vídeos"
 
@@ -895,7 +903,7 @@ msgid "Renderer saved — applies to video wallpapers"
 msgstr "Renderizador guardado — se aplica a los fondos de vídeo"
 
 #: src/apricus/gui/gtk4app.py:4010 src/apricus/gui/gtk4app.py:4023
-#: src/apricus/gui/gtk4app.py:4069 src/apricus/gui/gtk4app.py:4088
+#: src/apricus/gui/gtk4app.py:4071 src/apricus/gui/gtk4app.py:4096
 msgid "Unable to apply the selected renderer."
 msgstr "No se pudo aplicar el renderizador seleccionado."
 
@@ -903,39 +911,39 @@ msgstr "No se pudo aplicar el renderizador seleccionado."
 msgid "Applying video renderer…"
 msgstr "Aplicando renderizador de vídeo…"
 
-#: src/apricus/gui/gtk4app.py:4060
+#: src/apricus/gui/gtk4app.py:4062
 msgid "The previous renderer has been restored."
 msgstr "Se ha restaurado el renderizador anterior."
 
-#: src/apricus/gui/gtk4app.py:4062
+#: src/apricus/gui/gtk4app.py:4064
 msgid "Video renderer updated."
 msgstr "Renderizador de vídeo actualizado."
 
-#: src/apricus/gui/gtk4app.py:4112
+#: src/apricus/gui/gtk4app.py:4120
 msgid "Wallpaper service starts at login"
 msgstr "El servicio del fondo se inicia al iniciar sesión"
 
-#: src/apricus/gui/gtk4app.py:4114
+#: src/apricus/gui/gtk4app.py:4122
 msgid "Starts only the wallpaper service at login"
 msgstr "Inicia solo el servicio del fondo al iniciar sesión"
 
-#: src/apricus/gui/gtk4app.py:4127 src/apricus/gui/gtk4app.py:4138
+#: src/apricus/gui/gtk4app.py:4135 src/apricus/gui/gtk4app.py:4146
 msgid "Could not change the startup setting."
 msgstr "No se pudo cambiar el ajuste de inicio."
 
-#: src/apricus/gui/gtk4app.py:4141
+#: src/apricus/gui/gtk4app.py:4149
 msgid "Startup enabled"
 msgstr "Inicio automático activado"
 
-#: src/apricus/gui/gtk4app.py:4141
+#: src/apricus/gui/gtk4app.py:4149
 msgid "Startup disabled"
 msgstr "Inicio automático desactivado"
 
-#: src/apricus/gui/gtk4app.py:4170
+#: src/apricus/gui/gtk4app.py:4178
 msgid "Could not open the configuration file."
 msgstr "No se pudo abrir el archivo de configuración."
 
-#: src/apricus/gui/gtk4app.py:4177
+#: src/apricus/gui/gtk4app.py:4185
 msgid ""
 "Click to select a video.\n"
 "Ctrl+click or Shift+click selects more than one.\n"

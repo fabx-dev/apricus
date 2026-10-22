@@ -113,6 +113,7 @@ CONFIG_KEY_FIRST_TIME = "is_first_time"
 CONFIG_KEY_VIDEO_DIR = "video_dir"
 CONFIG_KEY_PLAYLIST = "playlist"
 CONFIG_KEY_SHUFFLE = "playlist_shuffle"
+CONFIG_KEY_PLAYLIST_POS = "playlist_position"
 CONFIG_KEY_STREAM_HISTORY = "stream_history"
 CONFIG_KEY_STREAM_FAVORITES = "stream_favorites"
 CONFIG_KEY_WEB_HISTORY = "web_history"
@@ -144,6 +145,10 @@ CONFIG_TEMPLATE = {
     # back to "Default". Shuffled order is computed at apply time.
     CONFIG_KEY_PLAYLIST: None,  # seeded per-process, see ensure_template_monitors()
     CONFIG_KEY_SHUFFLE: False,
+    # Per-monitor playlist positions ({monitor_key: index}) so a player
+    # respawn (renderer switch, mode reload) resumes the current item
+    # instead of restarting the queue. Backfilled like video_dir.
+    CONFIG_KEY_PLAYLIST_POS: {},
     # Stream pick-list (no version bump: backfilled like video_dir).
     # History entries: {url, title, site, kind, last_used}.
     CONFIG_KEY_STREAM_HISTORY: [],
