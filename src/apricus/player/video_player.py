@@ -30,6 +30,7 @@ from apricus.commons import (
     CONFIG_KEY_MUTE_WHEN_MAXIMIZED,
     CONFIG_KEY_PAUSE_WHEN_MAXIMIZED,
     CONFIG_KEY_PLAYLIST,
+    CONFIG_KEY_RENDERER,
     CONFIG_KEY_SHUFFLE,
     CONFIG_KEY_STATIC_WALLPAPER,
     CONFIG_KEY_VOLUME,
@@ -38,7 +39,9 @@ from apricus.commons import (
     MODE_PLAYLIST,
     MODE_STREAM,
     MODE_VIDEO,
+    RENDERER_AUTO,
 )
+from apricus.gnome_shell import integration_active
 from apricus.menu import build_menu
 from apricus.player.base_player import BasePlayer
 from apricus.utils import (
@@ -55,16 +58,13 @@ from apricus.yt_utils import youtube_dl as yt_dlp
 logger = logging.getLogger(LOGGER_NAME)
 
 
-def _vlc_options(disable_audio: bool, use_xcb: bool):
+def _vlc_options(disable_audio: bool, vout):
     """VLC instance options for one player window (pure logic, tested).
 
-    Mirrors the option building in :class:`VLCWidget.__init__`: callers
-    pass ``use_xcb=is_gnome() and is_wayland()``. Keeping the logic here
-    lets tests pin the exact flags per session type without a display.
-
-    ``APRICUS_VOUT`` overrides the video output (empty = session default).
-    Supported for renderer experiments and debugging; the default stays
-    authoritative for correct desktop integration.
+    *vout* is ``None`` (VLC default) or a module name (``"gl"``/``"xcb"``/
+    ``"xv"``). Use :func:`resolve_renderer_vout` to compute it. Keeping
+    the option building here lets tests pin the exact flags per renderer
+    without a display.
     """
     if disable_audio:
         options = [
@@ -75,12 +75,38 @@ def _vlc_options(disable_audio: bool, use_xcb: bool):
         ]
     else:
         options = ["--no-disable-screensaver", "--no-interact", "--aout=pulse"]
-    forced = os.environ.get("APRICUS_VOUT", "").strip()
-    if forced:
-        options.append(f"--vout={forced}")
-    elif use_xcb:
-        options.append("--vout=xcb")
+    if vout in ("gl", "xcb", "xv"):
+        options.append(f"--vout={vout}")
     return options
+
+
+def resolve_renderer_vout(explicit=RENDERER_AUTO):
+    """Decide the VLC video output module name, or None for VLC default.
+
+    Precedence: ``APRICUS_VOUT`` env override > saved *explicit* selection
+    > automatic policy. The automatic policy selects ``gl`` when the GNOME
+    Shell integration is active, ``xcb`` on GNOME Wayland without it, and
+    leaves VLC's default elsewhere (Xorg keeps hardware presentation).
+    Unknown values fall back to automatic with a warning, never silently
+    passed to VLC.
+    """
+    env = os.environ.get("APRICUS_VOUT", "").strip().lower()
+    if env in ("gl", "xcb", "xv"):
+        return env
+    if env:
+        logger.warning(f"[Player] ignoring unknown APRICUS_VOUT={env!r}")
+    if explicit in ("gl", "xcb", "xv"):
+        return explicit
+    if explicit != RENDERER_AUTO:
+        logger.warning(f"[Player] ignoring unknown renderer {explicit!r}, using automatic")
+    try:
+        if integration_active():
+            return "gl"
+    except Exception:  # noqa: BLE001 - detection is best-effort
+        logger.debug("[Player] integration check failed, using session default")
+    if is_gnome() and is_wayland():
+        return "xcb"
+    return None
 
 
 class Fade:
@@ -141,7 +167,7 @@ class VLCWidget(Gtk.DrawingArea):
 
     __gtype_name__ = "VLCWidget"
 
-    def __init__(self, width, height, disable_audio=False):
+    def __init__(self, width, height, disable_audio=False, renderer=RENDERER_AUTO):
         Gtk.DrawingArea.__init__(self)
 
         # Spawn a VLC instance and create a new media player to embed.
@@ -150,22 +176,17 @@ class VLCWidget(Gtk.DrawingArea):
         # --aout=pulse: Force PulseAudio output. VLC's PipeWire audio-output
         #   plugin segfaults (pw_thread_loop_lock) when multiple instances are
         #   active, e.g. one per monitor. See the Flatpak, which uses Pulse too.
-        # --vout=xcb: Force plain X11 (XImage/SHM) presentation into our X
-        #   window pixmap, but only on GNOME Wayland sessions. There it is
-        #   required: GPU-direct outputs bypass the pixmap via overlay planes
-        #   that always composite above everything — including DING — so no
-        #   stacking order can place them below the desktop icons (verified
-        #   live: black X pixmap + renderDRI open while the video visibly
-        #   played on top). Everywhere else the default output is kept so
-        #   Xorg sessions retain hardware presentation. Session-based (not
-        #   extension-state-based): the player cannot know whether the user
-        #   will enable the extension later, and pixmap rendering is harmless
-        #   without it.
+        # Video output (--vout): resolved by resolve_renderer_vout() from the
+        # saved selection, APRICUS_VOUT and the automatic policy (gl with
+        # active GNOME integration, xcb on GNOME Wayland, VLC default
+        # elsewhere so Xorg keeps hardware presentation). Pixmap-based
+        # outputs are required under DING: GPU-direct outputs bypass the
+        # pixmap via overlay planes that always composite above everything.
         # Playlist mode never needs audio: opening/closing the audio output
         # on every transition locks up PipeWire, so it is disabled entirely.
         # Option building lives in _vlc_options() (unit-tested).
-        use_xcb = is_gnome() and is_wayland()
-        vlc_options = _vlc_options(disable_audio, use_xcb)
+        vout = resolve_renderer_vout(renderer)
+        vlc_options = _vlc_options(disable_audio, vout)
         self.instance = vlc.Instance(vlc_options)
         self.player = self.instance.media_player_new()
 
@@ -192,7 +213,7 @@ class VLCWidget(Gtk.DrawingArea):
 
 
 class PlayerWindow(Gtk.ApplicationWindow):
-    def __init__(self, name, width, height, *args, mode=MODE_VIDEO, **kwargs):
+    def __init__(self, name, width, height, *args, mode=MODE_VIDEO, renderer=RENDERER_AUTO, **kwargs):
         super().__init__(*args, **kwargs)
         # Keyboard/mouse input is handled by VLC flags below (both disabled):
         # never take keyboard focus so clicks can't raise us over DING.
@@ -205,7 +226,9 @@ class PlayerWindow(Gtk.ApplicationWindow):
         self.height = height
         self.name = name
         self._mode = mode
-        self.__vlc_widget = VLCWidget(width, height, disable_audio=(mode == MODE_PLAYLIST))
+        self.__vlc_widget = VLCWidget(
+            width, height, disable_audio=(mode == MODE_PLAYLIST), renderer=renderer
+        )
         # Opaque black until the first frame lands: otherwise the theme
         # background flashes through on every video switch.
         self.override_background_color(Gtk.StateFlags.NORMAL, Gdk.RGBA(0, 0, 0, 1))
@@ -524,8 +547,14 @@ class VideoPlayer(BasePlayer):
 
     def new_window(self, gdk_monitor):
         rect = gdk_monitor.get_geometry()
+        renderer = (self.config or {}).get(CONFIG_KEY_RENDERER, RENDERER_AUTO)
         return PlayerWindow(
-            gdk_monitor.get_model(), rect.width, rect.height, application=self, mode=self.mode
+            gdk_monitor.get_model(),
+            rect.width,
+            rect.height,
+            application=self,
+            mode=self.mode,
+            renderer=renderer,
         )
 
     def do_activate(self):
