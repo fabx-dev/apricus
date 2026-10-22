@@ -526,3 +526,40 @@ def test_respawn_player_noop_without_media_mode():
 
     assert srv.ApricusServer.respawn_player(Stub()) is False
     assert calls == []
+
+
+def _deadline_player(*, resolve_error=None, first_frame=False, started_ago=None):
+    """VideoPlayer-shaped stub for playback_error (no display needed)."""
+    import time
+
+    from apricus.player.video_player import VideoPlayer
+
+    class Win:
+        def playback_error(self):
+            return None
+
+        _first_frame_reported = first_frame
+
+    class Stub:
+        FIRST_FRAME_TIMEOUT_SEC = VideoPlayer.FIRST_FRAME_TIMEOUT_SEC
+        _resolve_error = resolve_error
+        windows = {"m": Win()}
+        _media_started_at = None if started_ago is None else time.monotonic() - started_ago
+
+    return Stub()
+
+
+def test_no_frames_reported_only_after_timeout():
+    from apricus.player.video_player import VideoPlayer
+
+    assert VideoPlayer.playback_error(_deadline_player()) is None
+    old = _deadline_player(started_ago=VideoPlayer.FIRST_FRAME_TIMEOUT_SEC + 5)
+    assert VideoPlayer.playback_error(old) == "No video frames received yet"
+    framed = _deadline_player(
+        first_frame=True, started_ago=VideoPlayer.FIRST_FRAME_TIMEOUT_SEC + 5
+    )
+    assert VideoPlayer.playback_error(framed) is None
+    resolving = _deadline_player(
+        resolve_error="boom", started_ago=VideoPlayer.FIRST_FRAME_TIMEOUT_SEC + 5
+    )
+    assert VideoPlayer.playback_error(resolving) == "boom"

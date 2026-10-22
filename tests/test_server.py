@@ -443,3 +443,43 @@ def test_server_property_setters_persist_to_disk(monkeypatch):
     assert saved[-1][srv.CONFIG_KEY_MUTE] is True
     assert saved[-1][srv.CONFIG_KEY_VOLUME] == 75
     assert saved[-1][srv.CONFIG_KEY_STATIC_WALLPAPER] is False
+
+
+def test_respawn_player_forces_fresh_process():
+    """respawn_player() must rebuild the player even for the same mode."""
+    from unittest.mock import patch
+
+    calls = []
+
+    s = srv.ApricusServer.__new__(srv.ApricusServer)
+    s.config = {"mode": "MODE_VIDEO", "data_source": {"Default": "/a.mp4"}}
+    s._load_config = lambda: None
+
+    def fake_setup(mode, data_source=None, monitor=None, force_respawn=False):
+        calls.append((mode, force_respawn))
+
+    s._setup_player = fake_setup
+    assert s.respawn_player() is True
+    assert calls == [("MODE_VIDEO", True)]
+
+
+def test_respawn_player_noop_without_media_mode():
+    """respawn_player() does nothing when no player can run."""
+    s = srv.ApricusServer.__new__(srv.ApricusServer)
+    s.config = {"mode": "MODE_NULL"}
+    s._load_config = lambda: None
+    called = []
+    s._setup_player = lambda *a, **k: called.append((a, k))
+    assert s.respawn_player() is False
+    assert called == []
+
+
+def test_respawn_player_rejects_unknown_mode():
+    """respawn_player() refuses invalid modes instead of spawning."""
+    s = srv.ApricusServer.__new__(srv.ApricusServer)
+    s.config = {"mode": "BOGUS"}
+    s._load_config = lambda: None
+    called = []
+    s._setup_player = lambda *a, **k: called.append((a, k))
+    assert s.respawn_player() is False
+    assert called == []

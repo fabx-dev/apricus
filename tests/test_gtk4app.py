@@ -2665,7 +2665,6 @@ def renderer_selection_applies_live_with_rollback():
                 for delay, fn, args in new_timers:
                     assert fn(*args) is False
             assert server[0].respawns == respawns_before, "no rollback loop"
-            print("DBG guard-block passed")
             assert obj._renderer_reverting is False
             assert any("Unable" in t for t in toasts), toasts
             # Env override: saved, announced, but no respawn attempted.
