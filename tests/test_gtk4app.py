@@ -2461,7 +2461,7 @@ def integration_row_reflects_status():
             states["status"] = ("disabled", {})
             states["switch_is_on"] = False
             obj._on_integration_toggled(obj.integ_switch, None)
-            assert any("restart" in t.lower() for t in states.get("toasts", []))
+            assert any("basic stacking" in t for t in states.get("toasts", []))
     finally:
         if old_mod is not None:
             sys.modules["apricus.gnome_shell"] = old_mod

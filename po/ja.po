@@ -821,7 +821,7 @@ msgstr "ステータスを利用できません"
 
 #: src/apricus/gui/gtk4app.py:3882
 msgid "Integration disabled — restart Apricus to restore normal stacking"
-msgstr "統合を無効にしました — 通常の重なり順に戻すには Apricus を再起動してください"
+msgstr "統合を無効にしました — 基本的な重なり順を使用します"
 
 #: src/apricus/gui/gtk4app.py:3888
 #, python-brace-format

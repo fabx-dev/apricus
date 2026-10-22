@@ -370,7 +370,7 @@ class BasePlayer(Gtk.Application):
         # When the Shell extension hosts our windows in the background
         # layer, it owns stacking: skip the in-app guard, safety net and
         # the DING reload so the two never compete.
-        self._shell_managed = integration_active()
+        self._evaluate_shell_managed()
         if not getattr(self, "_shell_status_logged", False):
             log_status()
             self._shell_status_logged = True
@@ -402,9 +402,22 @@ class BasePlayer(Gtk.Application):
             # over DING. show_all() maps without activating.
             if not window.get_visible():
                 window.show_all()
+        # Watch for the integration being toggled mid-session (event-driven
+        # GSettings notify, no polling): enabling/disabling must take effect
+        # without restarting the player.
+        self._watch_shell_integration()
         if self._shell_managed:
             logger.info("[Player] stacking managed by GNOME Shell integration")
             return
+        self._start_legacy_stacking()
+
+    def _evaluate_shell_managed(self):
+        """Recompute whether the Shell extension owns stacking right now."""
+        self._shell_managed = bool(integration_active())
+        return self._shell_managed
+
+    def _start_legacy_stacking(self):
+        """(Re)start the in-app stacking guard (idempotent parts stay so)."""
         self._lower_desktop_windows()
         self._watch_stacking()
         self._start_stacking_safety_net()
@@ -412,6 +425,70 @@ class BasePlayer(Gtk.Application):
             GLib.timeout_add(delay_ms, self._lower_desktop_windows)
         # Workaround for DING extension
         gnome_desktop_icon_workaround()
+
+    def _watch_shell_integration(self):
+        """Re-evaluate integration when extensions are toggled (no polling).
+
+        The Shell loads newly enabled extensions only after login, but a
+        running player must still adopt when the user enables ours
+        mid-session (and fall back when it is disabled): recreating the
+        wallpaper windows triggers the proven window-created adoption.
+        """
+        if getattr(self, "_integration_watched", False):
+            return
+        try:
+            from gi.repository import Gio
+
+            settings = Gio.Settings.new("org.gnome.shell")
+        except Exception:  # noqa: BLE001 - sandbox/missing schema: static mode
+            logger.debug("[Player] Shell integration watcher unavailable")
+            return
+        # Keep a reference: without it the proxy is GC'd and notify stops.
+        self._integration_settings = settings
+        try:
+            settings.connect("changed::enabled-extensions", self._on_shell_integration_changed)
+            self._integration_watched = True
+        except Exception:  # noqa: BLE001 - best effort only
+            logger.debug("[Player] Shell integration watch failed")
+
+    def _on_shell_integration_changed(self, *_args):
+        was_managed = bool(getattr(self, "_shell_managed", False))
+        try:
+            now_managed = bool(integration_active())
+        except Exception:  # noqa: BLE001 - never break on a settings signal
+            logger.debug("[Player] integration re-check failed")
+            return
+        if now_managed == was_managed:
+            return
+        self._shell_managed = now_managed
+        log_status()
+        if now_managed:
+            logger.info(
+                "[Player] Shell integration became active: "
+                "recreating wallpaper windows for adoption"
+            )
+            self._recreate_wallpaper_windows()
+        else:
+            logger.info("[Player] Shell integration no longer active: resuming legacy stacking")
+            self._start_legacy_stacking()
+
+    def _recreate_wallpaper_windows(self):
+        """Destroy and recreate wallpaper windows (adoptable fresh ones)."""
+        for monitor, window in list(self.windows.items()):
+            if window is None:
+                continue
+            cleanup = getattr(window, "cleanup", None)
+            if callable(cleanup):
+                try:
+                    cleanup()
+                except Exception:  # noqa: BLE001 - best effort
+                    pass
+            try:
+                window.destroy()
+            except Exception:  # noqa: BLE001 - best effort
+                pass
+            self.windows[monitor] = None
+        self.do_activate()
 
     @property
     @abstractmethod
