@@ -125,6 +125,16 @@ RENDERER_GL = "gl"
 RENDERER_XCB = "xcb"
 RENDERER_XV = "xv"
 VALID_RENDERERS = frozenset({RENDERER_AUTO, RENDERER_GL, RENDERER_XCB, RENDERER_XV})
+# Canonical VLC video-output module names for each renderer id. These are
+# the only values ever passed to --vout: unknown strings (including older
+# shorthand) are rejected by resolve_renderer_vout() instead of being
+# handed to VLC, whose fuzzy matching could otherwise pick an
+# overlay-plane output that covers the desktop icons.
+VOUT_MODULES = {
+    RENDERER_GL: "opengl",
+    RENDERER_XCB: "xcb_x11",
+    RENDERER_XV: "xcb_xv",
+}
 CONFIG_TEMPLATE = {
     CONFIG_KEY_VERSION: CONFIG_VERSION,
     CONFIG_KEY_MODE: MODE_NULL,

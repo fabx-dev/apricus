@@ -53,13 +53,13 @@ def test_metadata_is_valid_and_version_pinned():
 
 
 def test_extension_manages_stacking_in_place():
-    """Structural contract: background-layer adoption with pixmap rendering.
+    """Structural contract: background-layer adoption keeps icons above video.
 
     The extension reparents role-identified actors into the Shell's
     background group and re-pins them above recreated static backgrounds.
-    This requires pixmap rendering (VLC `--vout=xcb`): GPU-direct outputs
-    bypass the pixmap via overlay planes that no stacking order can place
-    below DING (verified live on Mutter 50).
+    Icons stay above whatever output module VLC picks (verified live on
+    Mutter 50 with VLC's automatic `gl` pick: libvlc 3 ignores `--vout`
+    for embedded playback).
     """
     with open(EXT_JS, encoding="utf-8") as f:
         js = f.read()
@@ -78,27 +78,27 @@ def test_vlc_options_pin_exact_flags_per_renderer():
     """Renderer selection: exact flags per vout, none by default."""
     from apricus.player.video_player import _vlc_options
 
-    assert _vlc_options(False, "xcb") == [
+    assert _vlc_options(False, "opengl") == [
         "--no-disable-screensaver",
         "--no-interact",
         "--aout=pulse",
-        "--vout=xcb",
+        "--vout=opengl",
     ]
-    assert _vlc_options(True, "xcb") == [
+    assert _vlc_options(True, "xcb_x11") == [
         "--no-disable-screensaver",
         "--no-interact",
         "--no-audio",
         "--aout=none",
-        "--vout=xcb",
+        "--vout=xcb_x11",
     ]
-    assert _vlc_options(False, "gl")[-1] == "--vout=gl"
-    assert _vlc_options(False, "xv")[-1] == "--vout=xv"
+    assert _vlc_options(False, "xcb_xv")[-1] == "--vout=xcb_xv"
     plain = _vlc_options(False, None)
     assert not any(o.startswith("--vout") for o in plain)
     assert "--no-interact" in plain
     assert "--no-interact" in _vlc_options(True, None)
     # Unknown vout names are never passed through to VLC.
     assert not any(o.startswith("--vout") for o in _vlc_options(False, "bogus"))
+    assert not any(o.startswith("--vout") for o in _vlc_options(False, "gl"))
 
 
 def test_renderer_resolution_precedence(monkeypatch):
@@ -106,19 +106,26 @@ def test_renderer_resolution_precedence(monkeypatch):
     import apricus.player.video_player as player_mod
     from apricus.player.video_player import resolve_renderer_vout
 
+    monkeypatch.setenv("APRICUS_VOUT", "opengl")
+    assert resolve_renderer_vout("xcb") == "opengl"
+    assert resolve_renderer_vout("auto") == "opengl"
+    # Historic UI ids still work as env aliases.
     monkeypatch.setenv("APRICUS_VOUT", "gl")
-    assert resolve_renderer_vout("xcb") == "gl"
-    assert resolve_renderer_vout("auto") == "gl"
+    assert resolve_renderer_vout("auto") == "opengl"
+    monkeypatch.setenv("APRICUS_VOUT", "xcb")
+    assert resolve_renderer_vout("auto") == "xcb_x11"
+    monkeypatch.setenv("APRICUS_VOUT", "xv")
+    assert resolve_renderer_vout("auto") == "xcb_xv"
     monkeypatch.setenv("APRICUS_VOUT", "  ")
     monkeypatch.setattr(player_mod, "integration_active", lambda: True)
     monkeypatch.setattr(player_mod, "is_gnome", lambda: True)
     monkeypatch.setattr(player_mod, "is_wayland", lambda: True)
-    assert resolve_renderer_vout("auto") == "gl"
-    assert resolve_renderer_vout("xcb") == "xcb"
-    assert resolve_renderer_vout("xv") == "xv"
-    assert resolve_renderer_vout("gl") == "gl"
+    assert resolve_renderer_vout("auto") == "opengl"
+    assert resolve_renderer_vout("xcb") == "xcb_x11"
+    assert resolve_renderer_vout("xv") == "xcb_xv"
+    assert resolve_renderer_vout("gl") == "opengl"
     monkeypatch.delenv("APRICUS_VOUT", raising=False)
-    assert resolve_renderer_vout("xcb") == "xcb"
+    assert resolve_renderer_vout("xcb") == "xcb_x11"
 
 
 def test_renderer_automatic_policy_matrix(monkeypatch):
@@ -134,9 +141,9 @@ def test_renderer_automatic_policy_matrix(monkeypatch):
         monkeypatch.setattr(player_mod, "integration_active", lambda: active)
 
     env(True, True, True)
-    assert resolve_renderer_vout("auto") == "gl"
+    assert resolve_renderer_vout("auto") == "opengl"
     env(True, True, False)
-    assert resolve_renderer_vout("auto") == "xcb"
+    assert resolve_renderer_vout("auto") == "xcb_x11"
     env(True, False, False)
     assert resolve_renderer_vout("auto") is None
     env(False, True, False)
@@ -145,15 +152,15 @@ def test_renderer_automatic_policy_matrix(monkeypatch):
     assert resolve_renderer_vout("auto") is None
     # Explicit selection wins over the policy everywhere.
     env(False, False, False)
-    assert resolve_renderer_vout("xv") == "xv"
+    assert resolve_renderer_vout("xv") == "xcb_xv"
     # Unknown saved values fall back to automatic, never to VLC.
     env(True, True, True)
-    assert resolve_renderer_vout("bogus") == "gl"
+    assert resolve_renderer_vout("bogus") == "opengl"
     env(True, True, False)
-    assert resolve_renderer_vout("bogus") == "xcb"
+    assert resolve_renderer_vout("bogus") == "xcb_x11"
     # Unknown env values are ignored (with warning), never passed to VLC.
     monkeypatch.setenv("APRICUS_VOUT", "bogus-vout")
-    assert resolve_renderer_vout("auto") == "xcb"
+    assert resolve_renderer_vout("auto") == "xcb_x11"
 
 
 def test_shipped_metadata_declares_only_reviewed_shell_versions():

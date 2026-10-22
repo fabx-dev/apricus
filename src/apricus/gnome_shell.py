@@ -7,7 +7,10 @@ On GNOME Wayland, ordinary X11/XWayland restacking cannot place our video
 windows below DING's native Wayland desktop window. The companion extension
 ``apricus-integration@fabx-dev`` (shipped under ``gnome-extension/``)
 hosts our role-identified wallpaper windows in the Shell's background
-layer, which requires pixmap rendering (VLC ``--vout=xcb``).
+layer; icons stay above the video because the Shell parents our windows
+into its background group, whatever output module VLC picks (verified
+live: libvlc 3 ignores --vout for embedded playback and always uses its
+automatic pick).
 
 This module only *detects* the integration; it never talks to the
 compositor. The extension works autonomously by matching the window role

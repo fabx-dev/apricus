@@ -41,6 +41,7 @@ from apricus.commons import (
     MODE_STREAM,
     MODE_VIDEO,
     RENDERER_AUTO,
+    VOUT_MODULES,
 )
 from apricus.gnome_shell import integration_active
 from apricus.menu import build_menu
@@ -62,10 +63,10 @@ logger = logging.getLogger(LOGGER_NAME)
 def _vlc_options(disable_audio: bool, vout):
     """VLC instance options for one player window (pure logic, tested).
 
-    *vout* is ``None`` (VLC default) or a module name (``"gl"``/``"xcb"``/
-    ``"xv"``). Use :func:`resolve_renderer_vout` to compute it. Keeping
-    the option building here lets tests pin the exact flags per renderer
-    without a display.
+    *vout* is ``None`` (VLC default) or a canonical module name from
+    :data:`VOUT_MODULES`. Use :func:`resolve_renderer_vout` to compute it.
+    Keeping the option building here lets tests pin the exact flags per
+    renderer without a display.
     """
     if disable_audio:
         options = [
@@ -76,37 +77,71 @@ def _vlc_options(disable_audio: bool, vout):
         ]
     else:
         options = ["--no-disable-screensaver", "--no-interact", "--aout=pulse"]
-    if vout in ("gl", "xcb", "xv"):
+    if vout in VOUT_MODULES.values():
         options.append(f"--vout={vout}")
     return options
+
+
+# APRICUS_VOUT accepts canonical module names and historic UI ids / VLC
+# shortcut spellings (hyphen vs underscore).
+_ENV_VOUT_ALIASES = {
+    "gl": "opengl",
+    "opengl": "opengl",
+    "xcb": "xcb_x11",
+    "x11": "xcb_x11",
+    "xcb_x11": "xcb_x11",
+    "xcb-x11": "xcb_x11",
+    "xv": "xcb_xv",
+    "xvideo": "xcb_xv",
+    "xcb_xv": "xcb_xv",
+    "xcb-xv": "xcb_xv",
+}
+
+
+def _canonical_vout(name):
+    """Canonical VLC module name, or None when unknown/unset."""
+    if not name:
+        return None
+    name = str(name).strip().lower()
+    if name in VOUT_MODULES.values():
+        return name
+    return _ENV_VOUT_ALIASES.get(name)
 
 
 def resolve_renderer_vout(explicit=RENDERER_AUTO):
     """Decide the VLC video output module name, or None for VLC default.
 
     Precedence: ``APRICUS_VOUT`` env override > saved *explicit* selection
-    > automatic policy. The automatic policy selects ``gl`` when the GNOME
-    Shell integration is active, ``xcb`` on GNOME Wayland without it, and
-    leaves VLC's default elsewhere (Xorg keeps hardware presentation).
-    Unknown values fall back to automatic with a warning, never silently
-    passed to VLC.
+    > automatic policy. The automatic policy selects ``opengl`` when the GNOME
+    Shell integration is active, ``xcb_x11`` on GNOME Wayland without it,
+    and leaves VLC's default elsewhere (Xorg keeps hardware presentation).
+    Unknown values fall back to automatic with a warning: raw strings are
+    never passed to VLC, whose fuzzy matching could otherwise select an
+    overlay-plane output that covers the desktop icons.
+
+    NOTE (verified live, VLC 3.0.23): libvlc ignores --vout for embedded
+    set_xwindow playback (probe filter always "any"), so every renderer
+    currently yields VLC's automatic pick. Values are still canonical so
+    a future libvlc gets a valid module name.
     """
-    env = os.environ.get("APRICUS_VOUT", "").strip().lower()
-    if env in ("gl", "xcb", "xv"):
+    env = _canonical_vout(os.environ.get("APRICUS_VOUT", ""))
+    if env is not None:
         return env
-    if env:
-        logger.warning(f"[Player] ignoring unknown APRICUS_VOUT={env!r}")
+    if os.environ.get("APRICUS_VOUT", "").strip():
+        logger.warning(
+            f"[Player] ignoring unknown APRICUS_VOUT={os.environ.get('APRICUS_VOUT')!r}"
+        )
     if explicit in ("gl", "xcb", "xv"):
-        return explicit
+        return VOUT_MODULES[explicit]
     if explicit != RENDERER_AUTO:
         logger.warning(f"[Player] ignoring unknown renderer {explicit!r}, using automatic")
     try:
         if integration_active():
-            return "gl"
+            return VOUT_MODULES["gl"]
     except Exception:  # noqa: BLE001 - detection is best-effort
         logger.debug("[Player] integration check failed, using session default")
     if is_gnome() and is_wayland():
-        return "xcb"
+        return VOUT_MODULES["xcb"]
     return None
 
 
@@ -178,11 +213,19 @@ class VLCWidget(Gtk.DrawingArea):
         #   plugin segfaults (pw_thread_loop_lock) when multiple instances are
         #   active, e.g. one per monitor. See the Flatpak, which uses Pulse too.
         # Video output (--vout): resolved by resolve_renderer_vout() from the
-        # saved selection, APRICUS_VOUT and the automatic policy (gl with
-        # active GNOME integration, xcb on GNOME Wayland, VLC default
-        # elsewhere so Xorg keeps hardware presentation). Pixmap-based
-        # outputs are required under DING: GPU-direct outputs bypass the
-        # pixmap via overlay planes that always composite above everything.
+        # saved selection, APRICUS_VOUT and the automatic policy (opengl
+        # with active GNOME integration, xcb_x11 on GNOME Wayland, VLC
+        # default elsewhere so Xorg keeps hardware presentation). NOTE
+        # (verified live, VLC 3.0.23): libvlc IGNORES --vout for embedded
+        # playback via set_xwindow — the vout-display probe always runs
+        # with filter "any" (Instance options, :vout media options and
+        # vlcrc are all ignored there; only the cvlc CLI honors --vout).
+        # So today every renderer resolves to VLC's automatic pick (gl
+        # on this stack). The option is still passed in canonical form
+        # so a future libvlc that honors it gets a valid module name,
+        # and the respawn/verify/rollback machinery stays exercised.
+        # Icons stay above video via the GNOME Shell companion extension
+        # (background-layer adoption), not via the vout choice.
         # Playlist mode never needs audio: opening/closing the audio output
         # on every transition locks up PipeWire, so it is disabled entirely.
         # Option building lives in _vlc_options() (unit-tested).
