@@ -5,6 +5,9 @@
 
 import json
 import os
+import pathlib
+
+import pytest
 
 from apricus import gnome_shell
 from apricus.gnome_shell import (
@@ -389,3 +392,59 @@ def test_recreate_resets_windows_and_reactivates():
     assert order == ["cleanup", "destroy"]
     assert stub.windows == {"m0": None, "m1": None}
     assert stub.reactivated is True
+
+
+def test_host_zip_and_installer_roundtrip(tmp_path):
+    """The distributable ZIP installs byte-identical files (Snap/Flatpak path)."""
+    import json
+    import shutil
+    import subprocess
+    import zipfile
+
+    repo = pathlib.Path(__file__).resolve().parent.parent
+    if shutil.which("zip") is None or shutil.which("unzip") is None:
+        pytest.skip("zip/unzip not available")
+    out_zip = tmp_path / "ext.zip"
+    proc = subprocess.run(
+        [str(repo / "gnome-extension" / "build-zip.sh"), str(out_zip)],
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert proc.returncode == 0, proc.stderr
+    with zipfile.ZipFile(out_zip) as zf:
+        names = sorted(zf.namelist())
+    assert names == [
+        "apricus-integration@fabx-dev/",
+        "apricus-integration@fabx-dev/extension.js",
+        "apricus-integration@fabx-dev/metadata.json",
+    ], names
+    with zipfile.ZipFile(out_zip) as zf:
+        meta = json.loads(zf.read("apricus-integration@fabx-dev/metadata.json"))
+    assert meta["uuid"] == EXTENSION_UUID
+    assert set(meta["shell-version"]) == {"49", "50", "51"}
+    with zipfile.ZipFile(out_zip) as zf:
+        for name in ("metadata.json", "extension.js"):
+            zipped = zf.read(f"apricus-integration@fabx-dev/{name}")
+            source = (repo / "gnome-extension" / EXTENSION_UUID / name).read_bytes()
+            assert zipped == source, name
+    fake_home = tmp_path / "home"
+    fake_home.mkdir()
+    env = dict(os.environ, HOME=str(fake_home))
+    installer = str(repo / "gnome-extension" / "install-host.sh")
+    proc = subprocess.run(
+        ["bash", installer, "--zip", str(out_zip)],
+        capture_output=True,
+        text=True,
+        timeout=60,
+        env=env,
+    )
+    assert proc.returncode == 0, proc.stderr
+    installed = fake_home / ".local/share/gnome-shell/extensions" / EXTENSION_UUID
+    for name in ("metadata.json", "extension.js"):
+        src = (repo / "gnome-extension" / EXTENSION_UUID / name).read_bytes()
+        assert (installed / name).read_bytes() == src
+    proc = subprocess.run(
+        ["bash", installer, "--bogus"], capture_output=True, text=True, timeout=60, env=env
+    )
+    assert proc.returncode != 0
