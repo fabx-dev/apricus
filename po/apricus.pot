@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: apricus\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-22 23:47+0200\n"
+"POT-Creation-Date: 2026-10-23 00:27+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -223,7 +223,7 @@ msgid ""
 msgstr ""
 
 #: src/apricus/gui/gtk4app.py:768 src/apricus/gui/gtk4app.py:3675
-#: src/apricus/gui/gtk4app.py:4022
+#: src/apricus/gui/gtk4app.py:4035
 msgid "OK"
 msgstr ""
 
@@ -738,7 +738,7 @@ msgstr ""
 msgid "Open"
 msgstr ""
 
-#: src/apricus/gui/gtk4app.py:3795 src/apricus/gui/gtk4app.py:4013
+#: src/apricus/gui/gtk4app.py:3795 src/apricus/gui/gtk4app.py:4026
 msgid "How to select videos"
 msgstr ""
 
@@ -763,98 +763,98 @@ msgstr ""
 msgid "Version {version} · GPL-3.0-or-later"
 msgstr ""
 
-#: src/apricus/gui/gtk4app.py:3832
+#: src/apricus/gui/gtk4app.py:3834
 msgid "Active — icons stay above the video"
 msgstr ""
 
-#: src/apricus/gui/gtk4app.py:3836
+#: src/apricus/gui/gtk4app.py:3839
 msgid "Installed but disabled — enable it manually: gnome-extensions enable"
 msgstr ""
 
-#: src/apricus/gui/gtk4app.py:3838
+#: src/apricus/gui/gtk4app.py:3843
 msgid "Installed but disabled — turn on to keep icons above video"
 msgstr ""
 
-#: src/apricus/gui/gtk4app.py:3841
+#: src/apricus/gui/gtk4app.py:3846
 msgid "Enabled — log out and back in to activate it"
 msgstr ""
 
-#: src/apricus/gui/gtk4app.py:3844
+#: src/apricus/gui/gtk4app.py:3849
 msgid "Installed — log out and back in so GNOME finds it"
 msgstr ""
 
-#: src/apricus/gui/gtk4app.py:3847
+#: src/apricus/gui/gtk4app.py:3852
 msgid "Not installed — native packages include it; see README"
 msgstr ""
 
-#: src/apricus/gui/gtk4app.py:3850
+#: src/apricus/gui/gtk4app.py:3855
 #, python-brace-format
 msgid "Unsupported GNOME {shell} (supports {supported})"
 msgstr ""
 
-#: src/apricus/gui/gtk4app.py:3854
+#: src/apricus/gui/gtk4app.py:3859
 msgid "Failed to load — check the journal for errors"
 msgstr ""
 
-#: src/apricus/gui/gtk4app.py:3856
+#: src/apricus/gui/gtk4app.py:3861
 msgid "Status unavailable"
 msgstr ""
 
 #. noqa: BLE001 - show the failure inline
-#: src/apricus/gui/gtk4app.py:3883
+#: src/apricus/gui/gtk4app.py:3888
 #, python-brace-format
 msgid "Could not prepare installation files ({err})"
 msgstr ""
 
-#: src/apricus/gui/gtk4app.py:3887
+#: src/apricus/gui/gtk4app.py:3892
 msgid "Files ready — run the command on the host"
 msgstr ""
 
 #. noqa: BLE001 - clipboard best effort
-#: src/apricus/gui/gtk4app.py:3899
+#: src/apricus/gui/gtk4app.py:3904
 #, python-brace-format
 msgid "Could not copy ({err})"
 msgstr ""
 
-#: src/apricus/gui/gtk4app.py:3901
+#: src/apricus/gui/gtk4app.py:3906
 msgid "Command copied"
 msgstr ""
 
-#: src/apricus/gui/gtk4app.py:3919
+#: src/apricus/gui/gtk4app.py:3929
 msgid "Integration disabled — using basic stacking"
 msgstr ""
 
-#: src/apricus/gui/gtk4app.py:3926
+#: src/apricus/gui/gtk4app.py:3937
 #, python-brace-format
 msgid ""
 "Could not {action} automatically ({err}); run: gnome-extensions {action}"
 msgstr ""
 
-#: src/apricus/gui/gtk4app.py:3951
+#: src/apricus/gui/gtk4app.py:3964
 msgid "Wallpaper service starts at login"
 msgstr ""
 
-#: src/apricus/gui/gtk4app.py:3953
+#: src/apricus/gui/gtk4app.py:3966
 msgid "Starts only the wallpaper service at login"
 msgstr ""
 
-#: src/apricus/gui/gtk4app.py:3966 src/apricus/gui/gtk4app.py:3977
+#: src/apricus/gui/gtk4app.py:3979 src/apricus/gui/gtk4app.py:3990
 msgid "Could not change the startup setting."
 msgstr ""
 
-#: src/apricus/gui/gtk4app.py:3980
+#: src/apricus/gui/gtk4app.py:3993
 msgid "Startup enabled"
 msgstr ""
 
-#: src/apricus/gui/gtk4app.py:3980
+#: src/apricus/gui/gtk4app.py:3993
 msgid "Startup disabled"
 msgstr ""
 
-#: src/apricus/gui/gtk4app.py:4009
+#: src/apricus/gui/gtk4app.py:4022
 msgid "Could not open the configuration file."
 msgstr ""
 
-#: src/apricus/gui/gtk4app.py:4016
+#: src/apricus/gui/gtk4app.py:4029
 msgid ""
 "Click to select a video.\n"
 "Ctrl+click or Shift+click selects more than one.\n"

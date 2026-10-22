@@ -3822,10 +3822,12 @@ class ControlPanel(Adw.Application):
         if row is None:
             return
         try:
-            from apricus.gnome_shell import integration_status
+            from apricus.gnome_shell import EXTENSION_UUID, integration_status
 
             state, detail = integration_status()
         except Exception:  # noqa: BLE001 - status must never break settings
+            from apricus.gnome_shell import EXTENSION_UUID
+
             state, detail = "unknown", {}
         switch_on, sensitive = False, False
         if state == "active":
@@ -3833,7 +3835,10 @@ class ControlPanel(Adw.Application):
             switch_on, sensitive = True, True
         elif state == "disabled":
             if is_snap() or is_flatpak():
-                subtitle = _("Installed but disabled — enable it manually: gnome-extensions enable")
+                subtitle = (
+                    _("Installed but disabled — enable it manually: gnome-extensions enable")
+                    + f" {EXTENSION_UUID}"
+                )
             else:
                 subtitle = _("Installed but disabled — turn on to keep icons above video")
                 switch_on, sensitive = False, True
@@ -3846,9 +3851,9 @@ class ControlPanel(Adw.Application):
         elif state == "not_installed":
             subtitle = _("Not installed — native packages include it; see README")
         elif state == "incompatible":
-            supported = ", ".join(detail.get("supported") or [])
+            supported = ", ".join(detail.get("supported") or []) or "?"
             subtitle = _("Unsupported GNOME {shell} (supports {supported})").format(
-                shell=detail.get("shell"), supported=supported
+                shell=detail.get("shell") or "?", supported=supported
             )
         elif state == "error":
             subtitle = _("Failed to load — check the journal for errors")
@@ -3913,18 +3918,26 @@ class ControlPanel(Adw.Application):
             from apricus.utils import gnome_extension_set_disable, gnome_extension_set_enable
 
             if want:
-                gnome_extension_set_enable(EXTENSION_UUID)
+                confirmed = gnome_extension_set_enable(EXTENSION_UUID)
             else:
-                gnome_extension_set_disable(EXTENSION_UUID)
+                confirmed = gnome_extension_set_disable(EXTENSION_UUID)
+            if not confirmed:
+                # No exception, but the Shell did not confirm: fall through
+                # to the manual fallback instead of claiming success.
+                raise RuntimeError("Shell did not confirm")
+            if not want:
                 self._toast(_("Integration disabled — using basic stacking"))
         except Exception as e:  # noqa: BLE001 - show the manual fallback
             row = getattr(self, "integ_row", None)
             if row is not None:
                 action = "enable" if want else "disable"
                 row.set_subtitle(
-                    _(
-                        "Could not {action} automatically ({err}); run: gnome-extensions {action}"
-                    ).format(action=action, err=e)
+                    (
+                        _(
+                            "Could not {action} automatically ({err}); run: gnome-extensions {action}"
+                        ).format(action=action, err=e)
+                    )
+                    + f" {EXTENSION_UUID}"
                 )
             switch.set_active(not want)
             return False

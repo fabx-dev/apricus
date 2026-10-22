@@ -2462,6 +2462,24 @@ def integration_row_reflects_status():
             states["switch_is_on"] = False
             obj._on_integration_toggled(obj.integ_switch, None)
             assert any("basic stacking" in t for t in states.get("toasts", []))
+        # Enable returning False without an exception still shows the
+        # manual fallback (with UUID) instead of claiming success.
+        with patch("apricus.utils.gnome_extension_set_enable", return_value=False):
+            states["status"] = ("disabled", {})
+            states["switch_is_on"] = True
+            obj._on_integration_toggled(obj.integ_switch, None)
+            assert "gnome-extensions enable" in states["subtitle"]
+            assert "apricus-integration@fabx-dev" in states["subtitle"]
+        # Sandbox disabled hint carries the full runnable command (with UUID).
+        with patch.object(appmod, "is_snap", return_value=True):
+            states["status"] = ("disabled", {})
+            obj._refresh_integration_row()
+            assert "apricus-integration@fabx-dev" in states["subtitle"]
+            assert states["sensitive"] is False
+        # Missing version details never render as "None".
+        states["status"] = ("incompatible", {})
+        obj._refresh_integration_row()
+        assert "None" not in states["subtitle"], states["subtitle"]
     finally:
         if old_mod is not None:
             sys.modules["apricus.gnome_shell"] = old_mod

@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: apricus 2.0.1\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-22 23:47+0200\n"
+"POT-Creation-Date: 2026-10-23 00:27+0200\n"
 "PO-Revision-Date: 2026-10-15 23:55+0200\n"
 "Last-Translator: fabx-dev <https://github.com/fabx-dev>\n"
 "Language-Team: French\n"
@@ -233,7 +233,7 @@ msgstr ""
 "lire en boucle."
 
 #: src/apricus/gui/gtk4app.py:768 src/apricus/gui/gtk4app.py:3675
-#: src/apricus/gui/gtk4app.py:4022
+#: src/apricus/gui/gtk4app.py:4035
 msgid "OK"
 msgstr "OK"
 
@@ -761,7 +761,7 @@ msgstr "Ouvrir la configuration"
 msgid "Open"
 msgstr "Ouvrir"
 
-#: src/apricus/gui/gtk4app.py:3795 src/apricus/gui/gtk4app.py:4013
+#: src/apricus/gui/gtk4app.py:3795 src/apricus/gui/gtk4app.py:4026
 msgid "How to select videos"
 msgstr "Comment sélectionner des vidéos"
 
@@ -786,72 +786,72 @@ msgstr "À propos d'Apricus"
 msgid "Version {version} · GPL-3.0-or-later"
 msgstr "Version {version} · GPL-3.0-or-later"
 
-#: src/apricus/gui/gtk4app.py:3832
+#: src/apricus/gui/gtk4app.py:3834
 msgid "Active — icons stay above the video"
 msgstr "Actif — les icônes restent au-dessus de la vidéo"
 
-#: src/apricus/gui/gtk4app.py:3836
+#: src/apricus/gui/gtk4app.py:3839
 msgid "Installed but disabled — enable it manually: gnome-extensions enable"
 msgstr ""
 "Installée mais désactivée — activez-la manuellement : gnome-extensions enable"
 
-#: src/apricus/gui/gtk4app.py:3838
+#: src/apricus/gui/gtk4app.py:3843
 msgid "Installed but disabled — turn on to keep icons above video"
 msgstr ""
 "Installée mais désactivée — activez-la pour garder les icônes au-dessus de "
 "la vidéo"
 
-#: src/apricus/gui/gtk4app.py:3841
+#: src/apricus/gui/gtk4app.py:3846
 msgid "Enabled — log out and back in to activate it"
 msgstr "Activée — déconnectez-vous puis reconnectez-vous pour l’activer"
 
-#: src/apricus/gui/gtk4app.py:3844
+#: src/apricus/gui/gtk4app.py:3849
 msgid "Installed — log out and back in so GNOME finds it"
 msgstr ""
 "Installée — déconnectez-vous puis reconnectez-vous pour que GNOME la détecte"
 
-#: src/apricus/gui/gtk4app.py:3847
+#: src/apricus/gui/gtk4app.py:3852
 msgid "Not installed — native packages include it; see README"
 msgstr "Non installée — les paquets natifs l’incluent ; voir le README"
 
-#: src/apricus/gui/gtk4app.py:3850
+#: src/apricus/gui/gtk4app.py:3855
 #, python-brace-format
 msgid "Unsupported GNOME {shell} (supports {supported})"
 msgstr "GNOME {shell} non pris en charge (pris en charge : {supported})"
 
-#: src/apricus/gui/gtk4app.py:3854
+#: src/apricus/gui/gtk4app.py:3859
 msgid "Failed to load — check the journal for errors"
 msgstr "Échec du chargement — vérifiez les erreurs dans le journal"
 
-#: src/apricus/gui/gtk4app.py:3856
+#: src/apricus/gui/gtk4app.py:3861
 msgid "Status unavailable"
 msgstr "Statut indisponible"
 
 #. noqa: BLE001 - show the failure inline
-#: src/apricus/gui/gtk4app.py:3883
+#: src/apricus/gui/gtk4app.py:3888
 #, python-brace-format
 msgid "Could not prepare installation files ({err})"
 msgstr "Impossible de préparer les fichiers d’installation ({err})"
 
-#: src/apricus/gui/gtk4app.py:3887
+#: src/apricus/gui/gtk4app.py:3892
 msgid "Files ready — run the command on the host"
 msgstr "Fichiers prêts — exécutez la commande sur l’hôte"
 
 #. noqa: BLE001 - clipboard best effort
-#: src/apricus/gui/gtk4app.py:3899
+#: src/apricus/gui/gtk4app.py:3904
 #, python-brace-format
 msgid "Could not copy ({err})"
 msgstr "Copie impossible ({err})"
 
-#: src/apricus/gui/gtk4app.py:3901
+#: src/apricus/gui/gtk4app.py:3906
 msgid "Command copied"
 msgstr "Commande copiée"
 
-#: src/apricus/gui/gtk4app.py:3919
+#: src/apricus/gui/gtk4app.py:3929
 msgid "Integration disabled — using basic stacking"
 msgstr "Intégration désactivée — utilisation de l’empilement de base"
 
-#: src/apricus/gui/gtk4app.py:3926
+#: src/apricus/gui/gtk4app.py:3937
 #, python-brace-format
 msgid ""
 "Could not {action} automatically ({err}); run: gnome-extensions {action}"
@@ -859,31 +859,31 @@ msgstr ""
 "Activation/désactivation automatique impossible ({err}) ; exécutez : gnome-"
 "extensions {action}"
 
-#: src/apricus/gui/gtk4app.py:3951
+#: src/apricus/gui/gtk4app.py:3964
 msgid "Wallpaper service starts at login"
 msgstr "Le service de fond d'écran démarre à la connexion"
 
-#: src/apricus/gui/gtk4app.py:3953
+#: src/apricus/gui/gtk4app.py:3966
 msgid "Starts only the wallpaper service at login"
 msgstr "Démarre uniquement le service de fond d'écran à la connexion"
 
-#: src/apricus/gui/gtk4app.py:3966 src/apricus/gui/gtk4app.py:3977
+#: src/apricus/gui/gtk4app.py:3979 src/apricus/gui/gtk4app.py:3990
 msgid "Could not change the startup setting."
 msgstr "Impossible de modifier le paramètre de démarrage."
 
-#: src/apricus/gui/gtk4app.py:3980
+#: src/apricus/gui/gtk4app.py:3993
 msgid "Startup enabled"
 msgstr "Démarrage automatique activé"
 
-#: src/apricus/gui/gtk4app.py:3980
+#: src/apricus/gui/gtk4app.py:3993
 msgid "Startup disabled"
 msgstr "Démarrage automatique désactivé"
 
-#: src/apricus/gui/gtk4app.py:4009
+#: src/apricus/gui/gtk4app.py:4022
 msgid "Could not open the configuration file."
 msgstr "Impossible d'ouvrir le fichier de configuration."
 
-#: src/apricus/gui/gtk4app.py:4016
+#: src/apricus/gui/gtk4app.py:4029
 msgid ""
 "Click to select a video.\n"
 "Ctrl+click or Shift+click selects more than one.\n"
