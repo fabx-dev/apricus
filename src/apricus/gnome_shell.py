@@ -127,9 +127,7 @@ def host_export_dir():
             os.path.join("~", "snap", APP_DIR_SNAP, "common")
         )
     elif is_flatpak():
-        base = os.path.join(
-            os.path.expanduser("~"), ".var", "app", APP_ID_FLATPAK, "data"
-        )
+        base = os.path.join(os.path.expanduser("~"), ".var", "app", APP_ID_FLATPAK, "data")
     else:
         base = os.path.join(os.path.expanduser("~"), ".cache", "apricus")
     return os.path.join(base, "gnome-integration")

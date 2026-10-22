@@ -3803,9 +3803,9 @@ class ControlPanel(Adw.Application):
         forced_vout = (os.environ.get("APRICUS_VOUT") or "").strip()
         if forced_vout:
             self.renderer_row.set_subtitle(
-                _("Takes effect immediately. Note: APRICUS_VOUT={value} overrides the saved setting").format(
-                    value=forced_vout
-                )
+                _(
+                    "Takes effect immediately. Note: APRICUS_VOUT={value} overrides the saved setting"
+                ).format(value=forced_vout)
             )
         self.renderer_row.connect("notify::selected", self._on_renderer_changed)
         rendering.add(self.renderer_row)
@@ -4028,7 +4028,9 @@ class ControlPanel(Adw.Application):
         if token != getattr(self, "_renderer_token", None):
             return False
         GLib.timeout_add_seconds(8, self._check_renderer_applied, token, False)
-        GLib.timeout_add_seconds(self._RENDERER_CHECK_FINAL_SEC, self._check_renderer_applied, token, True)
+        GLib.timeout_add_seconds(
+            self._RENDERER_CHECK_FINAL_SEC, self._check_renderer_applied, token, True
+        )
         return False
 
     @staticmethod
