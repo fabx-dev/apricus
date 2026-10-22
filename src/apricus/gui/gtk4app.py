@@ -38,6 +38,7 @@ from apricus.commons import (
     CONFIG_KEY_MUTE_WHEN_MAXIMIZED,
     CONFIG_KEY_PAUSE_WHEN_MAXIMIZED,
     CONFIG_KEY_PLAYLIST,
+    CONFIG_KEY_RENDERER,
     CONFIG_KEY_STATIC_WALLPAPER,
     CONFIG_KEY_STREAM_FAVORITES,
     CONFIG_KEY_STREAM_HISTORY,
@@ -54,6 +55,10 @@ from apricus.commons import (
     MODE_VIDEO,
     MODE_WEBPAGE,
     PROJECT,
+    RENDERER_AUTO,
+    RENDERER_GL,
+    RENDERER_XCB,
+    RENDERER_XV,
     resolve_video_dir,
 )
 from apricus.utils import (
@@ -3739,13 +3744,41 @@ class ControlPanel(Adw.Application):
             icons.set_title(_("Desktop icons"))
             self.integ_row = Adw.ActionRow()
             self.integ_row.set_title(_("Keep icons above video"))
-            self.integ_btn = Gtk.Button(label=_("Enable"))
-            self.integ_btn.set_valign(Gtk.Align.CENTER)
-            self.integ_btn.connect("clicked", self._on_integration_enable)
-            self.integ_row.add_suffix(self.integ_btn)
+            self.integ_switch = Gtk.Switch()
+            self.integ_switch.set_valign(Gtk.Align.CENTER)
+            self.integ_switch.connect("state-set", self._on_integration_toggled)
+            self.integ_row.add_suffix(self.integ_switch)
             icons.add(self.integ_row)
             box.append(icons)
             self._refresh_integration_row()
+        rendering = Adw.PreferencesGroup()
+        rendering.set_title(_("Video Rendering"))
+        self.renderer_row = Adw.ComboRow()
+        self.renderer_row.set_title(_("Renderer"))
+        self.renderer_row.set_subtitle(_("Restart Apricus to apply a new renderer"))
+        self._renderer_ids = [
+            RENDERER_AUTO,
+            RENDERER_GL,
+            RENDERER_XCB,
+            RENDERER_XV,
+        ]
+        self.renderer_row.set_model(
+            Gtk.StringList.new(
+                [
+                    _("Automatic (Recommended)"),
+                    _("OpenGL"),
+                    _("Compatibility (XCB)"),
+                    _("XVideo (Experimental)"),
+                ]
+            )
+        )
+        current_renderer = (config.get(CONFIG_KEY_RENDERER) or RENDERER_AUTO).strip().lower()
+        if current_renderer not in self._renderer_ids:
+            current_renderer = RENDERER_AUTO
+        self.renderer_row.set_selected(self._renderer_ids.index(current_renderer))
+        self.renderer_row.connect("notify::selected", self._on_renderer_changed)
+        rendering.add(self.renderer_row)
+        box.append(rendering)
         startup = Adw.PreferencesGroup()
         startup.set_title(_("Startup"))
         self.autostart_row, self.autostart_switch = self._settings_switch_row(
@@ -3794,7 +3827,7 @@ class ControlPanel(Adw.Application):
     def _refresh_integration_row(self):
         """Show the GNOME Shell integration state (never raises)."""
         row = getattr(self, "integ_row", None)
-        btn = getattr(self, "integ_btn", None)
+        switch = getattr(self, "integ_switch", None)
         if row is None:
             return
         try:
@@ -3803,19 +3836,22 @@ class ControlPanel(Adw.Application):
             state, detail = integration_status()
         except Exception:  # noqa: BLE001 - status must never break settings
             state, detail = "unknown", {}
-        show_btn = False
+        switch_on, sensitive = False, False
         if state == "active":
             subtitle = _("Active — icons stay above the video")
+            switch_on, sensitive = True, True
         elif state == "disabled":
             if is_snap() or is_flatpak():
                 subtitle = _("Installed but disabled — enable it manually: gnome-extensions enable")
             else:
-                subtitle = _("Installed but disabled")
-                show_btn = True
+                subtitle = _("Installed but disabled — turn on to keep icons above video")
+                switch_on, sensitive = False, True
         elif state == "needs_logout":
             subtitle = _("Enabled — log out and back in to activate it")
+            switch_on, sensitive = True, True
         elif state == "not_discovered":
             subtitle = _("Installed — log out and back in so GNOME finds it")
+            switch_on, sensitive = False, True
         elif state == "not_installed":
             subtitle = _("Not installed — native packages include it; see README")
         elif state == "incompatible":
@@ -3828,26 +3864,50 @@ class ControlPanel(Adw.Application):
         else:
             subtitle = _("Status unavailable")
         row.set_subtitle(subtitle)
-        if btn is not None:
-            btn.set_visible(show_btn)
+        if switch is not None:
+            switch.set_active(switch_on)
+            switch.set_sensitive(sensitive)
 
-    def _on_integration_enable(self, _button):
-        """Enable the Shell extension on user request, then refresh."""
+    def _on_integration_toggled(self, switch, _state):
+        """Enable/disable the Shell extension on explicit user action."""
+        want = bool(switch.get_active())
         try:
             from apricus.gnome_shell import EXTENSION_UUID
-            from apricus.utils import gnome_extension_set_enable
+            from apricus.utils import gnome_extension_set_disable, gnome_extension_set_enable
 
-            gnome_extension_set_enable(EXTENSION_UUID)
+            if want:
+                gnome_extension_set_enable(EXTENSION_UUID)
+            else:
+                gnome_extension_set_disable(EXTENSION_UUID)
+                self._toast(_("Integration disabled — restart Apricus to restore normal stacking"))
         except Exception as e:  # noqa: BLE001 - show the manual fallback
             row = getattr(self, "integ_row", None)
             if row is not None:
+                action = "enable" if want else "disable"
                 row.set_subtitle(
-                    _("Could not enable automatically ({err}); run: gnome-extensions enable").format(
-                        err=e
+                    _("Could not {action} automatically ({err}); run: gnome-extensions {action}").format(
+                        action=action, err=e
                     )
                 )
-            return
+            switch.set_active(not want)
+            return False
         self._refresh_integration_row()
+        return False
+
+    def _on_renderer_changed(self, row, _pspec):
+        """Persist the selected video renderer; applies on player restart."""
+        ids = getattr(self, "_renderer_ids", [RENDERER_AUTO])
+        try:
+            selected = ids[row.get_selected()]
+        except (IndexError, TypeError):
+            return
+        current = (self.config.get(CONFIG_KEY_RENDERER) or RENDERER_AUTO).strip().lower()
+        if selected == current:
+            return
+        self.config = ConfigUtil().load()
+        self.config[CONFIG_KEY_RENDERER] = selected
+        ConfigUtil().save(self.config)
+        self._toast(_("Renderer saved — restart Apricus to apply it"))
 
     @staticmethod
     def _short_config_path():

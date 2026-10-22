@@ -2406,9 +2406,18 @@ def integration_row_reflects_status():
         def set_subtitle(self, text):
             states["subtitle"] = text
 
-    class _Btn:
-        def set_visible(self, visible):
-            states["visible"] = visible
+    class _Switch:
+        def set_active(self, active):
+            states["active"] = active
+
+        def set_sensitive(self, sensitive):
+            states["sensitive"] = sensitive
+
+        def get_active(self):
+            return states.get("switch_is_on", False)
+
+    def _toasts(self, message):
+        states.setdefault("toasts", []).append(message)
 
     fake_shell = types.ModuleType("apricus.gnome_shell")
     fake_shell.EXTENSION_UUID = "apricus-integration@fabx-dev"
@@ -2417,37 +2426,86 @@ def integration_row_reflects_status():
     sys.modules["apricus.gnome_shell"] = fake_shell
     try:
         obj = appmod.ControlPanel.__new__(appmod.ControlPanel)
-        obj.integ_row, obj.integ_btn = _Row(), _Btn()
-        for state, detail, expect_btn, needle in [
-            ("active", {}, False, "Active"),
-            ("disabled", {}, True, "disabled"),
-            ("needs_logout", {}, False, "log out"),
-            ("not_discovered", {}, False, "log out"),
-            ("not_installed", {}, False, "Not installed"),
-            ("incompatible", {"shell": "99", "supported": ["50"]}, False, "99"),
-            ("error", {}, False, "journal"),
-            ("unknown", {}, False, "unavailable"),
+        obj.integ_row, obj.integ_switch = _Row(), _Switch()
+        obj._toast = _toasts.__get__(obj)
+        for state, detail, expect_on, expect_sensitive, needle in [
+            ("active", {}, True, True, "Active"),
+            ("disabled", {}, False, True, "disabled"),
+            ("needs_logout", {}, True, True, "log out"),
+            ("not_discovered", {}, False, True, "log out"),
+            ("not_installed", {}, False, False, "Not installed"),
+            ("incompatible", {"shell": "99", "supported": ["50"]}, False, False, "99"),
+            ("error", {}, False, False, "journal"),
+            ("unknown", {}, False, False, "unavailable"),
         ]:
             states["status"] = (state, detail)
             obj._refresh_integration_row()
             assert needle in states["subtitle"], (state, states["subtitle"])
-            assert states["visible"] is expect_btn, (state, states["visible"])
+            assert states["active"] is expect_on, (state, states["active"])
+            assert states["sensitive"] is expect_sensitive, (state, states["sensitive"])
         # Enable path: success refreshes, failure shows the manual command.
         states["status"] = ("disabled", {})
         with patch("apricus.utils.gnome_extension_set_enable", return_value=True):
             states["status"] = ("needs_logout", {})
-            obj._on_integration_enable(None)
+            states["switch_is_on"] = True
+            obj._on_integration_toggled(obj.integ_switch, None)
             assert "log out" in states["subtitle"]
         with patch(
             "apricus.utils.gnome_extension_set_enable", side_effect=RuntimeError("denied")
         ):
-            obj._on_integration_enable(None)
+            states["switch_is_on"] = True
+            obj._on_integration_toggled(obj.integ_switch, None)
             assert "gnome-extensions enable" in states["subtitle"]
+        # Disable path asks for a restart and refreshes.
+        with patch("apricus.utils.gnome_extension_set_disable", return_value=True):
+            states["status"] = ("disabled", {})
+            states["switch_is_on"] = False
+            obj._on_integration_toggled(obj.integ_switch, None)
+            assert any("restart" in t.lower() for t in states.get("toasts", []))
     finally:
         if old_mod is not None:
             sys.modules["apricus.gnome_shell"] = old_mod
         else:
             sys.modules.pop("apricus.gnome_shell", None)
+
+
+@check
+def renderer_selection_persists_and_asks_restart():
+    import apricus.gui.gtk4app as appmod
+
+    saved = {}
+
+    class _FakeConfigUtil:
+        def load(self):
+            return {"video_renderer": "auto"}
+
+        def save(self, config):
+            saved.update(config)
+
+    class _FakeRow:
+        def __init__(self, selected):
+            self._selected = selected
+
+        def get_selected(self):
+            return self._selected
+
+    toasts = []
+    obj = appmod.ControlPanel.__new__(appmod.ControlPanel)
+    obj.config = {"video_renderer": "auto"}
+    obj._renderer_ids = ["auto", "gl", "xcb", "xv"]
+    obj._toast = lambda message: toasts.append(message)
+    old = appmod.ConfigUtil
+    appmod.ConfigUtil = _FakeConfigUtil
+    try:
+        # No change → no save, no toast.
+        obj._on_renderer_changed(_FakeRow(0), None)
+        assert saved == {} and toasts == []
+        # Change → persisted with restart notice.
+        obj._on_renderer_changed(_FakeRow(2), None)
+        assert saved.get("video_renderer") == "xcb", saved
+        assert any("restart" in t.lower() for t in toasts), toasts
+    finally:
+        appmod.ConfigUtil = old
 
 
 def main():
@@ -2825,3 +2883,7 @@ def test_shell_refresh_reveals_banner_and_badges():
 
 def test_integration_row_reflects_status():
     _run("integration_row_reflects_status")
+
+
+def test_renderer_selection_persists_and_asks_restart():
+    _run("renderer_selection_persists_and_asks_restart")
