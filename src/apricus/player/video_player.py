@@ -128,9 +128,7 @@ def resolve_renderer_vout(explicit=RENDERER_AUTO):
     if env is not None:
         return env
     if os.environ.get("APRICUS_VOUT", "").strip():
-        logger.warning(
-            f"[Player] ignoring unknown APRICUS_VOUT={os.environ.get('APRICUS_VOUT')!r}"
-        )
+        logger.warning(f"[Player] ignoring unknown APRICUS_VOUT={os.environ.get('APRICUS_VOUT')!r}")
     if explicit in ("gl", "xcb", "xv"):
         return VOUT_MODULES[explicit]
     if explicit != RENDERER_AUTO:

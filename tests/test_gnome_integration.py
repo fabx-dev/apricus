@@ -16,7 +16,6 @@ from apricus.gnome_shell import (
     extension_dir,
     extension_is_compatible,
     extension_is_enabled,
-    extension_load_state,
     integration_active,
     log_status,
     read_metadata,
@@ -457,7 +456,6 @@ def test_host_zip_and_installer_roundtrip(tmp_path):
     assert proc.returncode != 0
 
 
-
 def test_respawn_player_forces_fresh_instance():
     from apricus import server as srv
 
@@ -542,9 +540,7 @@ def test_no_frames_silent_when_paused():
     """Manual pauses, auto-pause and buffering must never trip the watchdog."""
     from apricus.player.video_player import VideoPlayer
 
-    paused = _deadline_player(
-        playing=False, started_ago=VideoPlayer.FIRST_FRAME_TIMEOUT_SEC + 60
-    )
+    paused = _deadline_player(playing=False, started_ago=VideoPlayer.FIRST_FRAME_TIMEOUT_SEC + 60)
     assert VideoPlayer.playback_error(paused) is None
 
 

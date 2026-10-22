@@ -447,8 +447,6 @@ def test_server_property_setters_persist_to_disk(monkeypatch):
 
 def test_respawn_player_forces_fresh_process():
     """respawn_player() must rebuild the player even for the same mode."""
-    from unittest.mock import patch
-
     calls = []
 
     s = srv.ApricusServer.__new__(srv.ApricusServer)
