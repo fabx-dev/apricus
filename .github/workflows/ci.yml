@@ -26,13 +26,13 @@ jobs:
         run: |
           updated=false
           for attempt in 1 2 3; do
-            if sudo timeout 240 apt-get update; then updated=true; break; fi
+            if sudo timeout --kill-after=30 240 apt-get update; then updated=true; break; fi
             sleep 15
           done
           if [ "$updated" != "true" ]; then exit 1; fi
           installed=false
           for attempt in 1 2 3; do
-            if sudo timeout 600 apt-get install -y python3-gi gir1.2-gtk-3.0 gir1.2-gdk-3.0 gir1.2-appindicator3-0.1 gir1.2-gnomedesktop-4.0 gir1.2-wnck-3.0 gir1.2-webkit2-4.1 gir1.2-gtk-4.0 gir1.2-adw-1 meson ninja-build gettext desktop-file-utils libglib2.0-dev libglib2.0-dev-bin rpm; then installed=true; break; fi
+            if sudo timeout --kill-after=120 600 apt-get install -y python3-gi gir1.2-gtk-3.0 gir1.2-gdk-3.0 gir1.2-appindicator3-0.1 gir1.2-gnomedesktop-4.0 gir1.2-wnck-3.0 gir1.2-webkit2-4.1 gir1.2-gtk-4.0 gir1.2-adw-1 meson ninja-build gettext desktop-file-utils libglib2.0-dev libglib2.0-dev-bin rpm; then installed=true; break; fi
             sleep 15
           done
           if [ "$installed" != "true" ]; then exit 1; fi
