@@ -213,7 +213,9 @@ class VLCWidget(Gtk.DrawingArea):
 
 
 class PlayerWindow(Gtk.ApplicationWindow):
-    def __init__(self, name, width, height, *args, mode=MODE_VIDEO, renderer=RENDERER_AUTO, **kwargs):
+    def __init__(
+        self, name, width, height, *args, mode=MODE_VIDEO, renderer=RENDERER_AUTO, **kwargs
+    ):
         super().__init__(*args, **kwargs)
         # Keyboard/mouse input is handled by VLC flags below (both disabled):
         # never take keyboard focus so clicks can't raise us over DING.

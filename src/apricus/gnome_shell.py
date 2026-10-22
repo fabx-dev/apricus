@@ -134,9 +134,7 @@ def extension_raw_state():
     try:
         import pydbus
 
-        proxy = pydbus.SessionBus().get(
-            "org.gnome.Shell.Extensions", "/org/gnome/Shell/Extensions"
-        )
+        proxy = pydbus.SessionBus().get("org.gnome.Shell.Extensions", "/org/gnome/Shell/Extensions")
         info = proxy.GetExtensionInfo(EXTENSION_UUID)
     except Exception as e:  # noqa: BLE001 - sandbox denial: unknown, not off
         logger.debug(f"[ShellIntegration] Shell state unreachable: {e}")

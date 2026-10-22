@@ -20,9 +20,7 @@ from apricus.gnome_shell import (
 )
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-EXT_DIR = os.path.join(
-    REPO_ROOT, "gnome-extension", EXTENSION_UUID
-)
+EXT_DIR = os.path.join(REPO_ROOT, "gnome-extension", EXTENSION_UUID)
 EXT_JS = os.path.join(EXT_DIR, "extension.js")
 EXT_META = os.path.join(EXT_DIR, "metadata.json")
 

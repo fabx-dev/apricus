@@ -3885,9 +3885,9 @@ class ControlPanel(Adw.Application):
             if row is not None:
                 action = "enable" if want else "disable"
                 row.set_subtitle(
-                    _("Could not {action} automatically ({err}); run: gnome-extensions {action}").format(
-                        action=action, err=e
-                    )
+                    _(
+                        "Could not {action} automatically ({err}); run: gnome-extensions {action}"
+                    ).format(action=action, err=e)
                 )
             switch.set_active(not want)
             return False
