@@ -337,12 +337,15 @@ def integration_active(shell_version=None, search_dirs=None, enabled=None, loade
     """
     if not (is_gnome() and is_wayland()):
         return False
-    if not extension_is_compatible(shell_version, search_dirs):
-        return False
     state = extension_load_state() if loaded is _UNSET else loaded
     if state is True:
+        # The Shell confirms it loaded our extension: that alone proves
+        # compatibility (the Shell fences versions on load), even where
+        # the filesystem is blind (sandbox) and no metadata is readable.
         return True
     if state is False:
+        return False
+    if not extension_is_compatible(shell_version, search_dirs):
         return False
     is_on = extension_is_enabled() if enabled is None else enabled
     return bool(is_on)

@@ -255,20 +255,29 @@ def test_detection_with_broken_metadata(tmp_path):
 
 
 def test_integration_active_requires_all_conditions(tmp_path, monkeypatch):
+    """Shell verdicts, compatibility fence and the sandbox fallback."""
     dirs = _write_fake_extension(str(tmp_path))
     monkeypatch.setattr(gnome_shell, "is_gnome", lambda: True)
     monkeypatch.setattr(gnome_shell, "is_wayland", lambda: True)
-    # Shell confirms loaded.
+    # Hermetic Shell answers: the real session bus (with our extension
+    # possibly loaded) must not leak into the matrix.
+    monkeypatch.setattr(gnome_shell, "extension_load_state", lambda: None)
+    # Shell confirms loaded: True even where metadata is blind or would
+    # disagree — a loaded extension proves compatibility itself, since
+    # the Shell fences versions on load.
     assert integration_active("50.1", dirs, enabled=True, loaded=True) is True
+    assert integration_active("49", dirs, enabled=True, loaded=True) is True
     # Listed as enabled but Shell has NOT loaded it (e.g. Wayland session
     # started before enable): must NOT stand the legacy guard down.
     assert integration_active("50.1", dirs, enabled=True, loaded=False) is False
-    # Shell unreachable (sandbox): fall back to the enabled list.
+    # Shell unreachable (sandbox): fall back to the enabled list, still
+    # fenced by the declared versions (loaded defaults to _UNSET so the
+    # mocked load_state is what runs).
     monkeypatch.setattr(gnome_shell, "extension_is_enabled", lambda: True)
-    assert integration_active("50.1", dirs, loaded=None) is True
+    assert integration_active("50.1", dirs) is True
+    assert integration_active("49", dirs) is False
     monkeypatch.setattr(gnome_shell, "extension_is_enabled", lambda: False)
-    assert integration_active("50.1", dirs, loaded=None) is False
-    assert integration_active("49", dirs, enabled=True, loaded=True) is False
+    assert integration_active("50.1", dirs) is False
     assert integration_active("50.1", [str(tmp_path / "empty")], enabled=True) is False
     monkeypatch.setattr(gnome_shell, "is_wayland", lambda: False)
     assert integration_active("50.1", dirs, enabled=True, loaded=True) is False
