@@ -153,7 +153,16 @@ class ControlPanel(Adw.Application):
         self.config = ConfigUtil().load()
         self.playlist_paths = list((self.config.get("playlist") or {}).get("Default", []))
 
+    def do_startup(self):
+        Adw.Application.do_startup(self)
+        from apricus.gnome_bridge import start
+
+        self._gnome_bridge = start(self._refresh_integration_row)
+
     def do_shutdown(self):
+        from apricus.gnome_bridge import stop
+
+        stop()
         pool = getattr(self, "_stream_thumb_pool", None)
         if pool is not None:
             pool.shutdown(wait=False, cancel_futures=True)
@@ -3873,6 +3882,8 @@ class ControlPanel(Adw.Application):
         if state == "active":
             subtitle = _("Active — icons stay above the video")
             switch_on, sensitive = True, True
+        elif state == "loaded":
+            subtitle = _("Loaded — integration is not operational")
         elif state == "disabled":
             if is_snap() or is_flatpak():
                 subtitle = (
@@ -3908,6 +3919,10 @@ class ControlPanel(Adw.Application):
         else:
             subtitle = _("Status unavailable")
         receipt = detail.get("receipt")
+        if detail.get("bridge") and state == "active":
+            subtitle += " · " + _("Wallpaper windows adopted: {count}").format(
+                count=detail.get("adopted", 0)
+            )
         if receipt and isinstance(receipt.get("checked_at"), (int, float)):
             stamp = time.strftime("%d/%m %H:%M", time.localtime(receipt["checked_at"]))
             subtitle += " · " + _("Last host check: {time}").format(time=stamp)

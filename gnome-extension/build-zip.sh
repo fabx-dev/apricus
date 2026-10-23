@@ -5,7 +5,7 @@
 # Default output: dist/apricus-integration@fabx-dev.zip
 #
 # The archive contains the top-level directory apricus-integration@fabx-dev/
-# with exactly the files GNOME Shell needs (metadata.json + extension.js),
+# with the files GNOME Shell needs (metadata.json, extension.js, statusBridge.js),
 # so users install it by unzipping straight into their extensions dir:
 #
 #   unzip -o apricus-integration@fabx-dev.zip -d ~/.local/share/gnome-shell/extensions/

@@ -98,6 +98,9 @@ install_file() {
     mv -f "$tmp" "$2"
 }
 install_file "$SRC_DIR/metadata.json" "$DEST_DIR/metadata.json"
+if [ -f "$SRC_DIR/statusBridge.js" ]; then
+    install_file "$SRC_DIR/statusBridge.js" "$DEST_DIR/statusBridge.js"
+fi
 install_file "$SRC_DIR/extension.js" "$DEST_DIR/extension.js"
 echo "Installed $UUID to $DEST_DIR"
 

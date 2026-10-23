@@ -845,6 +845,12 @@ msgid "Verification expired — last result: {status}"
 msgstr "確認が期限切れです — 最後の結果: {status}"
 
 #: src/apricus/gui/gtk4app.py:3909
+msgid "Loaded — integration is not operational"
+msgstr "読み込み済み — 統合は動作していません"
+
+msgid "Wallpaper windows adopted: {count}"
+msgstr "取り込んだ壁紙ウィンドウ数: {count}"
+
 msgid "Status unavailable"
 msgstr "ステータスを利用できません"
 

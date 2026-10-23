@@ -843,6 +843,12 @@ msgid "Verification expired — last result: {status}"
 msgstr "Überprüfung abgelaufen — letztes Ergebnis: {status}"
 
 #: src/apricus/gui/gtk4app.py:3909
+msgid "Loaded — integration is not operational"
+msgstr "Geladen — Integration nicht betriebsbereit"
+
+msgid "Wallpaper windows adopted: {count}"
+msgstr "Übernommene Hintergrundfenster: {count}"
+
 msgid "Status unavailable"
 msgstr "Status nicht verfügbar"
 

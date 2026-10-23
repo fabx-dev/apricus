@@ -160,7 +160,9 @@ def _write_extension_zip(source_dir, zip_path):
     import zipfile
 
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
-        for name in ("metadata.json", "extension.js"):
+        for name in ("metadata.json", "extension.js", "statusBridge.js"):
+            if name == "statusBridge.js" and not os.path.isfile(os.path.join(source_dir, name)):
+                continue  # Old extension bundles remain exportable.
             with open(os.path.join(source_dir, name), "rb") as f:
                 zf.writestr(f"{EXTENSION_UUID}/{name}", f.read())
 
@@ -406,15 +408,20 @@ def integration_active(shell_version=None, search_dirs=None, enabled=None, loade
 def integration_status(search_dirs=None):
     """Machine-readable integration state for setup UI (never raises).
 
-    Returns ``(state, detail)`` where state is one of: ``active``,
+    Returns ``(state, detail)`` where state is one of: ``active``, ``loaded``,
     ``disabled``, ``needs_logout``, ``not_discovered``, ``not_installed``,
-    ``incompatible``, ``error``, ``unknown`` (Shell unreachable: sandbox).
+    ``incompatible``, ``error``, ``stale``, ``unknown`` (no reliable evidence).
     ``detail`` carries paths/versions for user-facing messages.
     """
     detail = {}
     try:
         if not (is_gnome() and is_wayland()):
             return "unknown", detail
+        from apricus.gnome_bridge import status as bridge_status
+
+        observed = bridge_status()
+        if observed is not None:
+            return observed
         path = extension_dir(search_dirs)
         if path is not None:
             detail["path"] = path

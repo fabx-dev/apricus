@@ -576,13 +576,14 @@ def test_host_zip_and_installer_roundtrip(tmp_path):
         "apricus-integration@fabx-dev/",
         "apricus-integration@fabx-dev/extension.js",
         "apricus-integration@fabx-dev/metadata.json",
+        "apricus-integration@fabx-dev/statusBridge.js",
     ], names
     with zipfile.ZipFile(out_zip) as zf:
         meta = json.loads(zf.read("apricus-integration@fabx-dev/metadata.json"))
     assert meta["uuid"] == EXTENSION_UUID
     assert set(meta["shell-version"]) == {"49", "50", "51"}
     with zipfile.ZipFile(out_zip) as zf:
-        for name in ("metadata.json", "extension.js"):
+        for name in ("metadata.json", "extension.js", "statusBridge.js"):
             zipped = zf.read(f"apricus-integration@fabx-dev/{name}")
             source = (repo / "gnome-extension" / EXTENSION_UUID / name).read_bytes()
             assert zipped == source, name
@@ -599,7 +600,7 @@ def test_host_zip_and_installer_roundtrip(tmp_path):
     )
     assert proc.returncode == 0, proc.stderr
     installed = fake_home / ".local/share/gnome-shell/extensions" / EXTENSION_UUID
-    for name in ("metadata.json", "extension.js"):
+    for name in ("metadata.json", "extension.js", "statusBridge.js"):
         src = (repo / "gnome-extension" / EXTENSION_UUID / name).read_bytes()
         assert (installed / name).read_bytes() == src
     # The host run also leaves a machine-readable status receipt next to
@@ -619,12 +620,13 @@ def test_host_zip_and_installer_roundtrip(tmp_path):
         env=env,
     )
     assert proc.returncode == 0, proc.stderr
-    for name in ("metadata.json", "extension.js"):
+    for name in ("metadata.json", "extension.js", "statusBridge.js"):
         src = (repo / "gnome-extension" / EXTENSION_UUID / name).read_bytes()
         assert (installed / name).read_bytes() == src
     assert sorted(p.name for p in installed.iterdir()) == [
         "extension.js",
         "metadata.json",
+        "statusBridge.js",
     ]
     proc = subprocess.run(
         ["bash", installer, "--bogus"], capture_output=True, text=True, timeout=60, env=env

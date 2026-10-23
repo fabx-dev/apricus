@@ -36,6 +36,7 @@ import {Extension, InjectionManager} from 'resource:///org/gnome/shell/extension
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import {Workspace} from 'resource:///org/gnome/shell/ui/workspace.js';
 import {WorkspaceThumbnail} from 'resource:///org/gnome/shell/ui/workspaceThumbnail.js';
+import {StatusBridge} from './statusBridge.js';
 
 // Must match WALLPAPER_WINDOW_ROLE in src/apricus/gnome_shell.py and the
 // role set by the player before mapping (Gtk.Window.set_role).
@@ -43,7 +44,7 @@ const WALLPAPER_ROLE = 'apricus-wallpaper';
 
 // Bumped on every code change; logged from enable() so the journal shows
 // which revision the running shell actually loaded.
-const CODE_REVISION = 3;
+const CODE_REVISION = 4;
 
 const WINDOW_MATCH_RETRIES = 10;
 const WINDOW_MATCH_INTERVAL_MS = 100;
@@ -60,6 +61,22 @@ export default class ApricusIntegrationExtension extends Extension {
         this._restackedId = 0;
         this._workspaceChangedId = 0;
         this._overviewHiddenId = 0;
+        this._operational = false;
+        // Loaded is not the same as operational; zero adopted windows is valid.
+        try {
+            this._statusBridge = new StatusBridge(() => {
+                const state = Main.extensionManager.lookup(this.uuid)?.state;
+                // Shell ExtensionState.ENABLED == 1. Do not renew a green
+                // lease if Shell marked the extension erroneous or its
+                // background/injection setup is no longer present.
+                const operational = this._operational && state === 1 &&
+                    this._bgGroup === Main.layoutManager._backgroundGroup &&
+                    Boolean(this._bgGroup && this._injectionManager);
+                return [!this._destroyed, operational, this._adopted.size];
+            });
+        } catch (error) {
+            console.warn(`[ApricusBridge] unavailable: ${error.message}`);
+        }
 
         console.warn(`[${this.uuid}] enabled, code revision ${CODE_REVISION}`);
 
@@ -96,9 +113,14 @@ export default class ApricusIntegrationExtension extends Extension {
             }
         }
         console.warn(`[${this.uuid}] startup scan: ${seen} windows, ${matched} wallpaper role match(es)`);
+        this._operational = true;
+        this._statusBridge?.changed();
     }
 
     disable() {
+        this._statusBridge?.stop();
+        this._statusBridge = null;
+        this._operational = false;
         this._destroyed = true;
 
         for (const [, retry] of this._pending)
@@ -252,6 +274,7 @@ export default class ApricusIntegrationExtension extends Extension {
         // logs disposed-object warnings, and its handlers die with it.
         record.destroyId = actor.connect('destroy', () => {
             this._adopted.delete(window);
+            this._statusBridge?.changed();
         });
 
         // A wallpaper must never hold focus or rise in the stack, yet its
@@ -268,6 +291,7 @@ export default class ApricusIntegrationExtension extends Extension {
         this._refocusNormalWindow(window);
 
         console.warn(`[${this.uuid}] adopted "${window.get_title() ?? ''}" into the background layer`);
+        this._statusBridge?.changed();
         return true;
     }
 
@@ -303,6 +327,7 @@ export default class ApricusIntegrationExtension extends Extension {
         if (!record)
             return;
         this._adopted.delete(window);
+        this._statusBridge?.changed();
         this._disconnectRecord(record);
     }
 
