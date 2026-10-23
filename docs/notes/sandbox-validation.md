@@ -123,7 +123,48 @@ flatpak run io.github.fabx_dev.Apricus &
   (no local `rpmbuild`). Install test: same VM procedure with
   `rpm -i` / `rpm -e` on a Fedora/RHEL-family GNOME VM — NOT EXECUTED.
 
-## 4. Release approval gate (documented, not applied)
+## 4. Snap: why self-detection cannot confirm Active (verified, by design)
+
+Four independent states must be distinguished:
+
+- **installed**: extension files where GNOME Shell looks
+  (`~/.local/share/gnome-shell/extensions/`). Verifiable from the
+  sandbox: NO. The snap sees `~/snap/apricus/<rev>/` as HOME and
+  the `home` interface explicitly excludes dotfiles
+  (`owner @{HOME}/[^s.]*` patterns in the AppArmor profile), so
+  `~/.local` is invisible by policy.
+- **enabled**: `org.gnome.shell enabled-extensions` in dconf. Verifiable
+  from the sandbox: only with the schema XML present (it is not
+  shipped) AND via the `gsettings` plug's dconf access. Deliberately
+  NOT wired: without Shell confirmation it cannot distinguish
+  "enabled, waiting for login" from "enabled and loaded".
+- **loaded**: Shell reports state ENABLED(1). Verifiable: NO.
+  `org.gnome.Shell.Extensions` has no allow rule in the snap's
+  AppArmor profile (verified: only `org.freedesktop.DBus`,
+  portals, a11y, StatusNotifier peers); calls are denied, same as
+  the ScreenSaver introspection denials in the logs.
+- **operational**: loaded + video actually below icons. Only the user
+  can confirm visually.
+
+Consequences (all verified live):
+
+- The guided flow works up to host install + enable. The Settings row
+  can never show Active from inside the snap; with the reorder in
+  `integration_status()` it honestly reports "Status unavailable"
+  instead of the previous misleading "not installed".
+- `prepare_host_install()` + `install-host.sh` need no change: files
+  land in the sandbox-identical export dir, the host command is
+  copy-paste runnable (after the `set_content` clipboard fix).
+- The `org.freedesktop.Flatpak` talk-name stays: `backends.py`
+  needs `flatpak-spawn --host gsettings` for the static wallpaper.
+- Schema staging (`gnome-shell-common`) was evaluated and REJECTED:
+  it would only enable the dconf *enabled* read, which cannot prove
+  *loaded*, while `integration_active()`'s enabled-fallback would
+  then stand the legacy guard down on a mere "enabled" — less safe
+  than today's guard-up behavior when the Shell state is unknown.
+  No new permissions were added.
+
+## 5. Release approval gate (documented, not applied)
 
 Recommended hardening for `fabx-dev/apricus` (Settings → Environments):
 
