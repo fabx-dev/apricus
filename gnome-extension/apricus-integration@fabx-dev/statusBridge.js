@@ -87,6 +87,7 @@ export class StatusBridge {
         catch (error) {
             // A broken integration must not keep renewing a green lease.
             this._cancelTimer();
+            this._last = null; // A recovered identical snapshot must be sent again.
             console.warn(`[ApricusBridge] snapshot failed: ${error.message}`);
             return;
         }

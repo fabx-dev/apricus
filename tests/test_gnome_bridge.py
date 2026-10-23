@@ -202,6 +202,23 @@ def test_wrong_uid_fails_closed(monkeypatch):
     assert "credentials" in authenticate(bridge, bus, glib).error
 
 
+def test_inflight_register_across_suspend_is_rejected(monkeypatch):
+    clocks = [100.0]
+    monkeypatch.setattr(gnome_bridge, "boot_time", lambda: clocks[0])
+    monkeypatch.setattr(gnome_bridge.time, "monotonic", lambda: 100.0)
+    bridge, bus, glib = fake_bridge(monkeypatch, [":1.14", ":1.14"])
+    query = bridge._query
+
+    def suspending_query(method, argument, callback):
+        if method == "GetConnectionCredentials":
+            clocks[0] += 10
+        query(method, argument, callback)
+
+    bridge._query = suspending_query
+    assert "crossed suspend" in authenticate(bridge, bus, glib).error
+    assert bridge.registration.status() is None
+
+
 def test_credential_denial_fails_closed(monkeypatch):
     bridge, bus, glib = fake_bridge(monkeypatch, [])
     bus.call_finish = lambda _: (_ for _ in ()).throw(RuntimeError("AppArmor denied"))

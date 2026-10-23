@@ -113,6 +113,14 @@ function fixture() {
     f.run(30);
     assert(f.calls.length === 1 && f.timers.size === 0,
         'Broken snapshot does not renew a green lease');
+    f.bridge._snapshot = () => f.snapshot.slice();
+    f.bridge.changed();
+    f.run(0);
+    assert(f.calls[1].method === 'Update', 'Recovered identical snapshot is sent again');
+    f.ack(1, new Error('lease expired'));
+    f.run(5);
+    assert(f.calls[2].method === 'Register', 'Expired recovery negotiates a new generation');
+    f.ack(2);
     f.bridge.stop();
 }
 

@@ -226,6 +226,7 @@ class Bridge:
         self.pending += 1
         self.senders.add(sender)
         epoch = self.epoch
+        suspend_offset = boot_time() - time.monotonic()
         finished = False
 
         def finish(error=None):
@@ -241,6 +242,9 @@ class Bridge:
         def apply(bus, result):
             try:
                 owner = bus.call_finish(result).unpack()[0]
+                if abs(boot_time() - time.monotonic() - suspend_offset) > 2:
+                    self._invalidate("resume")
+                    raise ValueError("request crossed suspend; re-register")
                 if self.closed or epoch != self.epoch or owner != sender:
                     raise ValueError("ownership changed")
                 state = self.registration
