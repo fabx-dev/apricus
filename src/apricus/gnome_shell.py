@@ -361,24 +361,29 @@ def integration_status(search_dirs=None):
         if not (is_gnome() and is_wayland()):
             return "unknown", detail
         path = extension_dir(search_dirs)
-        if path is None:
-            return "not_installed", detail
-        detail["path"] = path
+        if path is not None:
+            detail["path"] = path
         ver = shell_version()
         detail["shell"] = ver
         meta = read_metadata(search_dirs)
         supported = (meta or {}).get("shell-version") or []
         detail["supported"] = list(supported)
-        if not extension_is_compatible(ver, search_dirs):
-            return "incompatible", detail
+        # Shell verdicts before the filesystem gate: inside sandboxes the
+        # filesystem is blind (remapped HOME, hidden dirs), but a reachable
+        # Shell still knows. ENABLED(1) also proves compatibility (the
+        # Shell fences versions itself), so no metadata is needed there.
         raw = extension_raw_state()
-        if raw is _UNREACHABLE:
-            return "unknown", detail
         if raw == _EXTENSION_STATE_ENABLED:
             return "active", detail
         if raw == _EXTENSION_STATE_ERROR:
             return "error", detail
         if raw == _EXTENSION_STATE_OUT_OF_DATE:
+            return "incompatible", detail
+        if raw is _UNREACHABLE:
+            return "unknown", detail
+        if path is None:
+            return "not_installed", detail
+        if not extension_is_compatible(ver, search_dirs):
             return "incompatible", detail
         if extension_is_enabled():
             # Enabled but the Shell does not report it loaded: logout/login

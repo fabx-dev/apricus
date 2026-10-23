@@ -328,9 +328,17 @@ def test_status_matrix_for_setup_ui(tmp_path, monkeypatch):
     monkeypatch.setattr(gnome_shell, "is_gnome", lambda: True)
     monkeypatch.setattr(gnome_shell, "is_wayland", lambda: True)
     monkeypatch.setattr(gnome_shell, "shell_version", lambda: "50.1")
+    # Neutral Shell answer by default: real D-Bus must not leak into the
+    # matrix (this session may have the extension loaded).
+    monkeypatch.setattr(gnome_shell, "extension_raw_state", lambda: None)
 
     monkeypatch.setattr(gnome_shell, "extension_dir", lambda *a: None)
     assert integration_status(dirs)[0] == "not_installed"
+
+    # Sandbox-blind filesystem (dir invisible) but Shell-confirmed loaded.
+    monkeypatch.setattr(gnome_shell, "extension_raw_state", lambda: 1)
+    assert integration_status(dirs)[0] == "active"
+    monkeypatch.setattr(gnome_shell, "extension_raw_state", lambda: None)
 
     monkeypatch.setattr(gnome_shell, "extension_dir", lambda *a: str(tmp_path))
     monkeypatch.setattr(gnome_shell, "read_metadata", lambda *a: {"shell-version": ["49"]})
