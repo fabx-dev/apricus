@@ -14,7 +14,12 @@ from gi.repository import Gdk, Gio, GLib, Gtk
 from pydbus import SessionBus
 
 from apricus.commons import DBUS_NAME_PLAYER, DBUS_PROJECT, LOGGER_NAME
-from apricus.gnome_shell import WALLPAPER_WINDOW_ROLE, integration_active, log_status
+from apricus.gnome_shell import (
+    WALLPAPER_WINDOW_ROLE,
+    _shell_settings,
+    integration_active,
+    log_status,
+)
 from apricus.utils import _authorize, gnome_desktop_icon_workaround, is_snap
 
 logger = logging.getLogger(LOGGER_NAME)
@@ -34,15 +39,27 @@ _xlib_handle = None
 
 
 def _x11_lib():
-    """ctypes handle for libX11, cached. None when unavailable."""
+    """ctypes handle for libX11, cached, with all signatures declared.
+
+    None when unavailable. Signatures are applied at load time so no
+    call site can pass a truncated pointer (segfault, uncatchable).
+    """
     global _xlib_handle
     if _xlib_handle is None:
         for lib in ("libX11.so.6", "libX11.so"):
             try:
-                _xlib_handle = ctypes.cdll.LoadLibrary(lib)
-                break
+                handle = ctypes.cdll.LoadLibrary(lib)
             except OSError:
                 continue
+            for name, (argtypes, restype) in _X11_FUNCS.items():
+                try:
+                    func = getattr(handle, name)
+                except AttributeError:
+                    continue
+                func.argtypes = argtypes
+                func.restype = restype
+            _xlib_handle = handle
+            break
     return _xlib_handle
 
 
@@ -83,6 +100,32 @@ class _XPropertyEvent(ctypes.Structure):
     ]
 
 
+# Exact ctypes signatures for every libX11 entry point we call.
+# Declared once, applied in _x11_lib(): without explicit argtypes,
+# ctypes truncates 64-bit pointers to C int and libX11 segfaults
+# (fatal, uncatchable — observed in the Flatpak sandbox).
+_X11_FUNCS = {
+    "XOpenDisplay": ([ctypes.c_char_p], ctypes.c_void_p),
+    "XInternAtom": (
+        [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_int],
+        ctypes.c_ulong,
+    ),
+    "XDefaultRootWindow": ([ctypes.c_void_p], ctypes.c_ulong),
+    "XSendEvent": (
+        [
+            ctypes.c_void_p,
+            ctypes.c_ulong,
+            ctypes.c_int,
+            ctypes.c_long,
+            ctypes.POINTER(_XClientMessageEvent),
+        ],
+        ctypes.c_int,
+    ),
+    "XFlush": ([ctypes.c_void_p], ctypes.c_int),
+    "XCloseDisplay": ([ctypes.c_void_p], ctypes.c_int),
+}
+
+
 def _x11_restack_below(xid):
     """Ask the WM (EWMH) to place window *xid* below its siblings.
 
@@ -95,17 +138,11 @@ def _x11_restack_below(xid):
     if lib is None:
         return False
     try:
-        lib.XOpenDisplay.argtypes = [ctypes.c_char_p]
-        lib.XOpenDisplay.restype = ctypes.c_void_p
         dpy = lib.XOpenDisplay(None)
         if not dpy:
             return False
         try:
-            lib.XInternAtom.argtypes = [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_int]
-            lib.XInternAtom.restype = ctypes.c_ulong
             msgtype = lib.XInternAtom(dpy, b"_NET_RESTACK_WINDOW", False)
-            lib.XDefaultRootWindow.argtypes = [ctypes.c_void_p]
-            lib.XDefaultRootWindow.restype = ctypes.c_ulong
             root = lib.XDefaultRootWindow(dpy)
             ev = _XClientMessageEvent()
             ev.type = _X11_CLIENT_MESSAGE
@@ -118,14 +155,6 @@ def _x11_restack_below(xid):
             ev.data[2] = _NET_RESTACK_WINDOW_DETAIL_BELOW
             ev.data[3] = 0
             ev.data[4] = 0
-            lib.XSendEvent.argtypes = [
-                ctypes.c_void_p,
-                ctypes.c_ulong,
-                ctypes.c_int,
-                ctypes.c_long,
-                ctypes.POINTER(_XClientMessageEvent),
-            ]
-            lib.XSendEvent.restype = ctypes.c_int
             lib.XSendEvent(dpy, root, False, _X_SUBSTRUCTURE_MASK, ctypes.byref(ev))
             lib.XFlush(dpy)
             return True
@@ -436,11 +465,10 @@ class BasePlayer(Gtk.Application):
         """
         if getattr(self, "_integration_watched", False):
             return
-        try:
-            from gi.repository import Gio
-
-            settings = Gio.Settings.new("org.gnome.shell")
-        except Exception:  # noqa: BLE001 - sandbox/missing schema: static mode
+        # Gio.Settings.new() aborts the process when the schema is absent
+        # (Flatpak runtime); _shell_settings() probes safely first.
+        settings = _shell_settings()
+        if settings is None:
             logger.debug("[Player] Shell integration watcher unavailable")
             return
         # Keep a reference: without it the proxy is GC'd and notify stops.

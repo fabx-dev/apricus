@@ -196,6 +196,55 @@ def test_detection_without_extension(tmp_path):
     assert extension_is_compatible("50.1", [str(tmp_path)]) is False
 
 
+def test_missing_shell_schema_never_aborts(monkeypatch):
+    """Flatpak runtime has no org.gnome.shell schema: Gio.Settings.new()
+    would abort the process (GLib fatal, uncatchable). The helper must
+    probe with SettingsSchemaSource.lookup() and report inactive.
+    """
+    from apricus import gnome_shell as gs_mod
+
+    class _NoSchemaSource:
+        def lookup(self, *args, **kwargs):
+            return None
+
+    monkeypatch.setattr(
+        "gi.repository.Gio.SettingsSchemaSource.get_default",
+        lambda: _NoSchemaSource(),
+    )
+    assert gs_mod._shell_settings() is None
+    assert gs_mod.extension_is_enabled() is False
+
+
+def test_x11_lib_declares_all_signatures():
+    """Every libX11 entry point needs explicit ctypes argtypes.
+
+    Without them ctypes truncates 64-bit pointers to C int and libX11
+    segfaults (fatal, uncatchable — crashed the Flatpak player in the
+    legacy stacking guard). Any future addition must extend the table.
+    """
+    import apricus.player.base_player as mod
+
+    lib = mod._x11_lib()
+    assert lib is not None
+    for name, (argtypes, restype) in mod._X11_FUNCS.items():
+        func = getattr(lib, name)
+        assert list(func.argtypes) == argtypes, name
+        assert func.restype == restype, name
+
+
+def test_player_integration_watch_handles_missing_schema(monkeypatch):
+    """_watch_shell_integration degrades gracefully without Gio schemas."""
+    import apricus.player.base_player as mod
+
+    monkeypatch.setattr(mod, "_shell_settings", lambda: None)
+
+    class Stub:
+        pass
+
+    mod.BasePlayer._watch_shell_integration(Stub())
+    assert getattr(Stub(), "_integration_watched", False) is False
+
+
 def test_detection_with_broken_metadata(tmp_path):
     ext = os.path.join(str(tmp_path), EXTENSION_UUID)
     os.makedirs(ext)

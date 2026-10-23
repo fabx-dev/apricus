@@ -289,14 +289,34 @@ def extension_load_state():
     return state == _EXTENSION_STATE_ENABLED
 
 
-def extension_is_enabled():
-    """True when the user enabled our extension in GNOME Shell."""
+def _shell_settings():
+    """Gio.Settings for ``org.gnome.shell``, or None when unavailable.
+
+    ``Gio.Settings.new()`` aborts the whole process (GLib fatal error,
+    not a catchable Python exception) when the schema is not installed —
+    e.g. inside the Flatpak runtime, which does not ship
+    ``org.gnome.shell``. Always probe with
+    ``SettingsSchemaSource.lookup()`` first; it fails safely.
+    """
     try:
         from gi.repository import Gio
 
-        settings = Gio.Settings.new("org.gnome.shell")
+        source = Gio.SettingsSchemaSource.get_default()
+        if source is None or source.lookup("org.gnome.shell", True) is None:
+            return None
+        return Gio.Settings.new("org.gnome.shell")
+    except Exception:  # noqa: BLE001 - sandbox without schemas
+        return None
+
+
+def extension_is_enabled():
+    """True when the user enabled our extension in GNOME Shell."""
+    settings = _shell_settings()
+    if settings is None:
+        return False
+    try:
         enabled = settings.get_strv("enabled-extensions")
-    except Exception as e:  # noqa: BLE001 - missing schema/sandbox: inactive
+    except Exception as e:  # noqa: BLE001 - sandbox denial: inactive
         logger.debug(f"[ShellIntegration] enabled-extensions unreadable: {e}")
         return False
     return EXTENSION_UUID in (enabled or [])
