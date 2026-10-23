@@ -24,13 +24,14 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          ref: ${{ inputs.ref }}
+        # No ref override: on pull_request this checks out the merge
+        # commit (branch HEAD + master), the same tree CI tests. The
+        # exact SHAs are recorded below for provenance.
 
       - name: Record provenance
         run: |
           git rev-parse HEAD | tee commit-sha.txt
-          git log -1 --format='%H %s'
+          git log -1 --format='%H %s' | tee -a commit-sha.txt
 
       - name: Install Snapcraft
         run: |
