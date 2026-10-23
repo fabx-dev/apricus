@@ -27,6 +27,7 @@ import logging
 import os
 import subprocess
 import sys
+import time
 
 from apricus.commons import LOGGER_NAME
 from apricus.utils import is_gnome, is_wayland
@@ -181,6 +182,43 @@ def prepare_host_install(dest_dir=None, search_roots=None):
     except OSError:  # noqa: BLE001 - best effort (e.g. noexec mounts)
         pass
     return export_dir, host_install_command(export_dir)
+
+
+# Max age of a host-written status receipt (seconds). The sandboxed GUI
+# cannot observe the host Shell itself, so it trusts the receipt only
+# while fresh; re-running the host command refreshes it. 15 minutes
+# covers the install → logout/login → check flow without letting a
+# stale "active" survive long after the user disables the extension.
+RECEIPT_MAX_AGE_SEC = 15 * 60
+
+
+def read_host_receipt(search_dirs=None):
+    """Host-verified extension status for sandboxed runs, or None.
+
+    ``install-host.sh --zip`` (run by the user on the host, where the
+    Shell is fully visible) writes ``status.json`` next to the ZIP with
+    the live Shell verdict. Returns the parsed dict when present, fresh
+    and well-formed, else None. Never raises; never contacts the Shell.
+    """
+    try:
+        export_dir = host_export_dir()
+        path = os.path.join(export_dir, "status.json")
+        if (time.time() - os.path.getmtime(path)) > RECEIPT_MAX_AGE_SEC:
+            return None
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+        if not isinstance(data, dict):
+            return None
+        if data.get("uuid") != EXTENSION_UUID:
+            return None
+        if not isinstance(data.get("installed"), bool):
+            return None
+        return data
+    except (OSError, ValueError):
+        return None
+    except Exception:  # noqa: BLE001 - never break status on a bad file
+        logger.debug("[ShellIntegration] unreadable host receipt")
+        return None
 
 
 def read_metadata(search_dirs=None):
@@ -383,6 +421,16 @@ def integration_status(search_dirs=None):
         if raw == _EXTENSION_STATE_OUT_OF_DATE:
             return "incompatible", detail
         if raw is _UNREACHABLE:
+            # Sandbox denial: the host Shell cannot be reached from here.
+            # A fresh host-written receipt (see install-host.sh --zip)
+            # carries the live Shell verdict; without one, stay unknown
+            # rather than claiming anything about the host.
+            receipt = read_host_receipt(search_dirs) if path is None else None
+            if receipt is not None:
+                if receipt.get("loaded"):
+                    return "active", detail
+                if receipt.get("enabled"):
+                    return "needs_logout", detail
             return "unknown", detail
         if path is None:
             return "not_installed", detail

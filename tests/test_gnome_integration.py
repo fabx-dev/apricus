@@ -471,6 +471,82 @@ def test_recreate_resets_windows_and_reactivates():
     assert stub.reactivated is True
 
 
+def test_host_receipt_roundtrip_and_freshness(tmp_path, monkeypatch):
+    """Sandbox status receipt: fresh+valid is honored, else ignored."""
+    import json
+    import time
+
+    from apricus import gnome_shell as mod
+
+    export = tmp_path / "gnome-integration"
+    export.mkdir()
+    monkeypatch.setattr(mod, "host_export_dir", lambda: str(export))
+
+    def write(payload, age_sec=0):
+        p = export / "status.json"
+        p.write_text(json.dumps(payload), encoding="utf-8")
+        if age_sec:
+            old = time.time() - age_sec
+            os.utime(p, (old, old))
+
+    good = {
+        "uuid": mod.EXTENSION_UUID,
+        "installed": True,
+        "enabled": True,
+        "loaded": True,
+        "shell": "50.1",
+        "checked_at": 1234567890,
+    }
+    assert mod.read_host_receipt() is None  # missing file
+    write({"uuid": "other@x", "installed": True})
+    assert mod.read_host_receipt() is None  # wrong uuid
+    write({"uuid": mod.EXTENSION_UUID, "installed": "yes"})
+    assert mod.read_host_receipt() is None  # malformed shape
+    write(good)
+    assert mod.read_host_receipt()["loaded"] is True
+    write(good, age_sec=mod.RECEIPT_MAX_AGE_SEC + 60)
+    assert mod.read_host_receipt() is None  # stale receipts never apply
+    write("not json {{{")
+    assert mod.read_host_receipt() is None  # corrupt file
+
+
+def test_sandbox_status_uses_host_receipt(tmp_path, monkeypatch):
+    """Blind fs + denied bus + fresh receipt => Shell-verified states."""
+    from apricus import gnome_shell as mod
+
+    monkeypatch.setattr(mod, "is_gnome", lambda: True)
+    monkeypatch.setattr(mod, "is_wayland", lambda: True)
+    monkeypatch.setattr(mod, "extension_dir", lambda *a: None)
+    monkeypatch.setattr(mod, "extension_raw_state", lambda: mod._UNREACHABLE)
+    export = tmp_path / "gnome-integration"
+    export.mkdir()
+    monkeypatch.setattr(mod, "host_export_dir", lambda: str(export))
+
+    import json
+
+    def write(enabled, loaded):
+        (export / "status.json").write_text(
+            json.dumps(
+                {
+                    "uuid": mod.EXTENSION_UUID,
+                    "installed": True,
+                    "enabled": enabled,
+                    "loaded": loaded,
+                    "shell": "50.1",
+                    "checked_at": 1234567890,
+                }
+            ),
+            encoding="utf-8",
+        )
+
+    write(True, True)
+    assert mod.integration_status()[0] == "active"
+    write(True, False)
+    assert mod.integration_status()[0] == "needs_logout"
+    write(False, False)
+    assert mod.integration_status()[0] == "unknown"
+
+
 def test_host_zip_and_installer_roundtrip(tmp_path):
     """The distributable ZIP installs byte-identical files (Snap/Flatpak path)."""
     import json
@@ -521,6 +597,14 @@ def test_host_zip_and_installer_roundtrip(tmp_path):
     for name in ("metadata.json", "extension.js"):
         src = (repo / "gnome-extension" / EXTENSION_UUID / name).read_bytes()
         assert (installed / name).read_bytes() == src
+    # The host run also leaves a machine-readable status receipt next to
+    # the ZIP (shape only here: enabled/loaded depend on the live Shell).
+    receipt = tmp_path / "status.json"
+    assert receipt.is_file(), "install-host.sh must write status.json in --zip mode"
+    data = json.loads(receipt.read_text(encoding="utf-8"))
+    assert data["uuid"] == EXTENSION_UUID and data["installed"] is True
+    assert isinstance(data["enabled"], bool) and isinstance(data["loaded"], bool)
+    assert abs(__import__("time").time() - data["checked_at"]) < 300
     # Re-running over an existing install (the update flow) is idempotent.
     proc = subprocess.run(
         ["bash", installer, "--zip", str(out_zip)],

@@ -107,3 +107,47 @@ if [ "$ENABLE" -eq 1 ]; then
 else
     echo "To enable: gnome-extensions enable $UUID (then log out and back in)."
 fi
+
+# Host-verified status receipt for sandboxed Apricus (Snap/Flatpak cannot
+# see ~/.local and cannot query the Shell over D-Bus, so Settings can
+# never confirm Active by itself). Written next to the ZIP only in
+# --zip mode; the GUI reads it on "Check again" and trusts it only
+# while fresh (see RECEIPT_MAX_AGE_SEC). Re-run this script to refresh
+# after logout/login: enabling is idempotent.
+if [ -n "$ZIP" ]; then
+    _receipt_dir="$(dirname "$ZIP")"
+    _shell_ver=""
+    if command -v gnome-shell >/dev/null 2>&1; then
+        _shell_ver="$(gnome-shell --version 2>/dev/null | awk '{print $NF}')"
+    fi
+    _enabled=0
+    _loaded=0
+    if command -v gnome-extensions >/dev/null 2>&1; then
+        if gnome-extensions list --enabled 2>/dev/null | grep -qx "$UUID"; then
+            _enabled=1
+        fi
+        # state 1 == ENABLED (loaded and running); numbers never localize.
+        if gdbus call --session --dest org.gnome.Shell.Extensions \
+            --object-path /org/gnome/Shell/Extensions \
+            --method org.gnome.Shell.Extensions.GetExtensionInfo "$UUID" 2>/dev/null \
+            | grep -q "'state': <1"; then
+            _loaded=1
+        fi
+    fi
+    _bool() { if [ "$1" -eq 1 ]; then printf 'true'; else printf 'false'; fi; }
+    _now="$(date +%s)"
+    {
+        printf '{\n'
+        printf '  "uuid": "%s",\n' "$UUID"
+        printf '  "installed": true,\n'
+        printf '  "enabled": %s,\n' "$(_bool "$_enabled")"
+        printf '  "loaded": %s,\n' "$(_bool "$_loaded")"
+        if [ -n "$_shell_ver" ]; then
+            printf '  "shell": "%s",\n' "$_shell_ver"
+        else
+            printf '  "shell": null,\n'
+        fi
+        printf '  "checked_at": %s\n}\n' "$_now"
+    } > "$_receipt_dir/status.json"
+    echo "Status written to $_receipt_dir/status.json"
+fi
