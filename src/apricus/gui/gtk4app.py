@@ -3942,16 +3942,16 @@ class ControlPanel(Adw.Application):
             if not want:
                 self._toast(_("Integration disabled — using basic stacking"))
         except Exception as e:  # noqa: BLE001 - show the manual fallback
+            # The raw error (often a long sandbox D-Bus denial) goes to
+            # the log; the UI shows a short actionable message instead.
+            logger.warning(f"[GUI4] Integration toggle failed: {e}")
             row = getattr(self, "integ_row", None)
             if row is not None:
                 action = "enable" if want else "disable"
                 row.set_subtitle(
-                    (
-                        _(
-                            "Could not {action} automatically ({err}); run: gnome-extensions {action}"
-                        ).format(action=action, err=e)
-                    )
-                    + f" {EXTENSION_UUID}"
+                    _(
+                        "Could not switch automatically; run on the host: gnome-extensions {action} {uuid}"
+                    ).format(action=action, uuid=EXTENSION_UUID)
                 )
             switch.set_active(not want)
             return False

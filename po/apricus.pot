@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: apricus\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-23 00:27+0200\n"
+"POT-Creation-Date: 2026-10-23 22:23+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -223,7 +223,7 @@ msgid ""
 msgstr ""
 
 #: src/apricus/gui/gtk4app.py:768 src/apricus/gui/gtk4app.py:3675
-#: src/apricus/gui/gtk4app.py:4035
+#: src/apricus/gui/gtk4app.py:4049
 msgid "OK"
 msgstr ""
 
@@ -738,7 +738,7 @@ msgstr ""
 msgid "Open"
 msgstr ""
 
-#: src/apricus/gui/gtk4app.py:3795 src/apricus/gui/gtk4app.py:4026
+#: src/apricus/gui/gtk4app.py:3795 src/apricus/gui/gtk4app.py:4040
 msgid "How to select videos"
 msgstr ""
 
@@ -801,60 +801,61 @@ msgid "Status unavailable"
 msgstr ""
 
 #. noqa: BLE001 - show the failure inline
-#: src/apricus/gui/gtk4app.py:3888
+#: src/apricus/gui/gtk4app.py:3892
 #, python-brace-format
 msgid "Could not prepare installation files ({err})"
 msgstr ""
 
-#: src/apricus/gui/gtk4app.py:3892
+#: src/apricus/gui/gtk4app.py:3896
 msgid "Files ready — run the command on the host"
 msgstr ""
 
 #. noqa: BLE001 - clipboard best effort
-#: src/apricus/gui/gtk4app.py:3904
+#: src/apricus/gui/gtk4app.py:3918
 #, python-brace-format
 msgid "Could not copy ({err})"
 msgstr ""
 
-#: src/apricus/gui/gtk4app.py:3906
+#: src/apricus/gui/gtk4app.py:3920
 msgid "Command copied"
 msgstr ""
 
-#: src/apricus/gui/gtk4app.py:3929
+#: src/apricus/gui/gtk4app.py:3943
 msgid "Integration disabled — using basic stacking"
 msgstr ""
 
-#: src/apricus/gui/gtk4app.py:3937
+#: src/apricus/gui/gtk4app.py:3953
 #, python-brace-format
 msgid ""
-"Could not {action} automatically ({err}); run: gnome-extensions {action}"
+"Could not switch automatically; run on the host: gnome-extensions {action} "
+"{uuid}"
 msgstr ""
 
-#: src/apricus/gui/gtk4app.py:3964
+#: src/apricus/gui/gtk4app.py:3978
 msgid "Wallpaper service starts at login"
 msgstr ""
 
-#: src/apricus/gui/gtk4app.py:3966
+#: src/apricus/gui/gtk4app.py:3980
 msgid "Starts only the wallpaper service at login"
 msgstr ""
 
-#: src/apricus/gui/gtk4app.py:3979 src/apricus/gui/gtk4app.py:3990
+#: src/apricus/gui/gtk4app.py:3993 src/apricus/gui/gtk4app.py:4004
 msgid "Could not change the startup setting."
 msgstr ""
 
-#: src/apricus/gui/gtk4app.py:3993
+#: src/apricus/gui/gtk4app.py:4007
 msgid "Startup enabled"
 msgstr ""
 
-#: src/apricus/gui/gtk4app.py:3993
+#: src/apricus/gui/gtk4app.py:4007
 msgid "Startup disabled"
 msgstr ""
 
-#: src/apricus/gui/gtk4app.py:4022
+#: src/apricus/gui/gtk4app.py:4036
 msgid "Could not open the configuration file."
 msgstr ""
 
-#: src/apricus/gui/gtk4app.py:4029
+#: src/apricus/gui/gtk4app.py:4043
 msgid ""
 "Click to select a video.\n"
 "Ctrl+click or Shift+click selects more than one.\n"
