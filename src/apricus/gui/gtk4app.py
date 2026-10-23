@@ -3935,9 +3935,17 @@ class ControlPanel(Adw.Application):
             return
         # Sandbox note: inside Snap/Flatpak the host extension dir is
         # invisible, so a genuinely missing extension and an unreachable
-        # Shell look identical ("unknown"). Keep Prepare available in both
-        # cases: exporting the helpers is always safe and idempotent.
-        show = is_snap() or is_flatpak()
+        # Shell look identical ("unknown"). Keep Prepare available where
+        # the user may still need the host command (missing, unknown,
+        # expired receipt, or installed-but-disabled); hide it once the
+        # flow is complete (active, waiting for login) or when it cannot
+        # help (error, incompatible).
+        show = (is_snap() or is_flatpak()) and state in (
+            "not_installed",
+            "unknown",
+            "stale",
+            "disabled",
+        )
         prep.set_visible(show)
         cmd = getattr(self, "_host_cmd", None)
         export_dir = getattr(self, "_host_export_dir", None)

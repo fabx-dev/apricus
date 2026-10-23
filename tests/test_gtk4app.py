@@ -2585,6 +2585,16 @@ def host_install_rows_guide_sandbox_setup():
             assert states["cmdline:visible"] is True
             obj._on_prepare_host_install(None)
             assert states["cmdline"].endswith("--check")
+            # Once the flow is complete (or only a login is pending) the
+            # guided rows get out of the way.
+            states["status"] = ("active", {})
+            obj._host_cmd = None
+            obj._refresh_integration_row()
+            assert states["prepline:visible"] is False
+            assert states["cmdline:visible"] is False
+            states["status"] = ("needs_logout", {})
+            obj._refresh_integration_row()
+            assert states["prepline:visible"] is False
         # Outside a sandbox the rows never appear.
         with patch.object(appmod, "is_snap", return_value=False), patch.object(
             appmod, "is_flatpak", return_value=False
