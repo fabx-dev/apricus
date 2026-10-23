@@ -3871,7 +3871,11 @@ class ControlPanel(Adw.Application):
         cmd_row = getattr(self, "cmd_row", None)
         if prep is None or cmd_row is None:
             return
-        show = state == "not_installed" and (is_snap() or is_flatpak())
+        # Sandbox note: inside Snap/Flatpak the host extension dir is
+        # invisible, so a genuinely missing extension and an unreachable
+        # Shell look identical ("unknown"). Keep Prepare available in both
+        # cases: exporting the helpers is always safe and idempotent.
+        show = state in ("not_installed", "unknown") and (is_snap() or is_flatpak())
         prep.set_visible(show)
         cmd = getattr(self, "_host_cmd", None)
         cmd_row.set_visible(bool(show and cmd))

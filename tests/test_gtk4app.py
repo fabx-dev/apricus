@@ -2566,6 +2566,12 @@ def host_install_rows_guide_sandbox_setup():
             with patch.object(appmod.Gdk.Display, "get_default", return_value=_DisplayWithClipboard()):
                 obj._on_copy_host_command(None)
             assert states.get("toasts") == ["Command copied"], states.get("toasts")
+            # Unknown in a sandbox also offers Prepare (host dir invisible:
+            # missing and unverifiable look the same, export is harmless).
+            states["status"] = ("unknown", {})
+            with patch.object(appmod, "is_snap", return_value=True):
+                obj._refresh_integration_row()
+                assert states["prepline:visible"] is True
             # Once installed, the guided rows disappear again.
             states["status"] = ("disabled", {})
             obj._refresh_integration_row()
