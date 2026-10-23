@@ -22,6 +22,7 @@ UUID="apricus-integration@fabx-dev"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SRC_DIR="$SCRIPT_DIR/$UUID"
 DEST_DIR="$HOME/.local/share/gnome-shell/extensions/$UUID"
+CHECK=0
 ENABLE=0
 ZIP=""
 EXPECT_ZIP=0
@@ -33,11 +34,12 @@ for arg in "$@"; do
         continue
     fi
     case "$arg" in
+        --check) CHECK=1 ;;
         --enable) ENABLE=1 ;;
         --zip) EXPECT_ZIP=1 ;;
         --zip=*) ZIP="${arg#--zip=}" ;;
         -h|--help)
-            echo "Usage: $0 [--zip PATH] [--enable]"
+            echo "Usage: $0 [--zip PATH] [--enable | --check]"
             exit 0
             ;;
         *)
@@ -51,6 +53,12 @@ if [ "$EXPECT_ZIP" -eq 1 ]; then
     exit 1
 fi
 
+if [ "$CHECK" -eq 1 ] && { [ "$ENABLE" -eq 1 ] || [ -z "$ZIP" ]; }; then
+    echo "--check requires --zip PATH and cannot be combined with --enable" >&2
+    exit 1
+fi
+
+if [ "$CHECK" -eq 0 ]; then
 if [ -n "$ZIP" ]; then
     command -v unzip >/dev/null 2>&1 || { echo "unzip not found (install 'unzip')" >&2; exit 1; }
     [ -f "$ZIP" ] || { echo "ZIP not found: $ZIP" >&2; exit 1; }
@@ -108,30 +116,37 @@ else
     echo "To enable: gnome-extensions enable $UUID (then log out and back in)."
 fi
 
+fi
+
 # Host-verified status receipt for sandboxed Apricus (Snap/Flatpak cannot
 # see ~/.local and cannot query the Shell over D-Bus, so Settings can
 # never confirm Active by itself). Written next to the ZIP only in
 # --zip mode; the GUI reads it on "Check again" and trusts it only
 # while fresh (see RECEIPT_MAX_AGE_SEC). Re-run this script to refresh
-# after logout/login: enabling is idempotent.
+# after logout/login using --check: it never installs or enables anything.
 if [ -n "$ZIP" ]; then
     _receipt_dir="$(dirname "$ZIP")"
     _shell_ver=""
     if command -v gnome-shell >/dev/null 2>&1; then
         _shell_ver="$(gnome-shell --version 2>/dev/null | awk '{print $NF}')"
     fi
+    _installed=false
+    [ ! -f "$DEST_DIR/metadata.json" ] || _installed=true
     _enabled=0
     _loaded=0
-    if command -v gnome-extensions >/dev/null 2>&1; then
-        if gnome-extensions list --enabled 2>/dev/null | grep -qx "$UUID"; then
-            _enabled=1
-        fi
-        # state 1 == ENABLED (loaded and running); numbers never localize.
-        if gdbus call --session --dest org.gnome.Shell.Extensions \
-            --object-path /org/gnome/Shell/Extensions \
-            --method org.gnome.Shell.Extensions.GetExtensionInfo "$UUID" 2>/dev/null \
-            | grep -q "'state': <1"; then
-            _loaded=1
+    _verified=false
+    _state=""
+    if _info="$(gdbus call --session --dest org.gnome.Shell.Extensions \
+        --object-path /org/gnome/Shell/Extensions \
+        --method org.gnome.Shell.Extensions.GetExtensionInfo "$UUID" 2>/dev/null)"; then
+        _verified=true
+        _state="$(printf '%s' "$_info" | sed -n "s/.*'state': <\([0-9][0-9]*\)\(\.0\)\{0,1\}>.*/\1/p")"
+        if [ "$_state" = 1 ]; then _loaded=1; _enabled=1; _installed=true; fi
+        if [ -n "$_state" ]; then _installed=true; fi
+        if command -v gnome-extensions >/dev/null 2>&1; then
+            if gnome-extensions list --enabled 2>/dev/null | grep -qx "$UUID"; then
+                _enabled=1
+            fi
         fi
     fi
     _bool() { if [ "$1" -eq 1 ]; then printf 'true'; else printf 'false'; fi; }
@@ -139,15 +154,18 @@ if [ -n "$ZIP" ]; then
     {
         printf '{\n'
         printf '  "uuid": "%s",\n' "$UUID"
-        printf '  "installed": true,\n'
+        printf '  "installed": %s,\n' "$_installed"
         printf '  "enabled": %s,\n' "$(_bool "$_enabled")"
         printf '  "loaded": %s,\n' "$(_bool "$_loaded")"
+        printf '  "verified": %s,\n' "$_verified"
+        printf '  "state": "%s",\n' "$_state"
         if [ -n "$_shell_ver" ]; then
             printf '  "shell": "%s",\n' "$_shell_ver"
         else
             printf '  "shell": null,\n'
         fi
         printf '  "checked_at": %s\n}\n' "$_now"
-    } > "$_receipt_dir/status.json"
+    } > "$_receipt_dir/status.json.tmp.$$"
+    mv -f "$_receipt_dir/status.json.tmp.$$" "$_receipt_dir/status.json"
     echo "Status written to $_receipt_dir/status.json"
 fi

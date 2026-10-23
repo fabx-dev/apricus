@@ -25,6 +25,7 @@ X11 stacking behavior.
 import json
 import logging
 import os
+import shlex
 import subprocess
 import sys
 import time
@@ -140,8 +141,17 @@ def host_export_dir():
 def host_install_command(export_dir):
     """The one host command the user runs (displayed, never executed)."""
     return (
-        f'bash "{os.path.join(export_dir, HOST_INSTALLER)}" '
-        f'--zip "{os.path.join(export_dir, EXTENSION_UUID + ".zip")}" --enable'
+        f"bash {shlex.quote(os.path.join(export_dir, HOST_INSTALLER))} "
+        f"--zip {shlex.quote(os.path.join(export_dir, EXTENSION_UUID + '.zip'))} --enable"
+    )
+
+
+def host_verify_command(export_dir=None):
+    """Read host state without copying files or enabling the extension."""
+    export_dir = export_dir or host_export_dir()
+    return (
+        f"bash {shlex.quote(os.path.join(export_dir, HOST_INSTALLER))} "
+        f"--zip {shlex.quote(os.path.join(export_dir, EXTENSION_UUID + '.zip'))} --check"
     )
 
 
@@ -192,7 +202,7 @@ def prepare_host_install(dest_dir=None, search_roots=None):
 RECEIPT_MAX_AGE_SEC = 15 * 60
 
 
-def read_host_receipt(search_dirs=None):
+def read_host_receipt(search_dirs=None, *, allow_stale=False):
     """Host-verified extension status for sandboxed runs, or None.
 
     ``install-host.sh --zip`` (run by the user on the host, where the
@@ -203,7 +213,7 @@ def read_host_receipt(search_dirs=None):
     try:
         export_dir = host_export_dir()
         path = os.path.join(export_dir, "status.json")
-        if (time.time() - os.path.getmtime(path)) > RECEIPT_MAX_AGE_SEC:
+        if not allow_stale and (time.time() - os.path.getmtime(path)) > RECEIPT_MAX_AGE_SEC:
             return None
         with open(path, encoding="utf-8") as f:
             data = json.load(f)
@@ -213,6 +223,10 @@ def read_host_receipt(search_dirs=None):
             return None
         if not isinstance(data.get("installed"), bool):
             return None
+        for key in ("enabled", "loaded"):
+            if not isinstance(data.get(key), bool):
+                return None
+        data["stale"] = time.time() - os.path.getmtime(path) > RECEIPT_MAX_AGE_SEC
         return data
     except (OSError, ValueError):
         return None
@@ -425,12 +439,26 @@ def integration_status(search_dirs=None):
             # A fresh host-written receipt (see install-host.sh --zip)
             # carries the live Shell verdict; without one, stay unknown
             # rather than claiming anything about the host.
-            receipt = read_host_receipt(search_dirs) if path is None else None
+            receipt = read_host_receipt(search_dirs, allow_stale=True)
             if receipt is not None:
+                detail["receipt"] = receipt
+                if receipt.get("verified") is False:
+                    return "unknown", detail
+                if receipt["stale"]:
+                    return "stale", detail
+                if receipt.get("state") == "3":
+                    return "error", detail
+                if receipt.get("state") == "4":
+                    return "incompatible", detail
+                if not receipt["installed"]:
+                    return "not_installed", detail
                 if receipt.get("loaded"):
                     return "active", detail
                 if receipt.get("enabled"):
                     return "needs_logout", detail
+                if receipt.get("state") == "":
+                    return "not_discovered", detail
+                return "disabled", detail
             return "unknown", detail
         if path is None:
             return "not_installed", detail

@@ -223,3 +223,21 @@ make update-po
 - **Author & Maintainer**: [fabx-dev](https://github.com/fabx-dev)
 - **Original Upstream Project**: [Hidamari](https://github.com/jeffshee/hidamari) by Jeff Shee
 - **License**: GPL-3.0-or-later (see [COPYING](COPYING))
+
+### Desktop icons status and host verification
+
+Settings updates the integration status when the panel regains focus, when
+Settings opens, and while Settings is visible. Native installations also listen
+for GNOME extension state changes. Refreshing the panel never enables or disables
+the extension. A failed switch operation restores the observed GNOME state.
+
+Snap/Flatpak show a read-only switch and host commands because their sandbox
+cannot control GNOME Shell. **Prepare** exports the helpers; before installation
+it offers the install command, and afterwards a separate `--check` command.
+**Verify status** always prepares the verification command, even when the host
+state is unavailable.
+`install-host.sh --zip <path> --check` only refreshes `status.json`; it never
+copies extension files or enables the extension. Run this command after logging
+back in, then use **Check again** to read the result. The last host-check time is
+shown, and after 15 minutes the result is explicitly marked expired. A failed
+host query is reported as unavailable, never as a disabled extension.

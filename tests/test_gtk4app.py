@@ -2394,97 +2394,96 @@ def shell_refresh_reveals_banner_and_badges():
 
 @check
 def integration_row_reflects_status():
-    import sys
-    import types
     from unittest.mock import patch
-
     import apricus.gui.gtk4app as appmod
+    import apricus.gnome_shell as shell
 
-    states = {}
-
-    class _Row:
+    class Row:
         def set_subtitle(self, text):
-            states["subtitle"] = text
+            self.subtitle = text
 
-    class _Switch:
+    class Switch:
+        active = False
+        sensitive = True
+        events = 0
+
         def set_active(self, active):
-            states["active"] = active
+            if self.active != active:
+                self.active = active
+                self.events += 1
+                assert self.events < 20, "recursive signal loop"
+                # Gtk emits state-set for programmatic changes as well.
+                result = obj._on_integration_toggled(self, active)
+                assert result is True
+
+        def set_state(self, state):
+            pass
 
         def set_sensitive(self, sensitive):
-            states["sensitive"] = sensitive
+            self.sensitive = sensitive
 
-        def get_active(self):
-            return states.get("switch_is_on", False)
-
-    def _toasts(self, message):
-        states.setdefault("toasts", []).append(message)
-
-    fake_shell = types.ModuleType("apricus.gnome_shell")
-    fake_shell.EXTENSION_UUID = "apricus-integration@fabx-dev"
-    fake_shell.integration_status = lambda: states["status"]
-    old_mod = sys.modules.get("apricus.gnome_shell")
-    sys.modules["apricus.gnome_shell"] = fake_shell
-    try:
-        obj = appmod.ControlPanel.__new__(appmod.ControlPanel)
-        obj.integ_row, obj.integ_switch = _Row(), _Switch()
-        obj._toast = _toasts.__get__(obj)
-        for state, detail, expect_on, expect_sensitive, needle in [
-            ("active", {}, True, True, "Active"),
-            ("disabled", {}, False, True, "disabled"),
-            ("needs_logout", {}, True, True, "log out"),
-            ("not_discovered", {}, False, True, "log out"),
-            ("not_installed", {}, False, False, "Not installed"),
-            ("incompatible", {"shell": "99", "supported": ["50"]}, False, False, "99"),
-            ("error", {}, False, False, "journal"),
-            ("unknown", {}, False, False, "unavailable"),
+    obj = appmod.ControlPanel.__new__(appmod.ControlPanel)
+    obj.integ_row, obj.integ_switch = Row(), Switch()
+    obj._toast = lambda text: None
+    current = ["active", {}]
+    with patch.object(shell, "integration_status", side_effect=lambda: tuple(current)), patch.object(
+        appmod, "is_snap", return_value=False
+    ), patch.object(appmod, "is_flatpak", return_value=False), patch(
+        "apricus.utils.gnome_extension_set_enable"
+    ) as enable, patch("apricus.utils.gnome_extension_set_disable") as disable:
+        # Refresh must never send enable/disable, including the initial ON.
+        for status, on, sensitive in [
+            ("active", True, True), ("disabled", False, True),
+            ("needs_logout", True, True), ("not_discovered", False, True),
+            ("not_installed", False, False), ("incompatible", False, False),
+            ("error", False, False), ("unknown", False, False), ("stale", False, False),
         ]:
-            states["status"] = (state, detail)
+            current[:] = [status, {}]
             obj._refresh_integration_row()
-            assert needle in states["subtitle"], (state, states["subtitle"])
-            assert states["active"] is expect_on, (state, states["active"])
-            assert states["sensitive"] is expect_sensitive, (state, states["sensitive"])
-        # Enable path: success refreshes, failure shows the manual command.
-        states["status"] = ("disabled", {})
-        with patch("apricus.utils.gnome_extension_set_enable", return_value=True):
-            states["status"] = ("needs_logout", {})
-            states["switch_is_on"] = True
-            obj._on_integration_toggled(obj.integ_switch, None)
-            assert "log out" in states["subtitle"]
-        with patch(
-            "apricus.utils.gnome_extension_set_enable", side_effect=RuntimeError("denied")
-        ):
-            states["switch_is_on"] = True
-            obj._on_integration_toggled(obj.integ_switch, None)
-            assert "gnome-extensions enable" in states["subtitle"]
-        # Disable path asks for a restart and refreshes.
-        with patch("apricus.utils.gnome_extension_set_disable", return_value=True):
-            states["status"] = ("disabled", {})
-            states["switch_is_on"] = False
-            obj._on_integration_toggled(obj.integ_switch, None)
-            assert any("basic stacking" in t for t in states.get("toasts", []))
-        # Enable returning False without an exception still shows the
-        # manual fallback (with UUID) instead of claiming success.
-        with patch("apricus.utils.gnome_extension_set_enable", return_value=False):
-            states["status"] = ("disabled", {})
-            states["switch_is_on"] = True
-            obj._on_integration_toggled(obj.integ_switch, None)
-            assert "gnome-extensions enable" in states["subtitle"]
-            assert "apricus-integration@fabx-dev" in states["subtitle"]
-        # Sandbox disabled hint carries the full runnable command (with UUID).
+            assert obj.integ_switch.active is on
+            assert obj.integ_switch.sensitive is sensitive
+        enable.assert_not_called()
+        disable.assert_not_called()
+
+        def enabled(uuid):
+            current[:] = ["active", {}]
+            return True
+
+        enable.side_effect = enabled
+        # Requested signal state matters, even when get_active is unavailable.
+        assert obj._on_integration_toggled(obj.integ_switch, True) is True
+        enable.assert_called_once_with(shell.EXTENSION_UUID)
+        assert obj.integ_switch.active is True
+
+        def disabled(uuid):
+            current[:] = ["disabled", {}]
+            return True
+
+        disable.side_effect = disabled
+        assert obj._on_integration_toggled(obj.integ_switch, False) is True
+        disable.assert_called_once_with(shell.EXTENSION_UUID)
+        assert obj.integ_switch.active is False
+        enable.reset_mock()
+        disable.reset_mock()
+        enable.side_effect = RuntimeError("denied")
+        obj._on_integration_toggled(obj.integ_switch, True)
+        assert obj.integ_switch.active is False
+        assert "gnome-extensions enable" in obj.integ_row.subtitle
+        enable.assert_called_once()
+        disable.assert_not_called()
+
+        # Sandboxes never pretend the switch can control the host Shell.
         with patch.object(appmod, "is_snap", return_value=True):
-            states["status"] = ("disabled", {})
+            current[:] = ["active", {}]
             obj._refresh_integration_row()
-            assert "apricus-integration@fabx-dev" in states["subtitle"]
-            assert states["sensitive"] is False
-        # Missing version details never render as "None".
-        states["status"] = ("incompatible", {})
-        obj._refresh_integration_row()
-        assert "None" not in states["subtitle"], states["subtitle"]
-    finally:
-        if old_mod is not None:
-            sys.modules["apricus.gnome_shell"] = old_mod
-        else:
-            sys.modules.pop("apricus.gnome_shell", None)
+            assert obj.integ_switch.active is True
+            assert obj.integ_switch.sensitive is False
+            obj._on_integration_toggled(obj.integ_switch, False)
+            disable.assert_not_called()
+            current[:] = ["stale", {"receipt": {"loaded": True, "checked_at": 12345}}]
+            obj._refresh_integration_row()
+            assert "expired" in obj.integ_row.subtitle
+            assert "Last host check" in obj.integ_row.subtitle
 
 
 @check
@@ -2511,6 +2510,9 @@ def host_install_rows_guide_sandbox_setup():
         def set_active(self, active):
             states["active"] = active
 
+        def set_state(self, state):
+            pass
+
         def set_sensitive(self, sensitive):
             states["sensitive"] = sensitive
 
@@ -2521,6 +2523,7 @@ def host_install_rows_guide_sandbox_setup():
     fake_shell.EXTENSION_UUID = "apricus-integration@fabx-dev"
     fake_shell.integration_status = lambda: states["status"]
     fake_shell.prepare_host_install = lambda: ("/tmp/x", "bash /tmp/x/install.sh")
+    fake_shell.host_verify_command = lambda path: "bash /tmp/x/install.sh --check"
     old_mod = sys.modules.get("apricus.gnome_shell")
     sys.modules["apricus.gnome_shell"] = fake_shell
     try:
@@ -2537,6 +2540,9 @@ def host_install_rows_guide_sandbox_setup():
             obj._refresh_integration_row()
             assert states["prepline:visible"] is True
             assert states["cmdline:visible"] is False
+            # Verification is available even with unknown/missing host state.
+            obj._on_prepare_host_install(None, verify=True)
+            assert states["cmdline"].endswith("--check")
             # Prepare exports files and reveals the exact host command.
             obj._on_prepare_host_install(None)
             assert states["cmdline"] == "bash /tmp/x/install.sh"
@@ -2572,11 +2578,13 @@ def host_install_rows_guide_sandbox_setup():
             with patch.object(appmod, "is_snap", return_value=True):
                 obj._refresh_integration_row()
                 assert states["prepline:visible"] is True
-            # Once installed, the guided rows disappear again.
+            # Verification stays available after installation.
             states["status"] = ("disabled", {})
             obj._refresh_integration_row()
-            assert states["prepline:visible"] is False
-            assert states["cmdline:visible"] is False
+            assert states["prepline:visible"] is True
+            assert states["cmdline:visible"] is True
+            obj._on_prepare_host_install(None)
+            assert states["cmdline"].endswith("--check")
         # Outside a sandbox the rows never appear.
         with patch.object(appmod, "is_snap", return_value=False), patch.object(
             appmod, "is_flatpak", return_value=False

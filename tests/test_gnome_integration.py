@@ -544,7 +544,12 @@ def test_sandbox_status_uses_host_receipt(tmp_path, monkeypatch):
     write(True, False)
     assert mod.integration_status()[0] == "needs_logout"
     write(False, False)
-    assert mod.integration_status()[0] == "unknown"
+    assert mod.integration_status()[0] == "disabled"
+    old = __import__("time").time() - mod.RECEIPT_MAX_AGE_SEC - 1
+    os.utime(export / "status.json", (old, old))
+    state, detail = mod.integration_status()
+    assert state == "stale"
+    assert detail["receipt"]["enabled"] is False
 
 
 def test_host_zip_and_installer_roundtrip(tmp_path):
@@ -784,3 +789,54 @@ def test_save_queue_index_persists_and_sanitizes():
         assert saved.get("playlist_position") == {"M#1": 4}
     finally:
         player_mod.ConfigUtil = real_configutil
+
+
+@pytest.mark.parametrize(
+    "raw, expected",
+    [
+        ("1", "active"),
+        ("1.0", "active"),
+        ("2", "disabled"),
+        ("3", "error"),
+        ("4", "incompatible"),
+        ("denied", "unknown"),
+    ],
+)
+def test_host_check_only_never_installs_or_enables(tmp_path, monkeypatch, raw, expected):
+    """A real script run against a fake Shell must only update its receipt."""
+    import subprocess
+
+    fake_home = tmp_path / "home"
+    export = tmp_path / "export"
+    bins = tmp_path / "bin"
+    for directory in (fake_home, export, bins):
+        directory.mkdir()
+    installer = pathlib.Path(REPO_ROOT) / "gnome-extension/install-host.sh"
+    commands = {
+        "gnome-shell": "echo 'GNOME Shell 50.1'",
+        "gnome-extensions": 'if [ "$1" != list ]; then echo mutation >> "$HOME/unexpected"; exit 1; fi',
+        "gdbus": "exit 1" if raw == "denied" else f'''echo "({{'state': <{raw}>}},)"''',
+    }
+    for name, body in commands.items():
+        command = bins / name
+        command.write_text("#!/bin/bash\n" + body + "\n")
+        command.chmod(0o755)
+    # The ZIP deliberately does not exist: verification must not unpack it.
+    proc = subprocess.run(
+        ["bash", str(installer), "--zip", str(export / "absent.zip"), "--check"],
+        env=dict(os.environ, HOME=str(fake_home), PATH=str(bins) + os.pathsep + os.environ["PATH"]),
+        capture_output=True,
+        text=True,
+        timeout=15,
+    )
+    assert proc.returncode == 0, proc.stderr
+    assert not list(fake_home.iterdir()), "--check must neither install nor enable"
+    assert sorted(p.name for p in export.iterdir()) == ["status.json"]
+    data = json.loads((export / "status.json").read_text())
+    assert data["verified"] is (raw != "denied")
+    monkeypatch.setattr(gnome_shell, "is_gnome", lambda: True)
+    monkeypatch.setattr(gnome_shell, "is_wayland", lambda: True)
+    monkeypatch.setattr(gnome_shell, "extension_dir", lambda *a: None)
+    monkeypatch.setattr(gnome_shell, "host_export_dir", lambda: str(export))
+    monkeypatch.setattr(gnome_shell, "extension_raw_state", lambda: gnome_shell._UNREACHABLE)
+    assert gnome_shell.integration_status()[0] == expected

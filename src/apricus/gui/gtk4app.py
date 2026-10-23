@@ -158,6 +158,12 @@ class ControlPanel(Adw.Application):
         if pool is not None:
             pool.shutdown(wait=False, cancel_futures=True)
             self._stream_thumb_pool = None
+        subscription = getattr(self, "_integration_subscription", None)
+        if subscription is not None:
+            subscription.unsubscribe()
+        timer = getattr(self, "_integration_timer", None)
+        if timer:
+            GLib.source_remove(timer)
         Gio.Application.do_shutdown(self)
 
     def do_activate(self):
@@ -3754,6 +3760,12 @@ class ControlPanel(Adw.Application):
             self.prep_btn.set_valign(Gtk.Align.CENTER)
             self.prep_btn.connect("clicked", self._on_prepare_host_install)
             self.prep_row.add_suffix(self.prep_btn)
+            verify_btn = Gtk.Button(label=_("Verify status"))
+            verify_btn.set_valign(Gtk.Align.CENTER)
+            verify_btn.connect(
+                "clicked", lambda button: self._on_prepare_host_install(button, verify=True)
+            )
+            self.prep_row.add_suffix(verify_btn)
             icons.add(self.prep_row)
             self.cmd_row = Adw.ActionRow()
             self.cmd_row.set_title(_("Run on the host"))
@@ -3770,6 +3782,26 @@ class ControlPanel(Adw.Application):
             icons.add(self.cmd_row)
             box.append(icons)
             self._refresh_integration_row()
+            window = getattr(self, "window", None)
+            if window is not None:
+                window.connect("notify::is-active", lambda *_: self._refresh_integration_row())
+            stack = getattr(self, "stack", None)
+            if stack is not None:
+                stack.connect(
+                    "notify::visible-child-name", lambda *_: self._refresh_integration_row()
+                )
+            # Also update receipt expiry while Settings stays open.
+            self._integration_timer = GLib.timeout_add_seconds(30, self._poll_integration)
+            if not (is_snap() or is_flatpak()):
+                try:
+                    self._integration_subscription = SessionBus().subscribe(
+                        sender="org.gnome.Shell.Extensions",
+                        object="/org/gnome/Shell/Extensions",
+                        signal="ExtensionStateChanged",
+                        signal_fired=lambda *_: self._refresh_integration_row(),
+                    )
+                except Exception as e:
+                    logger.debug("[GUI4] Integration subscription unavailable: %s", e)
         startup = Adw.PreferencesGroup()
         startup.set_title(_("Startup"))
         self.autostart_row, self.autostart_switch = self._settings_switch_row(
@@ -3815,6 +3847,14 @@ class ControlPanel(Adw.Application):
         box.append(info)
         return self._scroll_page(self._clamp_page(box))
 
+    def _poll_integration(self):
+        window = getattr(self, "window", None)
+        stack = getattr(self, "stack", None)
+        if window is not None and stack is not None and window.get_is_active():
+            if stack.get_visible_child_name() == "settings":
+                self._refresh_integration_row()
+        return True
+
     def _refresh_integration_row(self):
         """Show the GNOME Shell integration state (never raises)."""
         row = getattr(self, "integ_row", None)
@@ -3857,12 +3897,34 @@ class ControlPanel(Adw.Application):
             )
         elif state == "error":
             subtitle = _("Failed to load — check the journal for errors")
+        elif state == "stale":
+            receipt = detail.get("receipt", {})
+            last = (
+                _("Active")
+                if receipt.get("loaded")
+                else (_("Enabled") if receipt.get("enabled") else _("Disabled"))
+            )
+            subtitle = _("Verification expired — last result: {status}").format(status=last)
         else:
             subtitle = _("Status unavailable")
+        receipt = detail.get("receipt")
+        if receipt and isinstance(receipt.get("checked_at"), (int, float)):
+            stamp = time.strftime("%d/%m %H:%M", time.localtime(receipt["checked_at"]))
+            subtitle += " · " + _("Last host check: {time}").format(time=stamp)
+        if (is_snap() or is_flatpak()) and state in ("active", "disabled", "needs_logout"):
+            action = "disable" if switch_on else "enable"
+            subtitle += (
+                " · " + _("Run on the host") + f": gnome-extensions {action} {EXTENSION_UUID}"
+            )
         row.set_subtitle(subtitle)
         if switch is not None:
-            switch.set_active(switch_on)
-            switch.set_sensitive(sensitive)
+            self._integration_updating = True
+            try:
+                switch.set_active(switch_on)
+                switch.set_state(switch_on)
+                switch.set_sensitive(sensitive and not (is_snap() or is_flatpak()))
+            finally:
+                self._integration_updating = False
         self._refresh_host_install_rows(state)
 
     def _refresh_host_install_rows(self, state):
@@ -3875,19 +3937,49 @@ class ControlPanel(Adw.Application):
         # invisible, so a genuinely missing extension and an unreachable
         # Shell look identical ("unknown"). Keep Prepare available in both
         # cases: exporting the helpers is always safe and idempotent.
-        show = state in ("not_installed", "unknown") and (is_snap() or is_flatpak())
+        show = is_snap() or is_flatpak()
         prep.set_visible(show)
         cmd = getattr(self, "_host_cmd", None)
+        export_dir = getattr(self, "_host_export_dir", None)
+        if (
+            cmd
+            and export_dir
+            and state in ("active", "disabled", "needs_logout", "stale", "error", "incompatible")
+        ):
+            from apricus.gnome_shell import host_verify_command
+
+            cmd = self._host_cmd = host_verify_command(export_dir)
         cmd_row.set_visible(bool(show and cmd))
         if cmd:
             cmd_row.set_subtitle(cmd)
+        prep.set_subtitle(
+            _("Prepare exports installation and verification commands; run them on the host")
+        )
 
-    def _on_prepare_host_install(self, _button):
+    def _on_prepare_host_install(self, _button, verify=False):
         """Export ZIP + installer for the host (never executes anything)."""
         try:
-            from apricus.gnome_shell import prepare_host_install
+            from apricus.gnome_shell import (
+                host_verify_command,
+                integration_status,
+                prepare_host_install,
+            )
 
             _export_dir, cmd = prepare_host_install()
+            self._host_export_dir = _export_dir
+            state, detail = integration_status()
+            installed = state in (
+                "active",
+                "disabled",
+                "needs_logout",
+                "stale",
+                "error",
+                "incompatible",
+            )
+            if "receipt" in detail:
+                installed = detail["receipt"].get("installed", False)
+            if verify or installed:
+                cmd = host_verify_command(_export_dir)
         except Exception as e:  # noqa: BLE001 - show the failure inline
             self._toast(_("Could not prepare installation files ({err})").format(err=e))
             return
@@ -3923,40 +4015,48 @@ class ControlPanel(Adw.Application):
         """Re-read the real extension status (e.g. after a host install)."""
         self._host_cmd = getattr(self, "_host_cmd", None)
         self._refresh_integration_row()
+        if is_snap() or is_flatpak():
+            self._toast(
+                _(
+                    "Reads the last host check; run the verification command on the host to update it"
+                )
+            )
 
-    def _on_integration_toggled(self, switch, _state):
+    def _on_integration_toggled(self, switch, state):
         """Enable/disable the Shell extension on explicit user action."""
-        want = bool(switch.get_active())
+        if getattr(self, "_integration_updating", False):
+            return True
+        if is_snap() or is_flatpak():
+            self._refresh_integration_row()
+            return True
+        want = bool(state)
+        self._integration_updating = True
+        failure = None
         try:
             from apricus.gnome_shell import EXTENSION_UUID
             from apricus.utils import gnome_extension_set_disable, gnome_extension_set_enable
 
-            if want:
-                confirmed = gnome_extension_set_enable(EXTENSION_UUID)
-            else:
-                confirmed = gnome_extension_set_disable(EXTENSION_UUID)
-            if not confirmed:
-                # No exception, but the Shell did not confirm: fall through
-                # to the manual fallback instead of claiming success.
+            operation = gnome_extension_set_enable if want else gnome_extension_set_disable
+            if not operation(EXTENSION_UUID):
                 raise RuntimeError("Shell did not confirm")
-            if not want:
-                self._toast(_("Integration disabled — using basic stacking"))
-        except Exception as e:  # noqa: BLE001 - show the manual fallback
-            # The raw error (often a long sandbox D-Bus denial) goes to
-            # the log; the UI shows a short actionable message instead.
-            logger.warning(f"[GUI4] Integration toggle failed: {e}")
-            row = getattr(self, "integ_row", None)
-            if row is not None:
-                action = "enable" if want else "disable"
-                row.set_subtitle(
-                    _(
-                        "Could not switch automatically; run on the host: gnome-extensions {action} {uuid}"
-                    ).format(action=action, uuid=EXTENSION_UUID)
-                )
-            switch.set_active(not want)
-            return False
+        except Exception as e:
+            failure = e
+            logger.warning("[GUI4] Integration toggle failed: %s", e)
+        finally:
+            self._integration_updating = False
+        # Only the observed Shell state controls the displayed position.
         self._refresh_integration_row()
-        return False
+        if failure is not None:
+            action = "enable" if want else "disable"
+            self.integ_row.set_subtitle(
+                _(
+                    "Could not switch automatically; run on the host: gnome-extensions {action} {uuid}"
+                ).format(action=action, uuid=EXTENSION_UUID)
+            )
+        elif not want:
+            self._toast(_("Integration disabled — using basic stacking"))
+        # Suppress GTK's default handler, which would overwrite our refresh.
+        return True
 
     @staticmethod
     def _short_config_path():
