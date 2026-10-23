@@ -22,6 +22,8 @@ jobs:
   build-snap-test:
     name: Build test-only .snap
     runs-on: ubuntu-24.04
+    # Bounded like CI: a stuck runner must fail instead of hanging.
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         # No ref override: on pull_request this checks out the merge
@@ -38,6 +40,7 @@ jobs:
           sudo snap install snapcraft --classic
 
       - name: Build Snap (destructive-mode on clean core24 runner)
+        timeout-minutes: 40
         run: |
           sudo snapcraft pack --destructive-mode
           mkdir -p dist
