@@ -9,12 +9,11 @@ name: Snap test build (manual, no publication)
 # To publish, use .github/workflows/release-packages.yml from a tag.
 
 on:
-  workflow_dispatch:
-    inputs:
-      ref:
-        description: "Git ref to build (default: this branch)"
-        required: false
-        default: "feat/gnome-wayland-integration"
+  # Runs for this PR from the branch (GitHub only registers manual
+  # workflows from the default branch, so workflow_dispatch cannot
+  # trigger a branch-only file). Still test-only: no credentials,
+  # no publish step, artifact upload only.
+  pull_request:
 
 permissions:
   contents: read
@@ -30,7 +29,6 @@ jobs:
 
       - name: Record provenance
         run: |
-          echo "ref=${{ inputs.ref }}"
           git rev-parse HEAD | tee commit-sha.txt
           git log -1 --format='%H %s'
 
