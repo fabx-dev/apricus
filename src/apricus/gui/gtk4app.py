@@ -3899,7 +3899,17 @@ class ControlPanel(Adw.Application):
             display = Gdk.Display.get_default()
             if display is None:
                 raise RuntimeError("no display")
-            display.get_clipboard().set_text(cmd)
+            clipboard = display.get_clipboard()
+            set_text = getattr(clipboard, "set_text", None)
+            if set_text is not None:
+                set_text(cmd)
+            else:
+                # Some Gtk4 bindings (observed on 4.22) do not expose
+                # GdkClipboard.set_text: offer plain text via a provider.
+                provider = Gdk.ContentProvider.new_for_bytes(
+                    "text/plain;charset=utf-8", GLib.Bytes(cmd.encode("utf-8"))
+                )
+                clipboard.set_content(provider)
         except Exception as e:  # noqa: BLE001 - clipboard best effort
             self._toast(_("Could not copy ({err})").format(err=e))
             return

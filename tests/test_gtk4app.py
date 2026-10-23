@@ -2543,8 +2543,29 @@ def host_install_rows_guide_sandbox_setup():
             assert states["cmdline:visible"] is True
             assert any("host" in t for t in states.get("toasts", []))
             # Copy without a display reports the failure instead of crashing.
-            obj._on_copy_host_command(None)
+            with patch.object(appmod.Gdk.Display, "get_default", return_value=None):
+                obj._on_copy_host_command(None)
             assert any("copy" in t.lower() for t in states.get("toasts", []))
+            # Copy with a clipboard lacking set_text (Gtk 4.22 bindings)
+            # falls back to a bytes content provider and succeeds.
+            class _ClipboardNoSetText:
+                def __init__(self):
+                    self.provider = None
+
+                def set_content(self, provider):
+                    self.provider = provider
+
+            class _DisplayWithClipboard:
+                def __init__(self):
+                    self.clipboard = _ClipboardNoSetText()
+
+                def get_clipboard(self):
+                    return self.clipboard
+
+            states["toasts"] = []
+            with patch.object(appmod.Gdk.Display, "get_default", return_value=_DisplayWithClipboard()):
+                obj._on_copy_host_command(None)
+            assert states.get("toasts") == ["Command copied"], states.get("toasts")
             # Once installed, the guided rows disappear again.
             states["status"] = ("disabled", {})
             obj._refresh_integration_row()
