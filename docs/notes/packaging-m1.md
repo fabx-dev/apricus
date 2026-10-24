@@ -87,7 +87,7 @@ expect 15–40 min.
 ## 8. Validation matrix — Flatpak results ([validation date omitted], authorized --user install)
 
 Bundle: `<test-flatpak-bundle>` (52,625,152 bytes),
-sha256 `941ac5f47d9f3190914ab61c63d7673434dcc56b635057b067b91b417a1f9f4`,
+sha256 `<artifact-sha256>`,
 built from worktree HEAD `26138c3` (M1 sources identical to validated
 `9940bf3`; only docs/test-tooling added after). App-ID
 `io.github.fabx_dev.Apricus`, runtime org.gnome.Platform 50, Sdk 50.
@@ -151,7 +151,51 @@ process counts); Flatpak PSS moderately higher (+~20 MB), consistent with
 sandbox overhead. No RESUME spike beyond playing level. Xvfb numbers not
 compared.
 
-## 9. Current status
+## 9. Follow-up analysis (no installs, no desktop tests)
+
+### 10a. STOP-latency sample (Flatpak first STOP ≈ 3.9 s) — not a confirmed regression
+
+What the single sample measured: monotonic T0 before the `stop_playback`
+D-Bus call, T1 when `/proc` no longer showed the player (50 ms poll). The
+call is synchronous, so T1−T0 lumps IPC round trip + all server-side work.
+Server-side bounds in M1 code: `terminate()` + `join(0.75)` +
+`finish_process` (TERM + `join(2)` + KILL + `join(2)`) + config save/load +
+static apply. ≈3.9 s is consistent with both `join` timeouts being consumed,
+i.e. the first sandboxed player did not exit promptly on SIGTERM. Later
+STOPs completed inside bounds (no `Wallpaper player did not stop` exception
+anywhere in the run log) and felt normal; they were not individually timed.
+The run logs carry no wall-clock timestamps, so phase attribution from
+existing logs is impossible. n=1, first-STOP-only, no breakdown → reported,
+not root-caused, not declared a regression.
+
+Proposed phase-separating method for the next authorized run (external
+observation only, no production change):
+`T_call` (before D-Bus) → `T_reply` (method returned = IPC + server work
+incl. joins + static apply) → `T_death` (player PID gone; termination lag =
+`T_death − T_call`) → `T_uri` (picture-uri flips to the static asset) →
+`T_visible` (user confirmation). Additionally: record per-sample evidence
+under unique filenames (current `matrix.py` overwrites `matrix-stop.json`
+per action; the ranges in §8/`perf-m1.md` come from the run transcript) and
+collect ≥5 STOP samples per backend before any comparison with native
+(~40–140 ms observed there).
+
+### 10b. Build/report reproducibility from the declared M1 commit
+
+- Worktree clean; M1 code paths (`src/`, `gnome-extension/`, `snap/`,
+  `pkgs/`) byte-identical to build-time commit `26138c3`
+  (`git diff --name-only` empty) — only docs/test-tooling added after.
+- Manifest app module is `type: dir, path: ../..` (the worktree itself);
+  the built tree `build/flatpak-build/files/share/apricus/apricus/server.py`
+  contains the M1 `_save_config(..., manual_stop=None)` marker.
+- Artifact hash re-verified: full value in §8 (a one-char transcription typo
+  in the first draft of §8 was found by re-check and corrected — the
+  `.sha256` sidecar file was always correct).
+- Byte-reproducibility of a rebuild is NOT claimed (build-ids/timestamps);
+  the exact rebuild command is recorded in §3.
+- Flatpak test status: matrix complete, restore verified, package
+  uninstalled. Snap build/install: NOT STARTED, still gated.
+
+## 10. Current status
 
 - Tests: PASS (392). Packaging diff: none. Snap build/install: NOT STARTED,
   still gated (no release workflow invoked, no tags).
