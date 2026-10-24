@@ -120,35 +120,49 @@ Ubuntu 26.04, GNOME Shell/Mutter 50.1, Wayland, one virtual monitor, VirtIO/VirG
 The final review changes documentation and regression tests only; it does not
 change that tested runtime. This remains a Draft PR, not a published release.
 
-| Check | Current result |
-|---|---|
-| Python suite | PASS: 349 tests, including 26 bridge cases; final review adds unauthorized-state preservation, ownership epoch and receipt-priority cases |
-| GJS client lifecycle harness | PASS: coalescing, renew, stale-owner replies, stop races, bounded retries and snapshot-error recovery |
-| ZIP + host installer includes helper | PASS roundtrip |
-| Real Shell sender under strict | PASS: sender equals daemon-reported Shell owner, UID/PID match; enforce profile verified |
-| Independent same-UID GJS | PASS: identical registration rejected |
-| Automatic ACTIVE with zero wallpaper | PASS; no Check again |
-| Disable/enable and GUI/server restart | PASS real automatic transitions; fresh generation/reconnection |
-| Ownership changes during authentication | PASS unit/private-bus tests; live Shell replacement not forced |
-| Lease expiry under strict | PASS: GUI frozen 95.5s, Unregister intentionally timed out, UNKNOWN after unfreeze; enable restored ACTIVE |
-| Real process crash | NOT TESTED as a deliberate crash; controlled freeze is not a Shell crash |
-| Video/playlist/DING/Overview | PASS on x2: visible frames, two clips alternate, clickable/draggable icons, no wallpaper Overview tile, ACTIVE/adopted=1 |
-| GTK4 timer regression | PASS: fixed `is_active()` API, 65s real GUI observation without traceback |
-| Flatpak GUI | PASS smoke: isolated config, responsive pages and existing live detection, 65s without traceback; no new bridge service/permissions |
-| Flatpak new protocol | NOT ENABLED/NOT TESTED; existing path retained |
-| Native GUI install | NOT TESTED end-to-end in this round; unit/import/package checks cover compatibility, not a new install claim |
-| Test Snap build and CI | PASS for runtime `97e3684`; links below |
-| Real suspend/resume | BLOCKED: VM freezes with and without new bridge; clock simulations do not close this gap |
+### Final matrix: environments are not interchangeable
 
-The lifecycle/expiry tests initially ran on x1 (`3663254`). The x2 change is
-the GTK4 timer getter plus a regression test; bridge backend and client bytes
-were unchanged and checked. x2 revalidated real registration/adoption, timer,
-video, playlist, DING and Overview. Do not mislabel every earlier test as a
-fresh x2 fault-injection run.
+Here **x1/x2 mean local revisions of the `apricus` Snap**, not the separate
+`apricus-channel-poc` package. Preceding transport/auth PoCs are supporting
+history, not substitutes for tests of the production bridge implementation.
+"Not repeated" means no fresh runtime execution in that column; identical
+backend/client bytes do not turn an earlier result into another test run.
+
+| Check | Snap x1 — `3663254`, real GNOME 50.1, strict | Snap x2 — `97e3684`, real GNOME 50.1, strict | Isolated bus — unconfined fixture, NOT GNOME Shell |
+|---|---|---|---|
+| Real Shell owner/UID/PID and Register | PASS; enforce profile checked | PASS; fresh Register from real Shell, enforce profile checked | NOT APPLICABLE to genuine Shell; fixture connection only |
+| Independent same-UID GJS rejection | PASS, real request rejected | Not repeated; backend bytes unchanged | PASS private-bus roundtrip, including another connection of the same PID/UID |
+| ACTIVE with no wallpaper | PASS, adopted=0, no Check again | Not separately repeated with no wallpaper | PASS fixture snapshot only |
+| Disable → disabled → enable → ACTIVE | PASS, GUI transitions confirmed | Not repeated as a full live toggle cycle | PASS typed Unregister; unit/harness separately cover enable lifecycle |
+| Appearance/reconnection of receiver | PASS: extension first, receiver start and restart | PASS on x2 launch after local update; not a separate x2 crash/restart campaign | PASS fixture/harness; not evidence of real confinement |
+| 90/30 renewal and CPU sample | PASS: 95s active sample/3 Update; disabled sample/0 calls | NOT REPEATED: 65s GUI observation records 3 total Update, not a dedicated renewal/CPU sample | PASS separate timed experiment; metrics are not Snap/Shell costs |
+| Expiry after missing renewal/Unregister | PASS: 95.5s controlled GUI freeze, UNKNOWN after unfreeze, enable → ACTIVE | NOT REPEATED | PASS controlled snapshot failure, expiry and recovery timeline below |
+| Video/playlist/DING/Overview | Video and DING passed; GTK4 timer error discovered, then fixed in x2 | PASS: first frame, two clips alternate, icons clickable/draggable, no wallpaper Overview tile, ACTIVE/adopted=1 | NOT APPLICABLE |
+| GTK4 timer regression | FAIL: `get_is_active()` traceback; retained as historical defect | PASS: corrected `is_active()`, 65s without traceback | NOT a GUI test |
+| Actual suspend/resume | BLOCKED by VM; also reproduced without bridge | No further attempt; remains BLOCKED, not a PASS | Clock simulation only, not real suspend |
+| Deliberate real Shell/process crash | NOT TESTED; controlled freeze is not a crash | NOT TESTED | Fixture exit/owner loss is not a genuine Shell crash |
+
+Separate non-Snap checks:
+
+- **PASS:** local Python suite 349 tests, including 26 bridge cases; GJS
+  lifecycle harness; ZIP/host installer roundtrip; CI and artifact-only builds.
+- **PASS in unit/private-bus tests only:** ownership changes during auth,
+  ownership epochs, old generation/duplicate/out-of-order rejection and
+  receipt priority. Live Shell replacement was not forced.
+- **PASS Flatpak GUI smoke on `97e3684`:** isolated config, responsive pages,
+  existing live detection and 65s without traceback. No dedicated Snap bridge
+  service or new permission. New protocol inside Flatpak NOT ENABLED/NOT TESTED.
+- **NOT TESTED:** newly installed native GUI end-to-end in this round;
+  unit/import/package checks are not a native installation claim.
+
+The x1 → x2 runtime change was the GTK4 timer getter plus a regression test.
+Bridge backend and client bytes were checked unchanged; this supports the
+version comparison, not relabeling x1 fault injection as fresh x2 coverage.
 
 ### CPU and message measurements
 
-One 95s interval under strict: **3 accepted Update calls**, GUI CPU 0.03s
+**Real GNOME session, Snap x1:** one 95s interval under strict:
+**3 accepted Update calls**, GUI CPU 0.03s
 (~0.032% of one core), entire Shell CPU 11.28s (~11.9%). One 95s disabled
 interval: **0 bridge calls**, GUI CPU 0.02s (~0.021%), Shell CPU 9.69s (~10.2%).
 These are whole-process samples, not causal attribution of Shell cost; one
@@ -156,10 +170,39 @@ pair cannot establish a statistically reliable overhead. Daemon credential
 queries/replies are excluded from the application-call count. Each accepted
 request normally uses two GetNameOwner queries and one credential query.
 
-An additional private-bus 150s experiment exercised timed expiry and recovery;
-it is not evidence of confinement or genuine GNOME identity. Real 95.5s GUI
-freeze results above are separate. A stalled GUI cannot repaint while frozen;
-the observed UNKNOWN is after it resumes and checks expiry.
+**Real GNOME session, Snap x1, expiry:** the GUI was deliberately frozen for
+95.5s; the extension was disabled and Unregister intentionally timed out while
+the Shell stayed alive. After unfreeze the user observed UNKNOWN, then a new
+enable returned ACTIVE. This establishes bounded stale state in this scenario,
+not an exact visible transition at t=90, and not a real process crash or system
+suspend. A stalled GUI cannot repaint until it runs again.
+
+**Real GNOME session, Snap x2:** 65s observation checked the corrected GUI
+timer and current status/adoption; the log records one Register and three
+total Update calls. These include possible state changes and are not all
+classified as renewals. No new 95s CPU sample or 90s expiry injection was run.
+
+**Isolated private bus only:** an earlier 151.2s experiment used the backend
+from `745dbdf` and client snapshot-recovery fix later committed in `3663254`.
+It did not use the genuine Shell or Snap confinement. Observed timeline:
+
+| Elapsed | Fixture/server event |
+|---|---|
+| ~0s | Register, ACTIVE |
+| ~30s | Accepted renewal Update |
+| ~45s | Fixture snapshot marked broken; next renewal sends no Update |
+| ~121s | UNKNOWN, about 91s after the last valid renewal |
+| ~135s | Recovered client sends old-generation Update; rejected as expired |
+| ~140s | Fresh Register, ACTIVE |
+| ~145s | Unregister, disabled |
+| ~150s | Fixture connection exits; owner loss, UNKNOWN |
+
+Five application calls included one rejected late Update. The CPU figure
+included the measurement driver and is not a GNOME/Snap performance measure.
+The timing summary was retained in the local report; original transient `/tmp`
+trace/driver files did not survive later VM reboots. Retained real-session
+metrics and freeze records are listed below. No new experiment was run to
+recreate missing logs during documentary closeout.
 
 ### Separate limitations, not features added by this bridge
 
@@ -174,8 +217,14 @@ the observed UNKNOWN is after it resumes and checks expiry.
 - **Guided rows:** Prepare host installation also appears when disabled;
   this existing guidance is redundant when the bridge already proved an
   installation, not proof that extension files disappeared.
-- **Distribution:** no Store name approval has been requested. GNOME 49/51,
-  multiple monitors, hardware decode and 4K remain outside this runtime test.
+- **GNOME 49/51:** runtime NOT TESTED; metadata/static API review is not a
+  runtime compatibility PASS. This is independent of the VM suspend blocker.
+- **Snap Store:** reviewer approval/snap-declaration for the exact owned name
+  is still required before distribution; no request was made. This is a
+  distribution gate, not a failed runtime test or a reason to conflate the
+  GNOME 49/51 and suspend gaps.
+- **Other hardware:** multiple monitors, hardware decode and 4K remain
+  outside this VM runtime test.
 
 ### Evidence and reproducibility
 
@@ -193,6 +242,34 @@ the observed UNKNOWN is after it resumes and checks expiry.
 - Final machine state chosen by the user: test Snap x2 and tested extension
   retained, temporary Flatpak branch removed without deleting prior data.
   Terminal-only extension rollback and original byte-verified backups remain.
+
+### Runtime identity and final machine confirmation
+
+Documentary closeout rechecked installed revision **x2** against `97e3684`:
+all 23 mounted Python source files matched Git bytes, mounted launcher and
+manifest matched the retained CI artifact, and installed `extension.js`,
+`statusBridge.js` and `metadata.json` matched that commit. The retained `.snap`
+has the SHA256 above. Direct checksum of the root-owned installed archive was
+not available without elevated access; no new sudo action was requested.
+
+`git diff 97e3684 f514f9d -- src gnome-extension snap .github` is empty.
+The changes through `f514f9d` are documentation/regression tests only, so the
+installed runtime does **not** require another installation. This documentary
+closeout likewise changes no runtime or installed settings.
+
+At closeout: Snap `apricus` 2.0.7 x2 retained; extension code revision 4 and
+DING ACTIVE; temporary Flatpak ref absent, prior data retained. Separate
+`apricus-channel-poc` 0.1 x1 remains installed (not the production x1 column),
+with its source/evidence kept. Original extension backups were rechecked for
+contents, modes, ownership and mtime. `restore-extension.py` remains available;
+no VM KMS override remains. The final artifact, logs, configuration backups
+and demo videos used by the Snap playlist were preserved during approved
+build-output cleanup. This is the user's chosen working state, not a claim
+that the original extension was left installed instead of revision 4.
+
+**Disposition:** technical review concluded; functional runtime frozen at the
+tested code. PR #1 stays Draft/Open. Remaining validation/distribution limits
+above are explicit; no merge, tag, release, publication or Store request.
 
 The test Snap must be installed separately with preserved settings, then
 the extension must be backed up **again** before changing its installed files.
