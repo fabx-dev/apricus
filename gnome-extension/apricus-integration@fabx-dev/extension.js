@@ -86,9 +86,6 @@ export default class ApricusIntegrationExtension extends Extension {
             return;
         }
 
-        this._injectionManager = new InjectionManager();
-        this._installOverviewHiding();
-
         this._windowCreatedId = global.display.connect(
             'window-created', (_display, window) => this._watchWindow(window));
 
@@ -100,10 +97,19 @@ export default class ApricusIntegrationExtension extends Extension {
             'active-workspace-changed', () => this._repinAll());
         this._overviewHiddenId = Main.overview.connect('hidden', () => this._repinAll());
 
+        // Capture the actor list BEFORE installing the Overview-hiding
+        // overrides below: get_window_actors() is filtered by them, so a
+        // scan issued afterwards could never see pre-existing wallpaper
+        // windows and they would stay unadopted above DING after a reload.
+        const preexistingActors = global.get_window_actors();
+
+        this._injectionManager = new InjectionManager();
+        this._installOverviewHiding();
+
         // The player may already run (started before the extension was
         // enabled, or re-enabled after unlock): adopt matching windows now.
         let seen = 0, matched = 0;
-        for (const actor of global.get_window_actors()) {
+        for (const actor of preexistingActors) {
             const window = actor ? actor.get_meta_window() : null;
             if (window) {
                 seen++;

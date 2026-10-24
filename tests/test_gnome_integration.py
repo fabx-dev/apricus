@@ -73,6 +73,30 @@ def test_extension_manages_stacking_in_place():
     assert "owns_window" not in js  # XWayland renderer: role match, not WaylandClient
 
 
+def test_enable_scan_uses_precaptured_unfiltered_actors():
+    """Reload re-adoption: enable() must snapshot the actor list BEFORE the
+    Overview-hiding overrides filter wallpaper windows out of
+    get_window_actors(); otherwise pre-existing wallpaper windows are
+    invisible to the startup scan and stay above DING.
+
+    The scan must iterate the captured list, and no scan may call the
+    (then filtered) global.get_window_actors() again.
+    """
+    import re
+
+    with open(EXT_JS, encoding="utf-8") as f:
+        js = f.read()
+    capture = re.search(r"const\s+(\w+)\s*=\s*global\.get_window_actors\(\)\s*;", js)
+    assert capture, "startup scan must capture the actor list explicitly"
+    captured = capture.group(1)
+    install = js.index("this._installOverviewHiding();")
+    assert js.index(capture.group(0)) < install, (
+        "actor list must be captured before the Overview-hiding overrides"
+    )
+    assert f"for (const actor of {captured})" in js
+    assert "for (const actor of global.get_window_actors())" not in js
+
+
 def test_vlc_options_pin_exact_flags_per_renderer():
     """Canonical flags per stored renderer id, none by default.
 

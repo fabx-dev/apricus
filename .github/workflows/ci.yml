@@ -59,6 +59,9 @@ jobs:
       - name: GJS status bridge harness (no display)
         run: gjs -m tests/gjs/status-bridge.js
 
+      - name: GJS extension rescan harness (no display)
+        run: gjs -m tests/gjs/extension-rescan.js
+
       - name: Build and verify .deb and .rpm packages
         run: |
           ./pkgs/deb/build-deb.sh
