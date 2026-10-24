@@ -420,3 +420,74 @@ intervention checkpoint.
 
 **Checkpoint: stopped after phase 1. No real-session M1 result or distribution
 validation is claimed.**
+
+## Authorized phase 2 — isolation preflight stopped ([validation date omitted], [event time omitted])
+
+The user authorized an independent venv/dependencies, fresh backups, controlled
+Snap shutdown, source-run M1, normal temporary wallpaper changes, measurements
+and restoration. This attempt stopped **before Snap shutdown** under the user's
+explicit condition: if full isolation is not supported, describe the problem
+before proceeding.
+
+### Reproduced preflight blocker (not a demonstrated M1 playback bug)
+
+The proposed standard source launch isolates Apricus using `XDG_CONFIG_HOME`
+(`commons.py`), but GNOME's GSettings/dconf client also uses that directory
+(`GnomeWallpaperBackend._settings()` uses normal `Gio.Settings`). Two read-only
+commands on the same real session produced different background values:
+
+| Read-only probe | Observation |
+|---|---|
+| Normal environment: `gsettings get org.gnome.desktop.background picture-uri` | Current Snap x3 static image, basename `static-9720803a88bb9e9c.png` |
+| Private `XDG_CONFIG_HOME`: same `gsettings get` | Default Ubuntu image `file:///usr/share/backgrounds/warty-final-ubuntu.png` |
+
+Consequently a standard XDG-isolated native launch does not have the same
+desktop-settings view as GNOME Shell. Its cached/static background validation
+would be unreliable. No write probe was attempted: the actual dconf writer's
+behavior must not be assumed from these read results. Isolation cannot be
+declared complete by simply changing XDG variables and proceeding.
+
+No symlink to the host dconf database, private-bus substitution, production-code
+patch or path-override bootstrap was introduced to work around the blocker.
+The existing native legacy-stacking fallback also contains a DING disable/enable
+workaround; it must not be allowed to run if integration detection is lost,
+because changes to other extensions are forbidden for this validation.
+
+### State and disposition
+
+| Item | Result |
+|---|---|
+| Worktree preflight | PASS: clean `feat/gnome-policy-stop`, HEAD `182150d`; implementation remains `84bd123` |
+| Required OS/session | PASS: Ubuntu 26.04.1 / GNOME 50.1 / Wayland |
+| Standard XDG profile and real desktop-settings coherence | FAIL (preflight): read-only mismatch above |
+| Independent venv / dependency installation | NOT TESTED: not created/installed after the isolation blocker |
+| Fresh full backup and executable restoration procedure | NOT TESTED: preparation did not proceed beyond the read-only isolation check; historical backups remain as inventoried above |
+| Snap shutdown / M1 source startup | NOT TESTED: current Snap never stopped, M1 never launched |
+| Video/playlist/stream/web, static/fallback, adoption and STOP persistence | NOT TESTED on the real session |
+| Visible frame, DING click/drag, Overview/workspaces | NOT TESTED; no desktop-control tool is available in this conversation, so manual visual confirmation would also be needed |
+| CPU windows of at least 60 seconds, memory and real transition latency | NOT TESTED; no Xvfb result substituted |
+| New M1 orphan processes | None created: no M1 runtime was started; not a real-session orphan regression test |
+| Restoration | No restoration/restart necessary: the existing Snap/session were left running, no settings or packages changed |
+
+Observed baseline Snap processes: server [process ID omitted], forkserver [process ID omitted], player
+[process ID omitted], resource tracker [process ID omitted]; a pre-existing zombie child [process ID omitted] was already
+present before any M1 launch and was not modified or attributed to M1.
+The only new local directory is the ignored <private-evidence-file> directory
+`<private-evidence-dir>/`; no source, installed extension, Snap profile,
+AppArmor rule, PoC Snap or other extension was changed. Agent-A repositories
+and the roadmap worktree were not accessed.
+
+### Proposed next decision (not executed)
+
+Approve a narrowly scoped **test launcher**, not a playback implementation
+change, that redirects only Apricus config/autostart/legacy-import paths in
+every server, forkserver/spawn child and GUI while keeping normal host GNOME
+settings access. Cache/data remain private. Its effective paths and unchanged
+host settings must be verified before Snap shutdown. No linking/copying the
+host dconf database into the private profile. If this needs a production path
+override rather than test instrumentation, request that separate scope first.
+
+Only after that method is agreed can fresh backup/restoration preparation,
+isolated dependency setup and the already-authorized runtime test sequence
+resume. No bug fix, package validation, push, PR, merge, tag or publication was
+performed in this attempt.
