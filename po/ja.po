@@ -854,6 +854,12 @@ msgstr "取り込んだ壁紙ウィンドウ数: {count}"
 msgid "Status unavailable"
 msgstr "ステータスを利用できません"
 
+msgid "Preparing static wallpaper…"
+msgstr "静止画の壁紙を準備しています…"
+
+msgid "No video playing — static wallpaper will apply to the next video"
+msgstr "再生中の動画がありません — 次の動画に静止画の壁紙が適用されます"
+
 #: src/apricus/gui/gtk4app.py:3913
 #, python-brace-format
 msgid "Last host check: {time}"

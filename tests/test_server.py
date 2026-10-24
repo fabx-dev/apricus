@@ -481,3 +481,91 @@ def test_respawn_player_rejects_unknown_mode():
     s._setup_player = lambda *a, **k: called.append((a, k))
     assert s.respawn_player() is False
     assert called == []
+
+
+def _static_flag_server(static=False):
+    s = srv.ApricusServer.__new__(srv.ApricusServer)
+    s.config = {srv.CONFIG_KEY_STATIC_WALLPAPER: static}
+    s._save_config = lambda: None
+    return s
+
+
+def test_static_flag_on_triggers_player_refresh():
+    """Enabling static mid-playback must apply the current frame: the
+    player setup path only covers fresh (re)starts."""
+    from unittest.mock import patch
+
+    s = _static_flag_server(False)
+
+    class _Player:
+        mode = "MODE_VIDEO"
+        refreshed = 0
+
+        def reload_config(self):
+            pass
+
+        def refresh_static(self):
+            self.refreshed += 1
+
+    player = _Player()
+    with patch.object(srv, "get_instance", return_value=player):
+        s.is_static_wallpaper = True
+    assert s.config[srv.CONFIG_KEY_STATIC_WALLPAPER] is True
+    assert player.refreshed == 1
+
+
+def test_static_flag_off_never_refreshes():
+    from unittest.mock import patch
+
+    s = _static_flag_server(True)
+
+    class _Player:
+        mode = "MODE_VIDEO"
+        refreshed = 0
+
+        def reload_config(self):
+            pass
+
+        def refresh_static(self):
+            self.refreshed += 1
+
+    player = _Player()
+    with patch.object(srv, "get_instance", return_value=player):
+        s.is_static_wallpaper = False
+    assert player.refreshed == 0
+
+
+def test_static_flag_on_tolerates_absent_or_idle_player():
+    """No player, MODE_NULL, or a failing refresh must never break the
+    toggle: the flag persists and the next setup applies it as before."""
+    from unittest.mock import patch
+
+    from gi.repository import GLib
+
+    s = _static_flag_server(False)
+    with patch.object(srv, "get_instance", return_value=None):
+        s.is_static_wallpaper = True  # must not raise
+
+    class _IdlePlayer:
+        mode = "MODE_NULL"
+        refreshed = 0
+
+        def reload_config(self):
+            pass
+
+        def refresh_static(self):
+            self.refreshed += 1
+
+    idle = _IdlePlayer()
+    with patch.object(srv, "get_instance", return_value=idle):
+        s.is_static_wallpaper = True
+    assert idle.refreshed == 0
+
+    class _FailingPlayer(_IdlePlayer):
+        mode = "MODE_VIDEO"
+
+        def refresh_static(self):
+            raise GLib.Error("bus unavailable")
+
+    with patch.object(srv, "get_instance", return_value=_FailingPlayer()):
+        s.is_static_wallpaper = True  # must not raise

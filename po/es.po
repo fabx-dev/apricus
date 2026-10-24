@@ -848,6 +848,12 @@ msgstr "Ventanas de fondo adoptadas: {count}"
 msgid "Status unavailable"
 msgstr "Estado no disponible"
 
+msgid "Preparing static wallpaper…"
+msgstr "Preparando el fondo de pantalla estático…"
+
+msgid "No video playing — static wallpaper will apply to the next video"
+msgstr "Ningún vídeo en reproducción — el fondo estático se aplicará al próximo vídeo"
+
 #: src/apricus/gui/gtk4app.py:3913
 #, python-brace-format
 msgid "Last host check: {time}"

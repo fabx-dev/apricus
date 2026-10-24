@@ -852,6 +852,12 @@ msgstr "Übernommene Hintergrundfenster: {count}"
 msgid "Status unavailable"
 msgstr "Status nicht verfügbar"
 
+msgid "Preparing static wallpaper…"
+msgstr "Statisches Hintergrundbild wird vorbereitet…"
+
+msgid "No video playing — static wallpaper will apply to the next video"
+msgstr "Kein Video läuft — das statische Hintergrundbild wird beim nächsten Video angewendet"
+
 #: src/apricus/gui/gtk4app.py:3913
 #, python-brace-format
 msgid "Last host check: {time}"

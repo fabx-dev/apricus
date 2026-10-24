@@ -540,6 +540,8 @@ class VideoPlayer(BasePlayer):
         <method name='preview_static'>
             <arg type='s' name='video_path' direction='in'/>
         </method>
+        <method name='refresh_static'>
+        </method>
         <method name='switch_media'>
             <arg type='s' name='mode' direction='in'/>
         </method>
@@ -1097,6 +1099,11 @@ class VideoPlayer(BasePlayer):
         if not self.wallpaper.supports_static:
             return
         video = video or self.data_source["Default"]
+        if getattr(self, "_static_in_flight", None) == video:
+            # A generation for this exact video is already running (e.g. a
+            # repeated toggle): don't stack another ffmpeg behind it.
+            perf.mark("player: static generation already running")
+            return
         cached = self._static_cache_path(video)
         if os.path.isfile(cached):
             # Instant path: show last frame immediately, no ffmpeg involved.
@@ -1109,6 +1116,7 @@ class VideoPlayer(BasePlayer):
             perf.mark("player: static refresh skipped (fast mode)")
             return
         self._static_token = getattr(self, "_static_token", 0) + 1
+        self._static_in_flight = video
         thread = threading.Thread(
             target=self._generate_static_wallpaper,
             args=(video, cached, self._static_token),
@@ -1152,9 +1160,11 @@ class VideoPlayer(BasePlayer):
             )
         except subprocess.TimeoutExpired:
             logger.warning("[StaticWallpaper] ffmpeg timed out")
+            self._release_static_in_flight(video, token)
             return
         if ret.returncode != 0 or not os.path.isfile(tmp_path):
             logger.warning("[StaticWallpaper] frame extraction failed")
+            self._release_static_in_flight(video, token)
             return
         # Sharp frame, no blur: the static wallpaper sits underneath the video
         # and blur only added startup cost for no visible benefit.
@@ -1162,6 +1172,7 @@ class VideoPlayer(BasePlayer):
             os.replace(tmp_path, cached)
         except OSError as e:
             logger.warning(f"[StaticWallpaper] {e}")
+            self._release_static_in_flight(video, token)
             return
         finally:
             if os.path.isfile(tmp_path) and tmp_path != cached:
@@ -1171,7 +1182,16 @@ class VideoPlayer(BasePlayer):
                     pass
         perf.mark("player: static cache refreshed")
         if token == getattr(self, "_static_token", None):
+            self._release_static_in_flight(video, token)
             GLib.idle_add(self._apply_static_wallpaper, cached)
+
+    def _release_static_in_flight(self, video, token):
+        """Clear the generation guard, unless a newer request superseded it."""
+        if (
+            token == getattr(self, "_static_token", None)
+            and getattr(self, "_static_in_flight", None) == video
+        ):
+            self._static_in_flight = None
 
     def _apply_static_wallpaper(self, static_wallpaper_path):
         self._last_static_path = static_wallpaper_path
@@ -1294,6 +1314,46 @@ class VideoPlayer(BasePlayer):
             threading.Thread(
                 target=self._generate_stream_static, args=(video_path,), daemon=True
             ).start()
+        return False
+
+    def refresh_static(self, dbus_context=None):
+        """Generate and apply the static frame for the current content.
+
+        Invoked when the user enables the static-wallpaper flag mid-playback,
+        so the frame applies without re-applying the video or restarting the
+        player. Generation runs in the usual background thread (a repeated
+        call for the same video while one is running is ignored); playback
+        itself is untouched — only the final wallpaper.apply_static runs on
+        the main loop. Returns True when a generation was started or a
+        cached frame applied synchronously.
+        """
+        _authorize("player.refresh_static", dbus_context)
+        if not self.wallpaper.supports_static:
+            return False
+        if self.mode == MODE_STREAM:
+            source = (self.data_source or {}).get("Default", "")
+            if not source:
+                return False
+            if source.startswith(("http://", "https://")):
+                cached = self._static_cache_path(source)
+                if os.path.isfile(cached):
+                    self._apply_static_wallpaper(cached)
+                    return True
+                threading.Thread(
+                    target=self._generate_stream_static, args=(source,), daemon=True
+                ).start()
+                return True
+            self.set_static_wallpaper(source)
+            return True
+        if self.mode == MODE_PLAYLIST:
+            first = self._first_queued_video()
+            if not first:
+                return False
+            self.set_static_wallpaper(first)
+            return True
+        if self.mode == MODE_VIDEO:
+            self.set_static_wallpaper()
+            return True
         return False
 
     def _live_cache_paths(self):

@@ -539,6 +539,15 @@ class ApricusServer:
         player = get_instance(DBUS_NAME_PLAYER)
         if player is not None:
             player.reload_config()
+            if is_static_wallpaper:
+                # Apply immediately when enabled mid-playback: the player
+                # setup path only covers fresh (re)starts, so without this
+                # the flag would sit idle until the next video change.
+                try:
+                    if player.mode in [MODE_VIDEO, MODE_STREAM, MODE_PLAYLIST]:
+                        player.refresh_static()
+                except (GLib.Error, AttributeError):
+                    pass
 
     @property
     def is_pause_when_maximized(self):

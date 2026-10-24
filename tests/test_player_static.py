@@ -308,3 +308,114 @@ def test_error_handler_attached_in_window_init():
     dump = "\n".join(ast.dump(n) for n in inits)
     assert "MediaPlayerEncounteredError" in dump, "error event not wired in __init__"
     assert "_on_media_error" in dump
+
+
+def _video_player(mode, source="", wallpaper=None, playlist=None):
+    config = {"mode": mode, "data_source": {"Default": source}}
+    if playlist is not None:
+        config["playlist"] = playlist
+    return _player(config, wallpaper if wallpaper is not None else _Wallpaper())
+
+
+def _silent_thread(monkeypatch, spawns):
+    """Replace worker threads with non-starting recorders (deterministic)."""
+
+    class _Thread:
+        def __init__(self, target=None, args=(), **kwargs):
+            spawns.append((target, args))
+
+        def start(self):
+            pass
+
+    monkeypatch.setattr(player_mod.threading, "Thread", _Thread)
+
+
+def test_refresh_static_applies_cached_frame_without_touching_media(monkeypatch, tmp_path):
+    monkeypatch.setattr(player_mod, "CONFIG_DIR", str(tmp_path))
+    wb = _Wallpaper()
+    obj = _video_player("MODE_VIDEO", "/v/a.mp4", wb)
+    cached = VideoPlayer._static_cache_path("/v/a.mp4")
+    with open(cached, "wb") as f:
+        f.write(_blank_png_bytes())
+    spawns = []
+    _silent_thread(monkeypatch, spawns)
+    assert obj.refresh_static() is True
+    assert wb.applied == [cached]
+    assert len(spawns) == 1  # background refresh still scheduled
+
+
+def test_refresh_static_generates_missing_frame_in_background(monkeypatch, tmp_path):
+    monkeypatch.setattr(player_mod, "CONFIG_DIR", str(tmp_path))
+    monkeypatch.setattr(player_mod.mediacache, "probe_video", lambda _video: (640, 360, 30.0))
+
+    class _Result:
+        returncode = 0
+
+    def fake_run(cmd, **kwargs):
+        assert "-pix_fmt" in cmd and "rgb24" in cmd
+        with open(cmd[-1], "wb") as f:
+            f.write(_blank_png_bytes())
+        return _Result()
+
+    monkeypatch.setattr(player_mod.subprocess, "run", fake_run)
+    from gi.repository import GLib
+
+    monkeypatch.setattr(GLib, "idle_add", lambda func, *args: func(*args))
+    wb = _Wallpaper()
+    obj = _video_player("MODE_VIDEO", "/v/b.mp4", wb)
+    assert obj.refresh_static() is True
+    assert _wait_for(lambda: len(wb.applied) == 1)
+
+
+def test_refresh_static_second_call_while_running_is_ignored(monkeypatch, tmp_path):
+    monkeypatch.setattr(player_mod, "CONFIG_DIR", str(tmp_path))
+    wb = _Wallpaper()
+    obj = _video_player("MODE_VIDEO", "/v/c.mp4", wb)
+    spawns = []
+    _silent_thread(monkeypatch, spawns)
+    assert obj.refresh_static() is True
+    assert len(spawns) == 1
+    assert obj.refresh_static() is True
+    assert len(spawns) == 1, "duplicate generation must not stack ffmpeg"
+    # A different video still proceeds.
+    obj.config["data_source"] = {"Default": "/v/d.mp4"}
+    assert obj.refresh_static() is True
+    assert len(spawns) == 2
+
+
+def test_refresh_static_noop_without_media_content():
+    wb = _Wallpaper()
+    obj = _video_player("MODE_NULL", "", wb)
+    calls = []
+    obj.set_static_wallpaper = lambda *a, **k: calls.append((a, k))
+    assert obj.refresh_static() is False
+    assert calls == []
+    obj = _video_player("MODE_PLAYLIST", "", wb, playlist={})
+    obj.set_static_wallpaper = lambda *a, **k: calls.append((a, k))
+    assert obj.refresh_static() is False
+    assert calls == []
+
+
+def test_refresh_static_playlist_uses_first_queued_video():
+    wb = _Wallpaper()
+    obj = _video_player("MODE_PLAYLIST", "", wb, playlist={"Default": ["/q/1.mp4", "/q/2.mp4"]})
+    calls = []
+    obj.set_static_wallpaper = lambda *a, **k: calls.append((a, k))
+    assert obj.refresh_static() is True
+    assert calls == [(("/q/1.mp4",), {})]
+
+
+def test_refresh_static_rejects_foreign_uid(monkeypatch):
+    import types
+
+    import apricus.utils as utils_mod
+
+    monkeypatch.setattr(utils_mod, "_caller_uid", lambda sender: 0xFFFE)
+    wb = _Wallpaper()
+    obj = _video_player("MODE_VIDEO", "/v/a.mp4", wb)
+    ctx = types.SimpleNamespace(sender=":1.99")
+    try:
+        obj.refresh_static(ctx)
+    except PermissionError:
+        return
+    raise AssertionError("foreign UID must be rejected")

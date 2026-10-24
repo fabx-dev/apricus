@@ -2637,6 +2637,35 @@ def integration_timer_uses_gtk4_window_api():
     assert state["refreshes"] == 5
 
 
+@check
+def static_flag_toasts_and_persists():
+    from types import SimpleNamespace
+
+    import apricus.gui.gtk4app as appmod
+
+    for mode, expected in (
+        ("MODE_VIDEO", "Preparing static wallpaper…"),
+        ("MODE_NULL", "No video playing — static wallpaper will apply to the next video"),
+    ):
+        config = _base_config()
+        config["mode"] = mode
+        store = _ConfigStore(config)
+        old = _patch_config(None, store)
+        try:
+            obj, _server = _panel(dict(config), [])
+            seen = []
+            obj._toast = seen.append
+            switch = SimpleNamespace(get_active=lambda: True)
+            assert (
+                obj._on_settings_flag(switch, True, appmod.CONFIG_KEY_STATIC_WALLPAPER)
+                is False
+            )
+            assert store.config["is_static_wallpaper"] is True
+            assert seen == [expected], (mode, seen)
+        finally:
+            appmod.ConfigUtil = old
+
+
 def main():
     name = sys.argv[1]
     try:
@@ -2681,6 +2710,10 @@ def test_apply_sends_edited_queue_not_stale_config():
 
 def test_integration_timer_uses_gtk4_window_api():
     _run("integration_timer_uses_gtk4_window_api")
+
+
+def test_static_flag_toasts_and_persists():
+    _run("static_flag_toasts_and_persists")
 
 
 def test_apply_empty_queue_sends_nothing():

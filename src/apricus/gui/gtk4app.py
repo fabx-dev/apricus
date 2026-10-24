@@ -4149,6 +4149,11 @@ class ControlPanel(Adw.Application):
         self.config = ConfigUtil().load()
         self.config[key] = want
         ConfigUtil().save(self.config)
+        if key == CONFIG_KEY_STATIC_WALLPAPER and want:
+            if self.config.get(CONFIG_KEY_MODE) == MODE_NULL:
+                self._toast(_("No video playing — static wallpaper will apply to the next video"))
+            else:
+                self._toast(_("Preparing static wallpaper…"))
         return False
 
     def _on_open_config(self, *_args):
