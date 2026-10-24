@@ -491,3 +491,164 @@ Only after that method is agreed can fresh backup/restoration preparation,
 isolated dependency setup and the already-authorized runtime test sequence
 resume. No bug fix, package validation, push, PR, merge, tag or publication was
 performed in this attempt.
+
+## Test-only isolation adapter — new preflight ([validation date omitted])
+
+**PASS for preparation/preflight only. No live M1 test has started.** All
+production files under `src/`, installed extension files, packaging, bridge and
+integration-branch code remain unchanged. The playback implementation is still
+`84bd123`; the adapters and evidence described here are separate test tooling.
+
+### Method and safety gates
+
+New opt-in files: `tests/manual/m1_isolation/{launcher.py,sitecustomize.py,
+m1_bootstrap.py,m1_probe.py,landlock_guard.py}`; fail-closed unit tests in
+`tests/test_m1_isolation.py`. See the adjacent README for usage and boundaries.
+
+An independent `.venv` was created in this worktree with system GI access and
+the locked Python runtime/test dependencies (`uv sync --frozen`); downloads/cache
+are under `<private-evidence-dir>/`. Nothing was installed globally and no
+Agent-A environment was used. No sudo or package-manager operation was used.
+
+The parent launcher does not alter its host environment. Only probe subprocesses
+receive private XDG_CACHE_HOME, XDG_DATA_HOME, temp, shader and Deno cache roots.
+**HOME, XDG_CONFIG_HOME, XDG_RUNTIME_DIR, DBUS_SESSION_BUS_ADDRESS and display
+information are preserved**, including whether a variable was originally unset.
+The real dconf/GSettings backend/profile is retained; no copy, symlink, private
+bus or memory backend is substituted to obtain matching values.
+
+`sitecustomize` patches Apricus's **in-memory application path constants** before
+dependent modules import aliases. The hook runs in fresh Python interpreters;
+forked workers inherit the patched state. All Python probes use this worktree's
+venv and this worktree's source, not a PATH launcher or installed Apricus.
+Bootstrap failures exit with code 78 instead of continuing unisolated.
+
+On this machine, Landlock ABI **8** is available. An unprivileged process-local
+write boundary allows only the private profile/evidence roots, plus limited
+device I/O (`/dev/null`, existing `/dev/dri` and `/dev/snd`). It does not allow
+persistent writes to host HOME/config/cache/runtime, global `/tmp` or `/dev/shm`.
+Fork/exec children inherit it. AppArmor, user/system services and the parent
+process's policy are not changed. Unexpected native filesystem writes fail
+rather than silently escaping to stable profiles.
+
+In this phase all Python GSettings mutations, extension toggles (including the
+legacy DING workaround), systemd operations, external application launches and
+native file chooser actions are rejected. A harmless local autostart file was
+created and removed **inside the test profile** to exercise the real path; it is
+not in the host autostart search directory. No portal/systemd launcher was
+installed. All Apricus server/player/GUI constructors are blocked; the launcher
+has **no live-runtime subcommand**. There is no hidden call to `main()`.
+
+### Audited path inventory
+
+Let `R` be the fresh `build/m1p-*` evidence directory and `P=R/p`.
+
+| Resource / production users | Test path / handling |
+|---|---|
+| `commons` / `utils` config, backups, lock, atomic temp | `P/config/apricus/config.json`, `.bak`, `.lock`, `.tmp` |
+| Legacy Hidamari import | `P/legacy/hidamari/config.json`; real legacy profile is not imported |
+| Static frames and stopped fallback (`video_player`, `web_player`, `stop_support`, GUI hero) | `P/config/apricus/static-*.png`, unique temporary PNGs, `stopped-background.png`; aliases verified after role-specific imports |
+| FFprobe metadata (`mediacache`) | `P/config/apricus/video-info.json` and its atomic temp |
+| Playlist, queue position/shuffle, volume/mute, stream/web history and favorites | Same private config.json; no separate host database |
+| Default library / preseeded media | `P/media`; no automatic use of the user's Hidamari library |
+| Native GnomeDesktop thumbnail factory | `P/cache/thumbnails/...`; actual native save+lookup performed |
+| GUI stream thumbnail images/index and favicons | `P/cache/apricus/stream-thumbs/`, `P/cache/apricus/favicons/`; index write and path checks performed |
+| App yt-dlp metadata | `P/cache/apricus/ytdlp-meta-cache.json`; synthetic metadata write, no network extraction |
+| yt-dlp internal cache | `P/cache/yt-dlp`; effective cache root read from a real YoutubeDL object without extraction |
+| Deno, Mesa/NVIDIA shader caches, SQLite temp | `P/cache/deno`, `P/cache/mesa`, `P/cache/nvidia`, `P/t` via child-only environment |
+| Python/tempfile/GLib and native helper temp | `P/t`; actual temporary-file and multiprocessing socket paths exercised |
+| VLC user configuration | `P/config/vlc/vlcrc`, via test-only application option-builder adapter adding public `--config`; actual CLI help verifies support; real vlc.Instance class unchanged |
+| WebKit local storage/cookies/cache | Explicit WebsiteDataManager: `P/data/webkit`, `P/cache/webkit`; actual manager getters checked; no WebView/page created |
+| XDG desktop autostart | `P/autostart/io.github.fabx_dev.Apricus.desktop`; isolated create/remove verified |
+| systemd unit path | `P/systemd/user`; setup and `systemctl` calls blocked, no registration |
+| Host install ZIP/script and verification receipt | `P/exports`; helper sources read from this worktree; explicit outside destinations denied by filesystem policy; no installer executed |
+| Application Unix IPC fallback | `P/ipc`; XDG_RUNTIME_DIR itself stays real; no Snap socket or native service was published |
+| Python bytecode, diagnostic logs and evidence | Bytecode disabled in probes; logs/JSON under `R/evidence`; regular inherited write FDs outside private roots are rejected |
+| External folder/browser/desktop launch and chooser recent-state | Blocked test actions; no global desktop launcher or chooser state installed |
+
+Paths that remain real are intentional: session bus and display sockets, GNOME
+settings and schema sources, the loaded host extension (read only), system
+libraries/devices and explicitly selected media (read only). No persistent
+Apricus file is intentionally shared with native/Snap/Flatpak stable profiles.
+
+### Recorded preflight results
+
+Final evidence root: **`build/m1p-ayadto2e/`** (mode 0700, local/ignored).
+`marker.json` records the source HEAD used (`de1bd8e`) and adapter file hashes.
+`host-before.json`, `host-after.json`, `report.json`, `<private-evidence-file>`,
+per-role JSON and per-interpreter bootstrap records are retained there.
+
+| Check | Result |
+|---|---|
+| GNOME background and all 11 meaningful keys | PASS: host CLI and real Gio.Settings agree in every probe, including light/dark URI, colors/options, screensaver, enabled extensions and color scheme; all keys available |
+| Host environment and display/session context | PASS: all 13 protected variables identical in launcher/probe/children; GLib config directory remains the real host directory |
+| Same isolated application paths | PASS: imported aliases in server, GTK3 video/web and GTK4 GUI contexts agree |
+| Host extension discovery | PASS: actual `integration_status()` returns ACTIVE in every context despite private XDG_DATA_HOME; no extension toggle |
+| Actual child propagation | PASS: 4 roles under **spawn**, 4 under **forkserver**, controller, thread worker, exec worker = **11 contexts**; 8 fresh-interpreter bootstrap logs include tracker/forkserver; fork children report their inherited bootstrap origin |
+| Effective native/cache writes | PASS: ConfigUtil, isolated desktop autostart, fallback PNG, yt-dlp cache, stream index, native thumbnail save/lookup; WebKit manager directories and public VLC config option verified |
+| Alternative-path writes | PASS: controlled outside-root sentinel cannot be overwritten through Python, native C open/truncate, a native shell exec, symlink or cross-boundary hardlink; **55 denial checks** across 11 contexts, sentinel intact |
+| Stable installations/profiles/extension | PASS: hashes plus mode/owner/mtime of **27 protected paths** unchanged within the measured preflight window |
+| Production sources | PASS: all **25 Python source files** byte-identical before/after; no source edits |
+| Snap and application bus ownership | PASS within final probe window: same strict Snap processes/start identities and same relevant well-known name ownership; no M1 service registered |
+| Global GNOME changes | PASS: before/after significant values identical; mutating Python APIs/commands rejected before execution |
+| Preflight helper cleanup | PASS: multiprocessing children joined, thread/exec worker finished, tracker/forkserver/bootstrap PIDs gone |
+| Adapter unit/lint/format tests | PASS: **5 fail-closed tests**; Ruff lint and format checks over `src`/`tests` passed |
+| Live wallpaper, GUI behavior, decoding, DING click/drag, performance | **NOT TESTED** in this preparation |
+
+Probe-only method-name/import-order errors were fixed in test tooling; failed
+run/evidence directories were kept and host-state checks remained unchanged.
+The VLC adapter was reviewed to keep the actual binding class intact and adapt
+only option construction. No production bug was diagnosed or fixed here.
+
+Process inventory note: the initial Snap server/player were [process IDs omitted];
+the final preflight observed server/player **[process IDs omitted]** and related strict
+Snap children [process IDs omitted]. No command to stop/start Snap was issued by
+this preparation. The cause of the intervening inventory difference is not
+asserted. The PASS statement is limited to the final controlled before/after
+window, not a claim that the entire session was frozen throughout preparation.
+Re-inventory is mandatory before any subsequent approved shutdown.
+
+### Residual limits and next reversible phase
+
+- This is **not a full security sandbox**: reads/network/session IPC remain
+  available. Landlock does not mediate all metadata operations or pre-existing
+  write FDs; inherited regular write FDs are checked, Python metadata mutations
+  outside private roots are rejected, and stable hashes/metadata are compared.
+  Arbitrary malicious native code or writes requested from another service are
+  not covered by a blanket guarantee. The reviewed preflight constructs no
+  applications and uses read-only GNOME operations.
+- Known persistent Apricus paths are isolated. If an untested native helper
+  later requires a different write path, it will fail closed: stop and report
+  the exact path, rather than adding a broad HOME/runtime/tmp exception.
+- WebKit browsing subprocesses, GPU/audio access, native decoder allocation and
+  normal Gtk3/XWayland window mapping remain untested. Landlock/no_new_privs may
+  affect helper sandbox startup; current manager/config checks are **not** a
+  claim of rendering compatibility. No sandbox is disabled to make them pass.
+- Real GNOME settings/IPC are deliberately not redirected. C/portal-generated
+  preferences are not generically intercepted by Python method guards; file
+  choosers and external-launch actions are excluded. A later live mode needs
+  separately reviewed background-only write permissions and restoration, not
+  weaker isolation or a fake dconf database.
+- Private XDG_DATA_HOME also isolates user desktop associations/recent-state;
+  it is not equivalent to the installed application's data view. External app
+  launches/choosers are excluded rather than installing global desktop files.
+  Account for this when reviewing later GUI/Overview observations. Host extension
+  discovery stays real via HOME and the session bus, as verified above.
+- This preflight does not replace real-session or confined-package acceptance,
+  nor does it provide new CPU/latency measurements. Instrumentation overhead
+  must be identified if it is retained for future measurements.
+
+On new authorization: recheck current Snap revision/PIDs, preserve current
+configs/selection/volume/mute/static/autostart and exact GNOME settings, prepare
+an independently usable restore script **before any shutdown**, review/enable
+the adapter's live-mode entrypoint and only the intended background writes,
+then quit the identified Snap via its existing control API. Verify all its
+children are gone before starting M1. Keep private profiles and the unchanged
+host extension; preseed approved media instead of using global file choosers.
+After testing, stop/reap only M1, restore exact host background/settings and
+unchanged original profile, then explicitly relaunch the original Snap and
+verify DING/bridge with the user. No package replacement, extension toggle,
+logout/login or privilege escalation is implicit in that authorization.
+
+**Stopped after successful preflight. Awaiting authorization for real validation;
+the Snap was not stopped by this tooling and M1 was not started.**
