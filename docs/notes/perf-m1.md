@@ -1268,7 +1268,84 @@ were verified. Normal IPC `quit` returned `ok=true`. All four original identitie
 process remained. Configuration after quit still matches the backup. Evidence:
 `<private-evidence-dir>`.
 
-**Shutdown PASS. Actual removal remains NOT PERFORMED**, awaiting user execution
-of `sudo snap remove apricus` without `--purge`. No sudo/package operation or M1
-launch was performed by the agent. Snap files remain installed at this checkpoint;
-PoC, host extension and DING remain untouched. No automatic reinstall is planned.
+**Shutdown PASS. Actual removal is covered in the next section.**
+
+### Native Wayland smoke attempt after temporary Snap removal ([validation date omitted])
+
+The user executed the privileged removal themselves:
+
+```text
+sudo snap remove apricus
+apricus rimosso (istantanea dei dati snap salvata)
+```
+
+Verification after removal: `snap list apricus` absent, automatic snapshot **ID 9**
+recorded for `2.0.7 x3`, `snap/apricus` and `/snap/apricus` absent,
+`apricus-channel-poc 0.1 x1` still installed, host integration and DING ACTIVE,
+no Apricus-named processes left. Removal evidence:
+`<private-evidence-dir>`.
+
+No `--purge` was used. No extension, DING, service, repository or other Snap
+was changed. No automatic snapshot restore/reinstall was performed.
+
+M1 was then started from `<private-path>` with the
+independent `.venv/bin/python -S`, adding only source, venv site-packages and
+system GI import paths. No Landlock, no `sitecustomize` adapter, no `make
+install`, no ambiguous PATH launcher. Parent/spawn/forkserver probes used the
+real HOME/config/runtime/session bus/GSettings and the same source/config paths.
+The real native config was preseeded only with the approved Hawaii selection
+(`is_stopped=false`); personal media were read-only inputs. This was not private
+profile isolation. No production code was changed for this run.
+
+### Results
+
+| Check | Result |
+|---|---|
+| Snap absent before M1, no competing wallpaper instance | PASS |
+| Source server startup and VLC `playing` property | PASS as internal-state observation only |
+| First Hawaii frame actually visible | PASS: user confirmed animated video |
+| Extension adoption of source window | PASS for initial window only; journal records background-layer adoption |
+| STOP command accepted, player PID gone, server alive | PASS |
+| STOP persisted (`is_stopped=true`) | PASS |
+| STOP latency measurement | NOT TESTED as a valid benchmark; one observed gdbus round trip was 106.53 ms including process launch, not a latency claim |
+| Static wallpaper/fallback visibly correct | FAIL/UNCONFIRMED: user reported blue background instead of expected Hawaii still |
+| H.264 decoder errors | FAIL/blocker: `get_buffer() failed`, `thread_get_buffer() failed`, `no frame!` logged twice during player teardown after STOP |
+| RESUME and visible video return | NOT TESTED: supervisor aborted before RESUME |
+| DING clicks/dragging during M1 | NOT TESTED |
+| DING after M1 stopped | PASS: user confirmed icons, clicks and dragging work |
+| Overview workspaces during M1 | NOT TESTED |
+| Playlist/stream/web/persistence/static matrix | NOT TESTED |
+| CPU >=60s, RSS/PSS/process/thread, STOP/RESUME latencies | NOT TESTED: benchmarks not started |
+| Source termination and child cleanup | PASS: no recorded source PIDs remain; supervisor/watchdog exited |
+| Native config/cache restoration | PASS: original native files byte-identical to backup |
+| GNOME background/settings restoration | PASS for values; original `~/snap/apricus/x3/...` URI target remains missing after Snap removal, as the user accepted |
+| Non-Snap original files vs initial archive | PASS: 13 files compared, no remaining changes |
+| Snap reinstall | NOT PERFORMED: explicitly left for a later user decision |
+| Bridge service telemetry | NOT TESTED as a service check; separate bridge name remained unowned |
+
+The retained M1 static PNG (`after-test-config/static-d47832c882a05d8a.png`)
+contains a correct Hawaii sunset frame, so the generated fallback asset itself is
+not blank. The user-visible blue screen may overlap the automatic URI restoration
+after STOP, so it is not conclusively attributed to a static-generation bug. The
+H.264 errors occurred after the STOP request during teardown, not during the
+initial visible playback, but they still abort the smoke gate before benchmarks.
+No speculative VLC/renderer fix was applied.
+
+Recovery completed with standalone system-Python `recover.py`; the same file is
+byte-identical to the reviewed `tests/manual/m1_native/session.py`. Native
+recovery tests were added (`tests/test_m1_native_session.py`: preserve generated
+data, restore originals, keep absent paths absent, never reinstall Snap).
+**2 recovery tests pass.** Ruff lint/format pass.
+
+### Final disposition
+
+M1 source is fully stopped; native data and original URI values are restored;
+Snap remains removed; PoC, extension and DING are untouched. No restart/reinstall
+was performed automatically. No production code, integration branch, PR #1,
+AppArmor, login/session or package change occurred. No push, PR, merge, tag,
+release or publication.
+
+**Stopped after an interrupted smoke test. Do not start Snap/Flatpak package
+validation.** Awaiting a separate decision on reinstalling the previous Snap or
+leaving source M1 available, plus any reproduced-bug fix before retrying RESUME,
+static-fallback verification and benchmarks.
