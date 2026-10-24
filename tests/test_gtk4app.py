@@ -2610,6 +2610,33 @@ def host_install_rows_guide_sandbox_setup():
             sys.modules.pop("apricus.gnome_shell", None)
 
 
+@check
+def integration_timer_uses_gtk4_window_api():
+    from types import SimpleNamespace
+
+    assert hasattr(app.Gtk.Window, "is_active")
+    assert not hasattr(app.Gtk.Window, "get_is_active")
+    state = {"active": True, "page": "settings", "refreshes": 0}
+    def refresh():
+        state["refreshes"] += 1
+    obj = SimpleNamespace(
+        window=SimpleNamespace(is_active=lambda: state["active"]),
+        stack=SimpleNamespace(get_visible_child_name=lambda: state["page"]),
+        _refresh_integration_row=refresh,
+    )
+    for _ in range(5):
+        assert app.ControlPanel._poll_integration(obj) is True
+    assert state["refreshes"] == 5
+    state["active"] = False
+    assert app.ControlPanel._poll_integration(obj) is True
+    state["active"] = True
+    state["page"] = "library"
+    assert app.ControlPanel._poll_integration(obj) is True
+    obj.window = None
+    assert app.ControlPanel._poll_integration(obj) is True
+    assert state["refreshes"] == 5
+
+
 def main():
     name = sys.argv[1]
     try:
@@ -2650,6 +2677,10 @@ def _run(check):
 
 def test_apply_sends_edited_queue_not_stale_config():
     _run("apply_sends_edited_queue")
+
+
+def test_integration_timer_uses_gtk4_window_api():
+    _run("integration_timer_uses_gtk4_window_api")
 
 
 def test_apply_empty_queue_sends_nothing():

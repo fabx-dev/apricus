@@ -3859,7 +3859,7 @@ class ControlPanel(Adw.Application):
     def _poll_integration(self):
         window = getattr(self, "window", None)
         stack = getattr(self, "stack", None)
-        if window is not None and stack is not None and window.get_is_active():
+        if window is not None and stack is not None and window.is_active():
             if stack.get_visible_child_name() == "settings":
                 self._refresh_integration_row()
         return True
