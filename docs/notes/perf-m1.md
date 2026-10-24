@@ -1252,3 +1252,23 @@ after source M1 is gone. Every privileged action remains user-gated.
 explicit confirmation.** No production code, Landlock adapter, extension,
 AppArmor, DING, master/integration branch or PR #1 changed. No push, PR, merge,
 tag, release or publication. No new M1 Snap/Flatpak package validation started.
+
+### User-confirmed checksum and authorized normal shutdown ([validation date omitted])
+
+The user supplied the privileged SHA256 of the installed x3 blob: **exact match**
+to retained `<artifact-sha256>`.
+Installed-payload identity is now PASS, no longer pending. They then explicitly
+confirmed proceeding with normal shutdown and temporary removal of apricus only.
+
+Before shutdown, all retained hashes, exact configuration and recorded GNOME
+values were rechecked and matched the prepared backup; no refreshed data copy
+was needed. Server PID/start identity, strict Snap label and socket peer UID
+were verified. Normal IPC `quit` returned `ok=true`. All four original identities
+([process IDs omitted]) exited; no Apricus-named or strict Snap apricus
+process remained. Configuration after quit still matches the backup. Evidence:
+`<private-evidence-dir>`.
+
+**Shutdown PASS. Actual removal remains NOT PERFORMED**, awaiting user execution
+of `sudo snap remove apricus` without `--purge`. No sudo/package operation or M1
+launch was performed by the agent. Snap files remain installed at this checkpoint;
+PoC, host extension and DING remain untouched. No automatic reinstall is planned.
