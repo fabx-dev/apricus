@@ -969,3 +969,153 @@ worktree access, PR #1 change, push, merge, tag, release or publication.
 Any future marker replacement or new native denial remains a reason to stop,
 not to grant directory permissions. A fresh inventory/backup and explicit
 authorization are still required before a real-session validation retry.
+
+## Authorized GNOME retry — smoke interrupted, Snap restored ([validation date omitted])
+
+User authorized real-session validation from `ee723a1`, gated on a successful
+smoke test before functional/performance tests. The approved Landlock adapter
+remains test-only; production code and packaging dependencies are unchanged.
+
+### Fresh preparation and controlled transition
+
+New process inventory identified Snap **2.0.7 revision x3**, server **[process ID omitted]**,
+tracker/forkserver **[process IDs omitted]**, player **[process ID omitted]**. Integration extension
+and DING were ACTIVE. Existing `build/m1p-rfvzu880/` backup (13 files and its
+standalone script) was verified, not overwritten. New private profile/evidence:
+**`build/m1p-48pantki/`**. The new preflight passed all 15 checks before shutdown.
+
+Fresh backup `backup/manifest.json` records the full configuration/playlist,
+GNOME settings, exact Snap revision, process identities and autostart state.
+Selected video: `Hawaii-Ocean-2K-AVC.mov`; two queued videos; volume **50**, mute
+**false**, static **true**, video mode. All 13 backup files were independently
+hashed and the copied `restore.py` verified with `/usr/bin/python3` before
+shutdown. Native config/extension copies are protected evidence, never blindly
+restored. Original autostart/services were not changed.
+
+The explicit supervisor sent the existing Snap's authenticated normal IPC quit,
+then checked original live descendants, strict Snap processes, Apricus process
+names and server bus ownership before source launch. No competing wallpaper
+instance was present when M1 started. It launched a private strace process
+**[process ID omitted]**, source server **[process ID omitted]**, player **[process ID omitted]**, with the same private
+config/cache/data/temp/IPC roots verified by preflight. A standalone watchdog
+was armed before shutdown. GSettings stayed real; the approved marker inode
+exception was checked before shutdown and throughout the attempt.
+
+Test-only wiring enabled the prepared public LibVLC file logger after Instance
+creation/before media playback, retained stderr and traced the full process
+tree's allocation/file syscalls. It did not change renderer/hardware/audio
+choices or replace `vlc.Instance`. The only existing option adaptation remained
+the private public `--config` path. Instrumentation is not release performance.
+
+### Immediate stop condition and VLC evidence
+
+`failure.json` records **dconf marker identity/permissions changed**. Before the
+attempt the marker was device **89**, inode **1142**. After restoration it is
+device **89**, inode **1154**, same owner/group/mode. The runtime monitoring
+detected a change during startup and immediately entered restoration. It did
+not grant rights to the new inode or its parent. Dconf marker replacement is
+consistent with notification invalidation after real GSettings writes, but the
+external dconf writer's unlink/replacement is not captured by the child-tree
+trace, so its precise initiating write is not claimed from these logs alone.
+
+The original-inode reader initialization succeeded: `openat O_RDWR|O_CREAT`,
+`pwrite64` at offset 1 and read-only shared mmap. No EACCES/EPERM appears in the
+captured syscall trace. The current file-only rule is therefore sufficient for
+initial reads, **not a live session that requires surviving marker replacement**.
+No broader/dynamic exception was attempted. The earlier positive preflight
+remains limited to its no-settings-mutation window.
+
+Detailed native log:
+`<private-evidence-file>` (241 lines), plus
+`<private-evidence-file>`, `<private-evidence-file>`, and the before-media map/status
+snapshot. Native log lines 108–113 identify **avcodec**, **Lavc62.11.100**, H.264.
+Lines 138–176 show VAAPI probing, **gl** vout selection, `vaDeriveImage: operation
+failed`, `video output creation failed`, `failed to create video output`.
+Later lines show VDPAU probing/fallback, gl selection again and **Received first
+picture** (line 231). These errors must not be hidden, but subsequent fallback
+means they do not alone prove final decoding failure. The older
+`get_buffer()/thread_get_buffer()/no frame!` sequence was not reproduced here.
+There is no evidence of a missing avcodec plugin, and no permission-denial
+syscall identified as the cause of the VAAPI output failure. Renderer/hardware
+fallback diagnosis remains incomplete; no speculative VLC fix was made.
+
+Server property reached `playing`; `ready.json` records that state, explicitly
+not visibility. The player logged `first frame ... 2.05s after start`, triggered
+by its first-time-changed event. **This is neither user-confirmed on-screen
+visibility nor a validated visible-frame latency measurement.** The supervisor
+interrupted before requesting a visual M1 confirmation. GNOME journal recorded
+adoption of the `__main__.py` window into the background layer, followed by
+adoption of the restored Snap's `apricus` window. The adoption observation is
+not substituted for a visible video or interactive DING check.
+
+### PASS / FAIL / NOT TESTED
+
+| Phase / test | Result and scope |
+|---|---|
+| Fresh inventory, independent backup and old backup verification | PASS |
+| Repeated isolated-path/real-session preflight | PASS, 15 checks before shutdown |
+| Normal Snap quit / no competing instance before M1 | PASS |
+| Source video player startup and VLC playing property | PASS as an internal-state observation only |
+| Smoke acceptance overall | **FAIL / interrupted**: marker identity changed; native vout probe failures also captured |
+| First M1 frame actually visible | **NOT TESTED**, no user/desktop visual evidence |
+| STOP and player resource release attributable to STOP | NOT TESTED |
+| M1 static wallpaper/fallback after STOP | NOT TESTED |
+| RESUME and visible video return | NOT TESTED |
+| New source window adopted by GNOME integration | PASS for initial adoption only; RESUME adoption NOT TESTED |
+| DING clicks/drags during M1 / Overview | NOT TESTED |
+| Playlist playback/advance and STOP during playlist | NOT TESTED |
+| Wallpaper changes during STOP / repeated STOP and RESUME | NOT TESTED |
+| Persistent STOP across M1 restart | NOT TESTED |
+| Static enabled/disabled / missing cache | NOT TESTED |
+| Controlled HTTP stream / web wallpaper | NOT TESTED |
+| >=60s CPU windows, RSS/PSS/process/thread measurements | NOT TESTED: benchmarks were not started |
+| STOP latency / resume-to-playing / visible-first-frame latency | NOT TESTED; no valid measurements from this interrupted run |
+| M1 termination, including tracer and recorded helpers | PASS after restoration; all recorded identities absent |
+| Restored Snap configuration and all 11 GNOME values | PASS, configuration semantically equal to fresh backup and values exact |
+| Original Snap restarted and wallpaper visible | PASS, runtime playing=true and **user confirmed Hawaii visible and animated** |
+| Restored desktop DING | PASS, **user confirmed icons, clicks and dragging work** |
+| Installed extension / DING enabled/ACTIVE | PASS, protected extension hashes unchanged |
+| Separate GNOME bridge service telemetry | NOT TESTED: bridge bus name unowned both before and after; extension adoption is separately observed |
+| Backup integrity | PASS, all 13 fresh backup files/script verified; old backup retained intact |
+| Snap/Flatpak M1 package validation | NOT TESTED; not started |
+
+No measurement here is imported from Xvfb or presented as a GNOME performance
+result. No restart/second runtime attempt was performed after the error.
+
+### Cleanup instrumentation correction, not a production bug
+
+During restoration, a **test-diagnostics bug** raised
+`Media.get_stats() missing required positional argument: p_stats`. It interrupted
+the normal player quit handler; identity-scoped supervisor termination then
+removed the remaining processes. The independent restoration completed, and
+all six recorded source/tracer/helper identities were verified absent.
+
+After restoring the Snap, corrected the adapter helper to allocate a real
+`vlc.MediaStats` and pass it to `get_stats`. Diagnostic snapshot/logging failures
+can no longer prevent invoking original player cleanup. Added two regression
+tests with fake media/player objects, requiring no playback. Also corrected the
+supervisor READY text to report the server PID instead of the tracer PID.
+No production M1 bug was established or changed. **13 adapter tests pass**;
+Ruff lint/format pass (existing Python 3.14 packed-ctypes deprecation warning).
+These fixes were not used for a second live run; their scope is unit-validated.
+Test-tool wiring and regression fixes are committed locally as **`787f1e2`**;
+the production M1 implementation remains unchanged.
+
+### Complete restoration status and remaining blocker
+
+Automatic supervisor restoration and watchdog both exited. Fresh backup/profile
+and exact original GNOME values restored; authenticated Snap runtime server
+**[process ID omitted]**, player **[process ID omitted]**, helpers **[process IDs omitted]**, video mode,
+playing=true, volume=50, mute=false, static=true. No recorded M1 identity remained.
+`restoration-verification.json` retains the technical results and user's explicit
+positive visual confirmations for Hawaii and DING. The separate bridge name's
+absence matches baseline, but is not represented as a successful bridge-state
+query. No manual recovery is required. Standalone recovery remains available
+at `/usr/bin/python3 .../build/m1p-48pantki/restore.py`, already completed.
+
+**Stopped.** The file-only dconf exception cannot silently follow replacement
+inodes; that constraint requires a separately reviewed approach before another
+live retry. Detailed VLC evidence is retained without altering renderer or
+hardware settings. No production code, installed extension, AppArmor, services,
+autostart, Agent-A worktree or PR #1 changed. No sudo, logout/login, package
+replacement, push, PR, merge, tag, release or publication occurred.

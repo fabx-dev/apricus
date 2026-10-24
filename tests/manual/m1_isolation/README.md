@@ -79,6 +79,23 @@ denied syscalls. Account for logging/tracing overhead in performance results.
 The helper's FILE lifetime is unit-tested with a fake Instance; actual native
 logging coverage and future live integration are **not tested/enabled** here.
 
+### [validation date omitted] authorized smoke attempt (supersedes dormant status)
+
+Live-mode test wiring now enables `NativeLog` on the actual VLCWidget Instance
+before media setup, without changing renderer/VLC choices, and the supervisor
+launches under a child-following syscall trace. The attempt in
+`build/m1p-48pantki/` was **interrupted by marker identity replacement**, and
+the original Snap was restored with user-confirmed visible video and working
+DING. Do not repeat it with the current inode-only assumption or widen the rule.
+See the report for complete native logs, vout probing/fallback and untested matrix.
+
+A diagnostic-only stats allocation bug observed during quit was then fixed;
+diagnostic failures now cannot block original VLCWidget resource cleanup.
+Regression tests pass; no second live attempt used these fixes. `live_env`
+explicitly propagates the identity from the corresponding fresh preflight and
+checks it before stopping any Snap. Prepared/copied restoration scripts remain
+immutable backup artifacts, not overwritten by subsequent source edits.
+
 Run from the dedicated M1 worktree using its independent environment:
 
 ```sh
