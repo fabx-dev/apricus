@@ -191,10 +191,36 @@ def test_same_uid_independent_gjs_is_rejected(monkeypatch):
     assert bridge.registration.status() is None
 
 
+def test_unauthorized_sender_cannot_replace_or_invalidate_valid_state(monkeypatch):
+    bridge, bus, glib = fake_bridge(monkeypatch, [":1.14"])
+    token = register(bridge.registration)
+    deadline = bridge.registration.deadline
+    assert "not current" in authenticate(bridge, bus, glib, sender=":1.99").error
+    assert bridge.registration.generation == token
+    assert bridge.registration.deadline == deadline
+    assert bridge.registration.status()[0] == "active"
+
+
 def test_owner_changed_during_authentication(monkeypatch):
     bridge, bus, glib = fake_bridge(monkeypatch, [":1.14", ":1.15"])
     assert "ownership changed" in authenticate(bridge, bus, glib).error
     assert bridge.registration.status() is None
+
+
+def test_ownership_epoch_invalidates_even_if_owner_returns_to_same_name(monkeypatch):
+    bridge, bus, glib = fake_bridge(monkeypatch, [":1.14", ":1.14"])
+    register(bridge.registration)
+    query = bridge._query
+
+    def ownership_event(method, argument, callback):
+        if method == "GetConnectionCredentials":
+            bridge._invalidate("shell_owner_changed")
+        query(method, argument, callback)
+
+    bridge._query = ownership_event
+    assert "ownership changed" in authenticate(bridge, bus, glib).error
+    assert bridge.registration.status()[0] == "unknown"
+    assert bridge.pending == 0 and not bridge.senders
 
 
 def test_wrong_uid_fails_closed(monkeypatch):
@@ -224,6 +250,27 @@ def test_credential_denial_fails_closed(monkeypatch):
     bus.call_finish = lambda _: (_ for _ in ()).throw(RuntimeError("AppArmor denied"))
     bridge._query = lambda _method, _arg, callback: callback(bus, None)
     assert "AppArmor denied" in authenticate(bridge, bus, glib).error
+
+
+def test_credential_failure_does_not_extend_previous_valid_lease(monkeypatch):
+    bridge, bus, glib = fake_bridge(monkeypatch, [":1.14"])
+    token = register(bridge.registration)
+    deadline = bridge.registration.deadline
+    query = bridge._query
+
+    def denied_credentials(method, argument, callback):
+        if method == "GetConnectionCredentials":
+            denied_bus = SimpleNamespace(
+                call_finish=lambda _: (_ for _ in ()).throw(RuntimeError("credentials denied"))
+            )
+            callback(denied_bus, None)
+        else:
+            query(method, argument, callback)
+
+    bridge._query = denied_credentials
+    assert "credentials denied" in authenticate(bridge, bus, glib).error
+    assert bridge.registration.generation == token
+    assert bridge.registration.deadline == deadline
 
 
 def test_bridge_absent_and_host_receipt_fallback(monkeypatch):
@@ -258,6 +305,23 @@ def test_expired_bridge_not_masked_by_receipt(monkeypatch, state):
         gnome_shell, "read_host_receipt", lambda *a, **kw: pytest.fail("stale fallback")
     )
     assert gnome_shell.integration_status([])[0] == "unknown"
+
+
+@pytest.mark.parametrize("expected", ["loaded", "disabled", "unknown"])
+def test_observed_bridge_state_takes_priority_over_receipt(monkeypatch, state, expected):
+    registration, _ = state
+    token = registration.register(":1.14", 1, 1, True, expected != "loaded", 0)
+    if expected == "disabled":
+        registration.unregister(":1.14", token, 2)
+    elif expected == "unknown":
+        registration.invalidate("shell_owner_changed")
+    monkeypatch.setattr(gnome_bridge, "_bridge", SimpleNamespace(registration=registration))
+    monkeypatch.setattr(gnome_shell, "is_gnome", lambda: True)
+    monkeypatch.setattr(gnome_shell, "is_wayland", lambda: True)
+    monkeypatch.setattr(
+        gnome_shell, "read_host_receipt", lambda *a, **kw: pytest.fail("receipt masked bridge")
+    )
+    assert gnome_shell.integration_status([])[0] == expected
 
 
 def test_real_private_bus_roundtrip():

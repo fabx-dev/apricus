@@ -190,7 +190,7 @@ apricus --systemd-enable    # disable anytime with: apricus --systemd-disable
      | 49 | yes (background group, restack, overview hooks identical to 50) | no | yes (pending runtime test) |
      | 50 | yes | yes, Wayland + DING | yes |
      | 51 | yes (same APIs on main branch) | no | yes (pending runtime test) |
-   - **Setup status**: on GNOME Wayland, Settings shows a *Desktop icons* row with an ON/OFF switch (Active / disabled / needs logout-login / not installed / incompatible / error / unavailable) plus, for Snap/Flatpak without the extension, guided host installation (Prepare → copy the shown command → Check again). The row never appears on other sessions.
+   - **Setup status**: on GNOME Wayland, Settings distinguishes loaded, operational/Active, disabled and unavailable states. The strict-Snap test build receives automatic status and a wallpaper-adoption count from the updated host extension; **zero wallpaper windows does not mean disabled**. Snap/Flatpak switches remain read-only, with guided host installation and host-check fallback when needed. The row never appears on other sessions. See [bridge protocol, validation and limits](docs/notes/gnome-status-bridge.md); this branch is not a new Store release.
    - **Updating the host extension**: re-run the same install command (Settings shows it, or `install-host.sh --zip <file.zip> --enable`): files are overwritten in place, then log out/in. Removing Apricus (Snap/Flatpak/deb/rpm) never touches `~/.local/share/gnome-shell/extensions/` — to remove it manually: `gnome-extensions disable apricus-integration@fabx-dev` (if enabled), log out/in, then delete `~/.local/share/gnome-shell/extensions/apricus-integration@fabx-dev`. No `sudo` is ever needed for the per-user install.
    - **Troubleshooting**: after install+enable, the video stays behind the icons only once the Shell loads the extension (logout/login required). Confirm with `journalctl --user -g apricus-integration` (expect `enabled, code revision N` and `adopted "…" into the background layer`). If the extension disappears after a GNOME upgrade, it was fenced by `shell-version`: wait for an Apricus update that declares the new Shell.
 
@@ -232,12 +232,28 @@ for GNOME extension state changes. Refreshing the panel never enables or disable
 the extension. A failed switch operation restores the observed GNOME state.
 
 Snap/Flatpak show a read-only switch and host commands because their sandbox
-cannot control GNOME Shell. **Prepare** exports the helpers; before installation
+cannot control GNOME Shell. In the strict-Snap test build, the updated extension
+pushes status to a dedicated, versioned session D-Bus service in the GUI.
+Register/Update/Unregister and a 90-second lease (renewed every 30 seconds)
+provide automatic updates without **Check again**; operational status and the
+number of adopted wallpaper windows are separate. The receiver validates the
+sender against the current Shell bus owner and daemon credentials. This is
+not cryptographic certification of an extension. No Snap → host signals or
+generic player RPC are exposed to the Shell. The slot needs Snap Store name
+approval before distribution; none has been requested in this work.
+
+Native and Flatpak keep their existing detection paths. When the bridge has
+not provided evidence, **Prepare** exports the helpers; before installation
 it offers the install command, and afterwards a separate `--check` command.
 **Verify status** always prepares the verification command, even when the host
 state is unavailable.
 `install-host.sh --zip <path> --check` only refreshes `status.json`; it never
 copies extension files or enables the extension. Run this command after logging
-back in, then use **Check again** to read the result. The last host-check time is
+back in, then use **Check again** for this fallback. The last host-check time is
 shown, and after 15 minutes the result is explicitly marked expired. A failed
 host query is reported as unavailable, never as a disabled extension.
+The receipt is unsigned evidence of a past check, not continuous liveness;
+once the current GUI has a valid bridge registration, an old receipt cannot
+hide its later invalidation. [Validation notes](docs/notes/gnome-status-bridge.md)
+separate real strict-Snap results from the VM suspend blocker and the existing
+playlist-heading limitation.

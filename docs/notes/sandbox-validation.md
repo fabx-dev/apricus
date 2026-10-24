@@ -1,13 +1,17 @@
 # Snap / Flatpak / native packages: validation procedures
 
-Status 2026-10-23, branch `feat/gnome-wayland-integration`.
-Rule: never claim a clean-installation success without executing it.
-Anything below marked NOT EXECUTED was not executed — follow the
-procedure on adequate hardware to close the gap.
+Updated 2026-10-24, branch `feat/gnome-wayland-integration`.
+Rule: never claim a runtime or clean-profile success without executing it.
+The current protocol, evidence matrix and unresolved limits are in
+[gnome-status-bridge.md](gnome-status-bridge.md). Earlier conclusions that
+Snap could *never* show automatic Active are superseded by the verified
+Shell → dedicated Snap slot direction; direct Snap → Shell queries remain
+denied. No sandbox bypass is involved.
 
-## 1. Snap — why local validation is blocked here
+## 1. Snap — CI build and real strict validation
 
-Precise blockers on this machine (no workaround attempted, as instructed):
+Local **compilation** still has these constraints; they are not blockers to
+installing an artifact from the separate test-only CI workflow:
 
 1. The repo builds the snap with `sudo snapcraft pack --destructive-mode`
    (see `.github/workflows/release-packages.yml`). Destructive mode
@@ -21,32 +25,47 @@ Precise blockers on this machine (no workaround attempted, as instructed):
 4. `sudo -n true` fails: passwordless sudo is unavailable and no
    interactive authentication exists in this session.
 
-Statically verified instead (no root needed):
+Packaging inspection and real installation were both executed:
 ` snapcraft expand-extensions` resolves to `confinement: strict`,
-`grade: stable`, with only standard desktop plugs (home, network,
+`grade: stable`, with standard desktop plugs (home, network,
 network-bind, network-status, audio-playback, opengl, x11, wayland,
 desktop, desktop-legacy, gsettings, screen-inhibit-control) —
 no `personal-files`, no classic confinement, no broad filesystem
-access. Meson stages the guided-install helpers under
+access. The new **session D-Bus slot** owns only
+`io.github.fabxdev.Apricus.GnomeBridge`; it is not an outgoing Shell plug.
+Store distribution of this name requires review/snap-declaration approval,
+which has not been requested. Meson stages the guided-install helpers under
 `share/apricus/gnome-extension/` (verified in DESTDIR staging,
 executable bit preserved), matching the `$SNAP/...` lookup in
 `src/apricus/gnome_shell.py`.
 
-### Exact procedure for a dedicated VM (Ubuntu 24.04+, GNOME Wayland)
+Runtime `97e3684` was built by
+[artifact-only CI](https://github.com/fabx-dev/apricus/actions/runs/40075441639),
+downloaded, SHA/content-verified, and installed by the user as local revision
+x2. The real Shell sender, enforce profile, same-UID impostor rejection,
+automatic state/reconnection and bounded lease were exercised; x2 additionally
+passed video/playlist/DING/Overview and the GTK4 timer regression check.
+The precise version split and limitations are in the bridge evidence matrix.
+
+### Procedure for an isolated test environment (GNOME Wayland)
 
 ```
-# 0. Fresh VM (GNOME Boxes/QEMU), GNOME Wayland session, user with sudo.
-#    Snapshot BEFORE installing anything (to test removal later).
-sudo snap install snapcraft --classic
-cd ~/apricus   # feat/gnome-wayland-integration, clean checkout
-sudo snapcraft pack --destructive-mode
-ls apricus_*.snap
+# 0. Preserve configuration and back up the complete host extension first.
+#    Prepare a terminal-only rollback before replacing any installed file.
+#    Use the artifact-only build on its supported Ubuntu 24.04 runner;
+#    do not run destructive core24 compilation on this Ubuntu 26.04 desktop.
+#    Verify artifact provenance, checksum and strict manifest before install.
 # 1. Clean profile: fresh user, no ~/.local/share/gnome-shell/extensions/
 #    apricus-integration*, no ~/.config/apricus, no dev install.
-sudo snap install --dangerous ./apricus_*.snap
-snap info apricus | grep -i confinement   # expect: strict
-apricus &
-# 2. Settings → Desktop icons → expect "Not installed".
+sudo snap install --dangerous ./apricus_2.0.7_amd64.snap
+# Same command updates an already installed local snap. Do NOT use
+# snap refresh --dangerous: refresh has no --dangerous option.
+snap connections apricus
+# Verify the installed manifest and the process's enforce profile too;
+# a running process or manifest alone does not prove a successful bridge.
+snap run apricus &
+# 2. With no bridge and no usable host receipt, expect "Status unavailable",
+#    NOT "Not installed": the snap cannot see the host extension directory.
 # 3. Click Prepare → copy the shown command (runs entirely in the
 #    sandbox; files land in ~/snap/apricus/common/gnome-integration,
 #    the SAME path visible on the host by Snap design).
@@ -55,12 +74,15 @@ apricus &
 #        --zip ~/snap/apricus/common/gnome-integration/apricus-integration@fabx-dev.zip \
 #        --enable
 #    Confirm: ~/.local/share/gnome-shell/extensions/apricus-integration@fabx-dev/
-#    contains metadata.json + extension.js (byte-identical to the ZIP).
+#    contains metadata.json + extension.js + statusBridge.js, identical to ZIP.
 # 5. Log out/in (Shell discovers new extensions only at login).
-#    Settings → Check again → expect Active (switch ON).
+#    Only the USER logs out/in. With the updated bridge extension and GUI,
+#    expect automatic Active (read-only switch ON), without Check again.
+#    Zero adopted windows is valid when no video is open.
+#    If the bridge is unavailable, the bounded host-receipt path remains.
 # 6. Start a video wallpaper: icons visible/clickable above video.
-# 7. Update flow: reinstall a newer snap, reopen Settings, re-run the
-#    shown command, log out/in, confirm Active again.
+# 7. Update flow: install a newer local artifact; update host extension only
+#    if its code changed, preserving backup/rollback; any logout stays manual.
 # 8. Removal flow: `sudo snap remove apricus` → confirm the host
 #    ~/.local/.../apricus-integration@fabx-dev REMAINS (documented,
 #    must be removed manually per README), wallpaper gone.
@@ -89,6 +111,21 @@ Manifest fix applied on this branch: dropped the obsolete
 `-Dlibdir=lib` for `totem-pl-parser` (commit `276968f`) — current
 flatpak-builder injects `--libdir` itself and the duplicate flag
 aborted the build. Rebuilt green after the fix.
+
+For `97e3684`, rebuilt locally without extra permissions and installed only
+the temporary `bridge-test` ref. The fresh-config GUI smoke passed: responsive
+pages, existing live Active detection and 65s without traceback. This is NOT
+a new full video/playlist validation of that Flatpak build. The Snap bridge
+is not started there; its owned name remained absent. Temporary app removed
+without `--delete-data`, previous config/data compared and preserved.
+
+Isolation detail: passing `--env=XDG_CONFIG_HOME=...` to `flatpak run` did not
+select the intended directory in this environment. The first launch was
+invalidated and stopped; contents were unchanged, one cache-image timestamp
+was restored. The corrected test uses `flatpak run --command=env APP ...`
+to set the XDG variables inside the unchanged sandbox, with a preflight
+`CONFIG_PATH` check BEFORE GUI startup. This adds no filesystem permissions.
+Never claim isolation solely from the launch command; verify the actual path.
 
 ### Clean-profile procedure (needs a second user/session)
 
@@ -123,9 +160,9 @@ flatpak run io.github.fabx_dev.Apricus &
   (no local `rpmbuild`). Install test: same VM procedure with
   `rpm -i` / `rpm -e` on a Fedora/RHEL-family GNOME VM — NOT EXECUTED.
 
-## 4. Snap: why self-detection cannot confirm Active (verified, by design)
+## 4. Snap: direct query limits versus the inbound status bridge
 
-Four independent states must be distinguished:
+Direct legacy observations must not be confused with inbound bridge evidence:
 
 - **installed**: extension files where GNOME Shell looks
   (`~/.local/share/gnome-shell/extensions/`). Verifiable from the
@@ -138,23 +175,28 @@ Four independent states must be distinguished:
   shipped) AND via the `gsettings` plug's dconf access. Deliberately
   NOT wired: without Shell confirmation it cannot distinguish
   "enabled, waiting for login" from "enabled and loaded".
-- **loaded**: Shell reports state ENABLED(1). Verifiable: NO.
+- **loaded via direct Shell API**: Shell reports state ENABLED(1).
+  The legacy outgoing query remains unavailable:
   `org.gnome.Shell.Extensions` has no allow rule in the snap's
   AppArmor profile (verified: only `org.freedesktop.DBus`,
   portals, a11y, StatusNotifier peers); calls are denied, same as
   the ScreenSaver introspection denials in the logs.
-- **operational**: loaded + video actually below icons. Only the user
-  can confirm visually.
+- **bridge evidence**: the host Shell sends loaded/operational/adopted fields
+  to a dedicated Snap service. This direction works under enforce policy.
+  Operational means initialized/healthy self-report; adopted=0 is valid.
+  Neither field proves decoded frames or visual icon ordering by itself.
 
-Consequences (all verified live):
+Current consequences:
 
-- The guided flow works up to host install + enable. The Settings row
-  can never show Active from inside the snap; with the reorder in
-  `integration_status()` it honestly reports "Status unavailable"
-  instead of the previous misleading "not installed".
-- `prepare_host_install()` + `install-host.sh` need no change: files
-  land in the sandbox-identical export dir, the host command is
-  copy-paste runnable (after the `set_content` clipboard fix).
+- With updated host extension + GUI endpoint, Settings shows automatic Active
+  and adoption count; disable, enable, restart and lease expiry update it
+  without Check again. It cannot toggle host enable/disable from the sandbox.
+- If bridge evidence is absent, use the host-written `status.json` fallback
+  (unsigned, 15-minute age limit). After a valid bridge registration in this
+  GUI lifetime, stale receipt positives cannot mask bridge invalidation.
+- `prepare_host_install()` and the installer also ship statusBridge.js;
+  files land in the sandbox-identical export dir. Explicit host install and
+  manual logout/login remain required for initial/revised extension loading.
 - The `org.freedesktop.Flatpak` talk-name stays: `backends.py`
   needs `flatpak-spawn --host gsettings` for the static wallpaper.
 - Schema staging (`gnome-shell-common`) was evaluated and REJECTED:
@@ -162,7 +204,14 @@ Consequences (all verified live):
   *loaded*, while `integration_active()`'s enabled-fallback would
   then stand the legacy guard down on a mere "enabled" — less safe
   than today's guard-up behavior when the Shell state is unknown.
-  No new permissions were added.
+  Adding the dedicated inbound slot does not make that enabled-only fallback
+  safer or add permission to query/control the Shell directly.
+
+The lease is 90s with renewal every 30s. Duplicate or old-generation updates
+cannot refresh it. A controlled 95.5s GUI freeze + timed-out Unregister led
+to UNKNOWN on unfreeze and a fresh registration recovered Active. This was
+not a deliberate process crash. Genuine suspend/resume remains BLOCKED by
+the VM's same freeze reproduced with the original extension and no bridge.
 
 ## 5. Release approval gate (documented, not applied)
 
@@ -180,5 +229,8 @@ Recommended hardening for `fabx-dev/apricus` (Settings → Environments):
 This was intentionally NOT applied here: it changes release
 configuration, and the task requires documenting — not modifying —
 release safety. Rulesets `Protect master` / `Protect release tags`
-verified active via API; no workflow on this branch can publish:
-feature-branch pushes trigger only the CI `pull_request` job.
+previously checked via API. This work uses only CI and the artifact-only PR
+Snap job; no release workflow dispatch, tags, Store publication/approval requests, environment,
+ruleset or secrets changes were performed. Their mere presence is not a
+claim that future publication is impossible; release approval remains a
+separate maintainer action outside this task.
