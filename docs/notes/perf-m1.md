@@ -1423,5 +1423,68 @@ AppArmor, login/session or package change occurred. No push, PR, merge, tag,
 release or publication.
 
 **Stopped after a successful smoke test. Do not start Snap/Flatpak package
-validation.** Awaiting a separate decision on the deeper functional matrix,
-benchmarks, or reinstalling the previous Snap.
+validation.** The matrix run below supersedes this checkpoint.
+
+### Full functional matrix + benchmarks ([validation date omitted])
+
+Same unconfined source setup, Snap still removed, no Landlock, no production
+changes. Live root `<private-evidence-dir>`, driver
+`tests/manual/m1_native/matrix.py`, sampler `tests/manual/m1_native/bench.py`
+(test tooling only). STOP latency samples include gdbus CLI launch overhead and
+are reported as observed ranges, not calibrated claims.
+
+| # | Test | Result |
+|---|---|---|
+| 1 | STOP persistence across server reload (same reload() path used at startup) | PASS: reload while stopped spawns no player, state stays stopped, config true |
+| 2 | Wallpaper change while STOP active | PASS: selection updated, stopped background re-applied, no player spawned |
+| 3 | Double STOP / double RESUME idempotency | PASS: single player after double resume, state consistent |
+| 4 | Playlist STOP/RESUME/advance (2s+3s clips) | PASS: 5 auto-advances while playing, zero advances during 8s STOP, advance resumes with fresh player |
+| 5 | Controlled HTTP stream (loopback) | NOT APPLICABLE as playback: app SSRF guard rejects local addresses by design with a clean warning, no crash; STOP/RESUME lifecycle around it works |
+| 5b | Public HTTP stream (1 MB test file) | PASS: RESUME playing in 3.2s, first-frame log 4.8s, stream thumbnail static cached (415 KB PNG) |
+| 6 | Local web wallpaper lifecycle | PASS: user confirmed rendered page; WebKit Network+Web processes present; STOP kills player; snapshot-to-static fails gracefully (cairo converter DEBUG, falls back to neutral PNG, no crash) |
+| 7 | Static disabled | PASS: STOP leaves background untouched (URI byte-identical before/after) |
+| 7b | Static re-enabled while stopped | PASS: Hawaii cache re-applied without player |
+| 8 | Missing static fallback | PASS: unknown video while stopped applies valid 69-byte `stopped-background.png` |
+| 9 | Repeated STOP/RESUME cycles (5x) | PASS: all recorded player PIDs gone, only server remains |
+| 10 | Orphan VLC/FFmpeg/WebKit processes | PASS: none; HTTP helper killed after tests |
+| 11 | Extension adoption of new windows | PASS: adoption events for initial and resumed windows |
+| 12 | DING clicks/dragging + Overview after cycles | PASS: user confirmed both with M1 playing |
+
+H.264 teardown lines recur after STOP during player teardown (non-fatal, no
+crash, no blocked release, RESUME unaffected). Web snapshot cairo-converter
+failure is a graceful DEBUG fallback, not an error. No production fix
+introduced.
+
+### Benchmarks (GNOME Wayland, 15 CPUs, video Hawaii 1080p)
+
+CPU% is machine-normalized (100% = all 15 cores); single-core equivalent ≈15x.
+RSS/PSS are whole-tree sums (server + tracker + forkserver + player).
+
+| State | CPU mean / max | RSS mean | PSS mean | Procs | Threads |
+|---|---|---|---|---|---|
+| PLAYING 60s | 2.61% / 2.95% (≈39% one core) | 420 MB | 330 MB | 4 | 28 |
+| STOPPED 60s | 0.00% / 0.00% | 90 MB | 51 MB | 3 | 7 |
+| RESUMED 60s | 2.56% / 2.97% (≈38% one core) | 420 MB | 330 MB | 4 | 28 |
+
+STOP latency observed (8 samples, gdbus-inclusive): 36–141 ms.
+RESUME to `playing` observed: 570 ms (playlist), 768–866 ms (video),
+1342 ms (web), 3189 ms (public stream incl. extraction). First-frame log after
+RESUME: ~1.0–4.8 s depending on mode. Visible-frame user confirmations were
+obtained for video and web; no calibrated visible-latency claim is made.
+No RESUME CPU spike beyond the steady playing level was observed in the 60s
+resumed window. Xvfb numbers are not compared here.
+
+### Final disposition (matrix run)
+
+M1 and all children fully stopped (no Apricus/FFmpeg/WebKit processes, no
+failure record); native config/cache byte-identical to the fresh backup;
+original URI values restored (missing-file target accepted by the user); Snap
+still not installed; PoC, host extension and DING ACTIVE and verified. No
+restart/reinstall performed automatically. No production code, integration
+branch, PR #1, AppArmor, login/session or package change. No push, PR, merge,
+tag, release or publication. Recovery tooling unchanged in behavior; matrix and
+sampler helpers added as test-only files with 2 pre-existing recovery tests
+still passing.
+
+**Stopped after a complete functional matrix and benchmarks. Do not start
+Snap/Flatpak package validation.**
