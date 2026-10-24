@@ -75,7 +75,39 @@ def snapshot(directory, *, media=None, state=None):
         status=Path("/proc/self/status").read_text(),
     )
     if media is not None:
-        record["media_stats"] = repr(media.get_stats())
+        import vlc
+
+        stats = vlc.MediaStats()
+        record["media_stats_available"] = bool(media.get_stats(stats))
+        record["media_stats"] = {name: getattr(stats, name) for name, _kind in stats._fields_}
     path = directory / f"vlc-snapshot-{os.getpid()}-{record['monotonic_ns']}.json"
     path.write_text(json.dumps(record, indent=2))
     return path
+
+
+def cleanup(widget, directory, original_cleanup):
+    """Diagnostics must never prevent production resource cleanup."""
+    logger = getattr(widget, "_m1_native_log", None)
+    if logger is not None:
+        errors = []
+        try:
+            snapshot(
+                directory,
+                media=widget.player.get_media() if widget.player else None,
+                state="before-vlc-cleanup",
+            )
+        except Exception as error:
+            errors.append(repr(error))
+        try:
+            logger.close()
+        except Exception as error:
+            errors.append(repr(error))
+        widget._m1_native_log = None
+        if errors:
+            try:
+                (Path(directory) / f"vlc-diagnostic-errors-{os.getpid()}.json").write_text(
+                    json.dumps(errors)
+                )
+            except OSError:
+                pass
+    return original_cleanup(widget)

@@ -163,3 +163,36 @@ def test_future_native_logging_lifetime_without_loading_vlc(tmp_path):
     logger.close()
     logger.close()
     assert calls == ["set", "unset"]
+
+
+def test_native_snapshot_allocates_required_media_stats(tmp_path):
+    module = manual_module("vlc_diagnostics")
+    vlc = pytest.importorskip("vlc")
+
+    class FakeMedia:
+        def get_stats(self, stats):
+            assert isinstance(stats, vlc.MediaStats)
+            stats.decoded_video = 7
+            return 1
+
+    record = json.loads(module.snapshot(tmp_path, media=FakeMedia()).read_text())
+    assert record["media_stats_available"] is True
+    assert record["media_stats"]["decoded_video"] == 7
+
+
+def test_diagnostic_failure_does_not_block_player_cleanup(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+
+    module = manual_module("vlc_diagnostics")
+    calls = []
+    widget = SimpleNamespace(
+        player=None, _m1_native_log=SimpleNamespace(close=lambda: calls.append("close"))
+    )
+
+    def fail(*args, **kwargs):
+        raise TypeError("snapshot failed")
+
+    monkeypatch.setattr(module, "snapshot", fail)
+    module.cleanup(widget, tmp_path, lambda obj: calls.append("production_cleanup"))
+    assert calls == ["close", "production_cleanup"]
+    assert widget._m1_native_log is None

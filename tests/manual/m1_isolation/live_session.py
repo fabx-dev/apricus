@@ -403,8 +403,11 @@ def restore(root):
 
 
 def live_env(root):
+    from landlock_guard import check_dconf
     from launcher import ADAPTER, WORKTREE
 
+    marker = read(root / "report.json")["dconf_exception"]["identity"]
+    check_dconf(marker)
     before = read(root / "host-before.json")["environment"]
     expected = dict(before)
     # This is Apricus's existing native GTK3/XWayland selection, not a change
@@ -414,6 +417,7 @@ def live_env(root):
     env.update(
         APRICUS_M1_PREFLIGHT_ROOT=str(root),
         APRICUS_M1_PHASE="live",
+        APRICUS_M1_DCONF_IDENTITY=json.dumps(marker),
         APRICUS_M1_HOST_ENV=json.dumps(expected),
         GDK_BACKEND="x11",
         PYTHONPATH=os.pathsep.join((str(ADAPTER), str(WORKTREE / "src"))),
@@ -436,6 +440,8 @@ def live_env(root):
 def supervise(root):
     os.umask(0o077)
     manifest = verify(root)
+    # Validate the approved existing-inode exception before touching the Snap.
+    env = live_env(root)
     state = read(root / "state.json")
     if state.get("restored") or state.get("snap_stopped"):
         raise RuntimeError("Fresh prepared session required")
@@ -476,7 +482,22 @@ def supervise(root):
         env = live_env(root)
         with (root / "evidence/live-server.log").open("w") as log:
             process = subprocess.Popen(
-                [str(pathlib.Path(sys.executable)), "-m", "apricus", "-b", "-d"],
+                [
+                    "strace",
+                    "-f",
+                    "-yy",
+                    "-s",
+                    "256",
+                    "-o",
+                    str(root / "evidence/live.trace"),
+                    "-e",
+                    "trace=openat,mmap,munmap,ftruncate,memfd_create,shmget,shmat,pwrite64",
+                    str(pathlib.Path(sys.executable)),
+                    "-m",
+                    "apricus",
+                    "-b",
+                    "-d",
+                ],
                 env=env,
                 stdin=subprocess.DEVNULL,
                 stdout=log,
@@ -484,7 +505,7 @@ def supervise(root):
                 start_new_session=True,
             )
         state = read(root / "state.json")
-        state["m1_server"] = identity(process.pid)
+        state["m1_launch_root"] = identity(process.pid)
         write(root / "state.json", state)
         remember(root, process.pid)
         deadline = time.monotonic() + 30
@@ -492,8 +513,14 @@ def supervise(root):
             if process.poll() is not None:
                 raise RuntimeError(f"M1 server exited at startup: {process.returncode}")
             remember(root, process.pid)
+            runtime_errors(root)
             try:
-                if owner_pid() == process.pid and playback() == "playing":
+                pid = owner_pid()
+                if pid in {row["pid"] for row in tree(process.pid)}:
+                    state = read(root / "state.json")
+                    state["m1_server"] = identity(pid)
+                    write(root / "state.json", state)
+                if pid in {row["pid"] for row in tree(process.pid)} and playback() == "playing":
                     break
             except subprocess.SubprocessError:
                 pass
@@ -502,10 +529,10 @@ def supervise(root):
             raise RuntimeError("M1 did not reach VLC playing")
         write(
             root / "ready.json",
-            dict(pid=process.pid, time=time.time(), state="playing", visible_frame="NOT MEASURED"),
+            dict(pid=pid, time=time.time(), state="playing", visible_frame="NOT MEASURED"),
         )
         print(
-            f"READY: {root}; M1 server {process.pid}; visible frame requires user confirmation",
+            f"READY: {root}; M1 server {pid}; visible frame requires user confirmation",
             flush=True,
         )
         expire = time.monotonic() + 1200
@@ -515,9 +542,7 @@ def supervise(root):
             remember(root, process.pid)
             if snap_rows():
                 raise RuntimeError("A concurrent Snap appeared")
-            log = (root / "evidence/live-server.log").read_text(errors="replace")
-            if "Traceback (most recent call last)" in log or "bootstrap failed closed" in log:
-                raise RuntimeError("M1 Python/bootstrap error; interrupt and restore")
+            runtime_errors(root)
             time.sleep(1)
     except BaseException as error:
         write(root / "failure.json", dict(error=str(error), time=time.time()))
@@ -526,6 +551,29 @@ def supervise(root):
         restore(root)
         if process:
             process.wait(timeout=10)
+
+
+def runtime_errors(root):
+    from landlock_guard import check_dconf
+
+    check_dconf(read(root / "report.json")["dconf_exception"]["identity"])
+    signatures = (
+        "Traceback (most recent call last)",
+        "bootstrap failed closed",
+        "dconf-CRITICAL",
+        "get_buffer() failed",
+        "thread_get_buffer() failed",
+        "no frame!",
+        "video output creation failed",
+        "failed to create video output",
+    )
+    for path in (root / "evidence").glob("*.log"):
+        log = path.read_text(errors="replace")
+        for signature in signatures:
+            if signature in log:
+                raise RuntimeError(
+                    f"Native/runtime error in {path.name}: {signature}; restore immediately"
+                )
 
 
 def main():

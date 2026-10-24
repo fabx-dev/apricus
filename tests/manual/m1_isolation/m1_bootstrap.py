@@ -88,6 +88,22 @@ def patch_loaded(name, module):
         module.ControlPanel.on_choose_video_dir = denied
         module.ControlPanel.on_webpage_choose_file = denied
     if name == "apricus.player.video_player":
+        if os.environ.get("APRICUS_M1_PHASE") == "live":
+            from vlc_diagnostics import NativeLog, cleanup, snapshot
+
+            original_init = module.VLCWidget.__init__
+            original_cleanup = module.VLCWidget.cleanup
+
+            def diagnostic_init(widget, *args, **kwargs):
+                original_init(widget, *args, **kwargs)
+                widget._m1_native_log = NativeLog(widget.instance, EVIDENCE)
+                snapshot(EVIDENCE, state="vlc-widget-created-before-media")
+
+            def diagnostic_cleanup(widget):
+                return cleanup(widget, EVIDENCE, original_cleanup)
+
+            module.VLCWidget.__init__ = diagnostic_init
+            module.VLCWidget.cleanup = diagnostic_cleanup
         original_options = module._vlc_options
         config = str(PROFILE / "config/vlc/vlcrc")
 
