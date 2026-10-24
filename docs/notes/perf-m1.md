@@ -1346,6 +1346,82 @@ AppArmor, login/session or package change occurred. No push, PR, merge, tag,
 release or publication.
 
 **Stopped after an interrupted smoke test. Do not start Snap/Flatpak package
-validation.** Awaiting a separate decision on reinstalling the previous Snap or
-leaving source M1 available, plus any reproduced-bug fix before retrying RESUME,
-static-fallback verification and benchmarks.
+validation.** The section below supersedes it with the authorized second run.
+
+### Second native attempt: full smoke PASS ([validation date omitted])
+
+Fresh recovery set `<private-evidence-dir>` preserved the MODE_NULL
+original native config/cache and the missing-file URI settings chosen by the
+user. The supervisor was corrected (test tooling only) to record H.264 teardown
+lines without auto-aborting on them or on blue-background observations; it still
+aborts on Python tracebacks, unexpected exit or uncontrolled processes. No
+production renderer/VLC option was changed.
+
+STOP timeline tooling `tests/manual/m1_native/stop_timeline.py` records GNOME
+state before STOP, the expected static asset, player death and every later URI
+change over 5s. Timeline `<private-evidence-file>` (52 rows) establishes:
+
+- Before STOP, GNOME already pointed to the native static asset
+  `<private-file-uri>`.
+- The expected PNG existed throughout: 1920x1080, 8-bit/color RGB,
+  1251009 bytes, valid PNG signature.
+- After the D-Bus STOP reply (122.72 ms round trip including gdbus launch, not
+  a latency claim), the URI was unchanged.
+- Player PIDs reached zero and no later GSettings rewrite to blue occurred.
+- Final state `is_stopped=true`, server alive.
+
+The blue origin is therefore resolved: the live desktop's blue screen is GNOME's
+`primary-color #023c88` fallback when `picture-uri` points to a missing file
+(observed after Snap removal restores the old `~/snap/apricus/x3/...` URI). It
+is not the STOP fallback path, which leaves the existing valid native static
+URI untouched. No fallback-order, PNG-generation or PNG-application defect was
+reproduced in this run. The 16-bit Mutter rejection path was not triggered; the
+generated cache is valid 8-bit RGB.
+
+H.264 diagnosis (separate, same run): 34 teardown lines
+(`get_buffer() failed`, `thread_get_buffer() failed`, `no frame!`, two decoder
+contexts) appear in `<private-evidence-file>` after the STOP request during player
+teardown. They do not precede STOP, do not crash the server, do not prevent
+player release (old PID gone, server alive), and leave no orphans. RESUME then
+created player [process ID omitted] and reached `playing`. No normal-quit-without-STOP
+comparison was run, no VLC option was changed, and no decoder/renderer cause is
+claimed. The errors remain non-fatal teardown noise for this configuration.
+
+| Check | Result |
+|---|---|
+| Snap absent before M1, no competing wallpaper instance | PASS |
+| Source server startup and VLC `playing` property | PASS as internal-state observation only |
+| First Hawaii frame actually visible | PASS: user confirmed animated video |
+| Extension adoption of source window | PASS: background-layer adoption logged for initial and resumed windows |
+| STOP command, player termination, server survival | PASS |
+| STOP persisted (`is_stopped=true`) | PASS |
+| STOP/RESUME latency | NOT TESTED as benchmarks; STOP gdbus round trip 122.72 ms and RESUME round trip 23.40 ms include process launch, not latency claims |
+| Static wallpaper visibly correct | PASS: user confirmed still Hawaii photo; URI/PNG timeline corroborates |
+| RESUME new player creation and `playing` | PASS: new PID [process ID omitted], no overlap with STOP PID set |
+| First frame after RESUME visibly animated | PASS: user confirmed |
+| New window adopted after RESUME | PASS: second adoption event logged |
+| DING clicks/dragging during resumed M1 | PASS: user confirmed |
+| Overview during resumed M1 | PASS: user confirmed |
+| Playlist/stream/web/persistence/static matrix | NOT TESTED in this authorized smoke scope |
+| CPU >=60s, RSS/PSS/process/thread measurements | NOT TESTED: benchmarks not started |
+| Source termination and child cleanup | PASS: 10 recorded identities absent, supervisor/watchdog exited cleanly |
+| Native config/cache restoration | PASS: byte-identical to fresh backup |
+| Original URI values restored | PASS for values; missing-file target remains as the user accepted |
+| Snap reinstall | NOT PERFORMED: left uninstalled per current user decision |
+| Bridge service telemetry | NOT TESTED as a service check; separate bridge name remains unowned |
+| Production bug fix | NONE: no reproducible M1 bug established; no production file changed |
+
+No measurement here is imported from Xvfb or presented as a GNOME performance
+result.
+
+### Final disposition (second native attempt)
+
+M1 source is fully stopped; native data and original URI values are restored;
+Snap remains removed; PoC, extension and DING are untouched. No restart/reinstall
+was performed automatically. No production code, integration branch, PR #1,
+AppArmor, login/session or package change occurred. No push, PR, merge, tag,
+release or publication.
+
+**Stopped after a successful smoke test. Do not start Snap/Flatpak package
+validation.** Awaiting a separate decision on the deeper functional matrix,
+benchmarks, or reinstalling the previous Snap.

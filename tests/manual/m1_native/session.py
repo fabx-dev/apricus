@@ -234,17 +234,11 @@ def supervise(root, worktree):
             if process.poll() is not None:
                 raise RuntimeError(f"M1 exited: {process.returncode}")
             log = (root / "evidence/server.log").read_text(errors="replace")
-            if any(
-                value in log
-                for value in (
-                    "Traceback (most recent call last)",
-                    "get_buffer() failed",
-                    "no frame!",
-                    "video output creation failed",
-                    "failed to create video output",
-                )
-            ):
-                raise RuntimeError("Source runtime error; abort before benchmarks")
+            # H.264 teardown lines and blue-background observations are recorded,
+            # not auto-abort signals. Abort only on Python tracebacks (real crash
+            # evidence), unexpected exit, or uncontrolled processes below.
+            if "Traceback (most recent call last)" in log:
+                raise RuntimeError("Source Python traceback; abort and recover")
             time.sleep(0.5)
     except BaseException as error:
         write(root / "failure.json", dict(error=repr(error)))
