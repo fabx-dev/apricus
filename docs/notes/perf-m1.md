@@ -276,3 +276,147 @@ to retain STOP without registering a player bus name.
   extension, Wnck backend, packaging, workflows, release versions or rulesets.
 
 Only M1 was implemented. M2–M10 remain outside this change.
+
+## Real GNOME validation — phase 1 inventory ([validation date omitted])
+
+**Read-only inventory completed. Phases 2–4 have NOT started.** The user has
+requested an explicit authorization checkpoint before session changes or
+installation. No application was launched/stopped, no dependency was installed,
+and no extension, GSettings, autostart, package or service was changed in this
+phase. Only this report is updated in the M1 worktree; Agent-A repositories and
+the roadmap worktree are not used.
+
+Source preflight: `feat/gnome-policy-stop`, clean at
+`84bd123d19ecfd547be5f713bc7895a185c07ea9` before this documentary update.
+
+| Inventory item | Result | Evidence / limits |
+|---|---|---|
+| OS/session | PASS | Ubuntu 26.04.1 LTS; GNOME Shell 50.1; Wayland |
+| Installed Snap | PASS (inventory) | `apricus` 2.0.7 revision **x3**, local/untracked channel; `apricus-channel-poc` 0.1 x1 also installed |
+| Active Apricus | PASS (inventory) | Snap server PID **[process ID omitted]**, forkserver **[process ID omitted]**, player **[process ID omitted]**; AppArmor `snap.apricus.apricus (enforce)`, cgroup and mapped `/snap/apricus/x3` libraries confirm strict Snap identity |
+| Current Snap source | PASS (sampled identity) | Mounted `server.py`, `player/video_player.py`, `snap_ipc.py` match Git `9cb6ea5`, not M1; this is not a full archive identity assertion |
+| Native local installation | PASS (inventory) | `~/.local/bin/apricus` and `~/.local/share/apricus` exist, launcher says 2.0.7; installed server has no M1 stop/resume methods. PATH prefers this launcher, so plain `apricus` must not be used for the M1 test |
+| Native package / Flatpak | PASS (inventory) | No installed Apricus dpkg package or Flatpak application found; prior `~/.var/app/io.github.fabx_dev.Apricus` data still exist and must be retained |
+| Apricus user service/autostart | PASS (inventory) | No matching systemd user unit or Apricus autostart entry found; no changes made |
+| Host extension | PASS (inventory only) | UUID `apricus-integration@fabx-dev`, ACTIVE, metadata version 1, `CODE_REVISION=4`, user installation; all three installed files match the M1 worktree's unchanged extension files |
+| DING | PASS (enabled-list only) | `ding@rastersoft.com` enabled; click/drag/stacking behavior is **NOT TESTED** |
+| Bridge runtime | NOT TESTED | No Apricus GUI/bridge well-known name observed during inventory; do not infer a failure or launch a GUI just to populate status |
+| Independent native Python runtime | NOT TESTED (dependency blocker) | System Python finds `gi`, `vlc`, `pydbus`, `setproctitle`, `requests`, but **not `yt_dlp`**. No borrowing of Agent-A's environment or installation was attempted |
+
+Process IDs are observations at inventory time, not future kill targets. Recheck
+identity, confinement and descendants immediately before any authorized shutdown.
+The absence of SNAP variables in `/proc/.../environ` is not evidence of native
+execution: process-title rewriting can obscure environment bytes; AppArmor,
+cgroup and mapped runtime paths were used instead.
+
+### Existing backups: availability and limits
+
+Evidence directory (read only): `~/apricus-bridge-validation-20261024/`.
+
+- **PASS:** `extension-original/` matches the recorded
+  `final-original-backup-inventory.json` in file hashes, ownership, modes and
+  mtime. It contains the **historical** extension, NOT the current host revision.
+  Its existing `restore-extension.py` was only read, not executed. It must not
+  be used blindly to roll back this test: it restores an older extension and
+  can remove the bridge helper. No extension replacement is planned for M1.
+- **AVAILABLE, historical:** `extension-before-final-snap-bridge/`,
+  `extension-before-resuming-tests/`, `snap-config-before-video/` (valid V5 JSON,
+  MODE_NULL), `flatpak-data-before-regression/` (valid V5 configs). These are not
+  a substitute for a fresh snapshot of the current session/profile.
+- **PASS, readable JSON:** native `~/.config/apricus/config.json` is V5/MODE_NULL;
+  its `.bak` is **V4**, not a current-profile rollback. Current Snap x3 config
+  and `.bak` are V5/MODE_VIDEO. None has the M1 `is_stopped` key; none was loaded
+  through Apricus or migrated during inventory.
+- **AVAILABLE, not restored/extracted:** `snap saved` lists retained automatic
+  snapshot sets **1–8** for Apricus. No `snap restore`, extraction or sudo action
+  was attempted; current revision/profile still needs a fresh backup before
+  testing.
+- **PASS, retained artifact checksums:**
+  - `artifacts/apricus_2.0.7_static-9cb6ea5_amd64.snap`, 123,387,904 bytes:
+    `<artifact-sha256>`.
+  - `artifacts/apricus_2.0.7_bridge-97e3684_amd64.snap`, 123,387,904 bytes:
+    `<artifact-sha256>`.
+  These permit later recovery preparation, not authorization to replace x3.
+
+### Proposed reversible procedure — NOT EXECUTED
+
+1. **Obtain approval first** for an independent M1 Python environment (only in
+   the dedicated worktree, no global installation/sudo), temporary shutdown of
+   the current Snap wallpaper, and a source-run M1 test on the real session.
+   Alternatively the user can supply a ready interpreter independent of Agent A.
+   The system's missing `yt_dlp` currently prevents a clean source launch.
+2. After approval, create a timestamped <private-evidence-file> directory **inside the
+   M1 worktree** (untracked and excluded from commits). Record hashes/metadata of
+   the current host extension, native/Snap configs and currently referenced
+   static images; save exact light/dark background and screensaver GSettings
+   values and the enabled extension list. Preserve the current extension, not
+   just the historical backup. Do not change autostart or enabled extensions.
+3. Ask the user to quit the current Snap using **Quit Apricus** (not merely
+   closing its GUI), or obtain explicit approval to issue its existing IPC quit
+   command. Verify that only the identified Snap instance and its descendants
+   stop. Never kill by name or overlap two wallpaper instances in the host
+   session. Abort if new/unknown Apricus processes appear.
+4. Prepare a separate M1 config/cache profile copied from the approved test
+   selection, without editing the native or Snap profiles. Use the dedicated
+   source path and interpreter explicitly, never the ambiguous PATH launcher.
+   Before launch, audit the effective write paths. Keep access to the host
+   extension's existing data directory for detection; do not blindly override
+   XDG_DATA_HOME and accidentally hide the installed extension. Disable neither
+   extension nor screensaver. Live background GSettings writes inherent in
+   wallpaper playback require the session-test authorization in step 1.
+5. Run the user's phase-2 matrix with the **unchanged current host extension**:
+   video, STOP/static cache/fallback, RESUME/new adoption, playlist, controlled
+   stream/web, stopped selection changes, duplicate commands, server restart and
+   persistent STOP. DING click/drag, visible first frame, Overview and workspace
+   transitions require user observation/confirmation (or separately authorized
+   capture). A running process/playing flag is not proof of visual success.
+   Extension disable/enable is a separate optional authorization, not implicit
+   in this procedure. No logout/login is initially expected since installed
+   extension files already match; if one becomes necessary, stop and ask.
+6. Measure in the real session: warm up for at least 10 seconds, then observe
+   PLAY/PAUSE/STOP/RESUME over **60-second CPU windows**, report RSS/PSS and
+   process/thread counts, player/server separately and Shell as context. Repeat
+   transition latency samples and check the owned process tree for VLC/FFmpeg
+   leftovers. Visible-first-frame latency is reported only if directly
+   observable with timestamps; otherwise mark NOT MEASURED, not the playing
+   property timestamp. Keep GNOME observations separate from Xvfb results.
+7. Close **only the M1 instance** and verify its descendants have exited.
+   Restore the exact saved background/screensaver values after pending M1 jobs
+   are gone; preserve all existing installations, extension bytes and original
+   profiles. With authorization, relaunch the original Snap explicitly with
+   `/snap/bin/apricus -b` and verify the previous wallpaper/state. Compare hashes
+   and enabled-state inventory. Retain evidence; do not delete or replace any
+   existing installation or historical backup.
+8. On a reproducible **M1-only** bug: record FAIL, add a regression test and
+   make a local fix on this branch. Do not change the bridge, installed
+   extension, Agent-A repositories or PR #1 to make a test pass.
+
+### Current real-session acceptance status
+
+| Test group | Status |
+|---|---|
+| Phase 1 inventory / source / host extension / historical backup verification | PASS, with runtime-dependency blocker above |
+| Video STOP/RESUME, static fallback and new GNOME adoption | NOT TESTED — awaiting authorization |
+| DING click/drag, Overview, workspaces | NOT TESTED — awaiting authorization and visual confirmation |
+| Playlist, remote stream, web in GNOME | NOT TESTED — awaiting authorization |
+| Duplicate operations, stopped selection, persistent STOP after restart in GNOME | NOT TESTED — awaiting authorization |
+| Bridge non-regression on the real strict Snap | NOT TESTED — existing x3 is the integration base, not M1 |
+| Real-session CPU/memory/latency/orphan measurements | NOT TESTED — Xvfb figures above are not substituted |
+| Extension disable/re-enable | NOT TESTED — not authorized or currently necessary |
+| M1 Snap strict / Flatpak packages | NOT TESTED — no experimental installation authorized |
+
+### Subsequent packaging gate
+
+Do not reuse the PR #1 artifact as evidence of M1: the retained x3 package is
+based on `9cb6ea5`, whereas M1 is local commit `84bd123`. A remote test workflow
+cannot build an unpublished local commit; with push forbidden, no workflow was
+dispatched or modified. Later options require separate approval: a local/VM
+test-only build, or explicit authorization to make the M1 ref available and run
+an artifact-only workflow pinned to that SHA (no Store credentials/publication).
+Snap/Flatpak test artifacts must have separate names/evidence and must not
+replace the user's existing installation or retained Flatpak data without
+explicit approval. Any sudo, package install/removal or logout remains a user
+intervention checkpoint.
+
+**Checkpoint: stopped after phase 1. No real-session M1 result or distribution
+validation is claimed.**
