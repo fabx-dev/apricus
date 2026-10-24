@@ -80,7 +80,7 @@ def patch_loaded(name, module):
         "apricus.player.web_player": "WebPlayer",
         "apricus.gui.gtk4app": "ControlPanel",
     }
-    if name in classes:
+    if name in classes and os.environ.get("APRICUS_M1_PHASE") == "preflight":
         getattr(module, classes[name]).__init__ = denied
     if name == "apricus.gui.gtk4app":
         # Native/portal choosers can persist their own host preferences over
@@ -151,8 +151,9 @@ def activate():
     global ROOT, PROFILE, EVIDENCE, ABI, PATHS, BOOT_PID
     if ROOT is not None:
         return
-    if os.environ.get("APRICUS_M1_PHASE") != "preflight":
-        raise RuntimeError("This adapter permits preflight only; no live launcher is authorized")
+    phase = os.environ.get("APRICUS_M1_PHASE")
+    if phase not in ("preflight", "live"):
+        raise RuntimeError("Only preflight or separately authorized live validation is allowed")
     worktree = Path(__file__).resolve().parents[3]
     if Path(sys.prefix).resolve() != worktree / ".venv":
         raise RuntimeError("Every Python child must use the independent M1 virtual environment")
@@ -169,6 +170,12 @@ def activate():
         raise RuntimeError("Private root must belong to this user and have mode 0700")
     if not (root / "marker.json").is_file():
         raise RuntimeError("Missing preflight root marker")
+    if phase == "live":
+        approval = json.loads((root / "live-authorization.json").read_text())
+        if approval.get("approved") is not True or approval.get("backup_verified") is not True:
+            raise RuntimeError("Live validation requires explicit approval and verified backup")
+        if not (root / "backup/manifest.json").is_file() or not (root / "restore.py").is_file():
+            raise RuntimeError("Independent restore procedure missing")
     expected = json.loads(os.environ["APRICUS_M1_HOST_ENV"])
     if {name: os.environ.get(name) for name in PROTECTED} != expected:
         raise RuntimeError("Host session/config/display environment changed")
@@ -238,10 +245,34 @@ def activate():
     snap_ipc._sock_dir = lambda: str(PROFILE / "ipc")
     from gi.repository import Gio
 
-    # Reads stay real. Every mutation (not just set_string) is denied in this phase.
+    original_set_string = Gio.Settings.set_string
+    original_set_value = Gio.Settings.set_value
+    # Reads stay real. Only the three reviewed wallpaper keys may change live.
     for method in dir(Gio.Settings):
         if method.startswith("set_") or method in {"reset", "apply", "bind", "bind_with_mapping"}:
             setattr(Gio.Settings, method, denied)
+    if phase == "live":
+        allowed = {
+            "org.gnome.desktop.background": {"picture-uri", "picture-uri-dark"},
+            "org.gnome.desktop.screensaver": {"picture-uri"},
+        }
+
+        def allow_key(settings, key):
+            if key not in allowed.get(settings.props.settings_schema.get_id(), set()):
+                denied()
+
+        def set_string(settings, key, value):
+            allow_key(settings, key)
+            return original_set_string(settings, key, value)
+
+        def set_value(settings, key, value):
+            allow_key(settings, key)
+            if value.get_type_string() != "s":
+                denied()
+            return original_set_value(settings, key, value)
+
+        Gio.Settings.set_string = set_string
+        Gio.Settings.set_value = set_value
     for method in ("launch_default_for_uri", "launch_default_for_uri_async"):
         setattr(Gio.AppInfo, method, denied)
     sys.meta_path.insert(0, PatchFinder())

@@ -6,6 +6,16 @@ mutations are blocked, even though their modules are imported for path checks.
 Do not remove those guards without the user's separate live-test approval and
 an independently usable backup/restoration procedure.
 
+### Authorized live attempt: stopped and restored
+
+`live_session.py` adds an explicit supervisor and a standalone stdlib recovery
+copy, used only after separate user authorization. `launcher.py` remains
+preflight-only. The first live attempt exposed denied native dconf access to
+`/run/user/1000/dconf/user` and H.264 decoder errors; it was interrupted and the
+original Snap restored. **Do not repeat live validation with the current guard.**
+No filesystem exceptions were broadened. See the report's live-attempt section;
+the earlier successful read-only probes do not establish live compatibility.
+
 Run from the dedicated M1 worktree using its independent environment:
 
 ```sh

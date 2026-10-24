@@ -652,3 +652,73 @@ logout/login or privilege escalation is implicit in that authorization.
 
 **Stopped after successful preflight. Awaiting authorization for real validation;
 the Snap was not stopped by this tooling and M1 was not started.**
+
+## Authorized real-session attempt — interrupted and restored ([validation date omitted])
+
+The user clarified that the earlier Snap PID change resulted from their manual
+reset, **not a spontaneous restart**. No investigation or autostart/service
+modification is needed. They authorized the real-session phase with fresh
+backup, isolated data and final Snap restoration.
+
+### Preparation and observations
+
+- Repeated preflight: PASS, `build/m1p-rfvzu880/`. Fresh independently verified
+  backup: `backup/manifest.json`, 13 files covering Snap configuration/cache,
+  native configuration and the installed extension. Full selection/playlist,
+  volume/mute/static/autostart inventory and 11 GNOME values were captured.
+- `tests/manual/m1_isolation/live_session.py` provides explicit preparation,
+  supervision, watchdog and standalone system-Python restoration. The copied
+  `build/m1p-rfvzu880/restore.py` and all backup file hashes were verified before
+  shutdown. No production source changed. Private red/blue video and HTML
+  fixtures were prepared but not used for runtime matrix tests.
+- The existing Snap server [process ID omitted] was closed using its authenticated Unix IPC
+  peer. The supervisor checked prior live descendants, strict Snap processes,
+  Apricus process names and server bus ownership before starting M1. No two
+  wallpaper-controlling instances were intentionally run together.
+- M1 server [process ID omitted]/player [process ID omitted] started from this worktree with private data,
+  real bus/display/GSettings, and the existing GTK3 X11 backend selection.
+  Native extension adoption was logged and VLC reported playing. **Neither
+  observation proves a visible decoded frame.**
+- Native dconf reported `unable to create file '/run/user/1000/dconf/user':
+  Permission denied; dconf will not work properly`. The write guard intentionally
+  did not permit that runtime path. The read-only preflight did not exercise
+  this native initialization/write requirement: its PASS must not be read as
+  complete runtime-isolation validation.
+- Additional log evidence includes H.264 `get_buffer() failed`,
+  `thread_get_buffer() failed`, `no frame!`, and denied Shell Introspect GetWindows.
+  Root causes of decoding failure are **not established**; no claim of an M1
+  regression or a visible wallpaper is justified.
+- On observing the errors, validation was interrupted. No filesystem allowance
+  was expanded; no production fix, extension change, autostart change or package
+  operation was performed. The supervisor/watchdog completed and exited.
+
+### Results
+
+| Check | Result |
+|---|---|
+| Fresh backup and independent restoration readiness | PASS |
+| Prior Snap shutdown / no concurrent Apricus before M1 start | PASS |
+| Native live initialization with current isolation | **FAIL**: dconf runtime access denied; decoder errors also present |
+| VLC playing-state observation | PASS as a state observation only, not frame visibility |
+| Visible first frame and resume-to-visible latency | NOT TESTED |
+| Functional STOP/RESUME/PAUSE/QUIT, persistence and 50-cycle matrix on real GNOME | NOT TESTED; validation interrupted before the matrix |
+| CPU windows >=60s, RSS/PSS, process/thread and latency measurements | NOT TESTED; no new valid performance result |
+| DING click/drag, Overview/workspaces, GUI survival | NOT TESTED visually |
+| M1 shutdown and cleanup | PASS: all five recorded M1 identities absent after restoration |
+| Exact GNOME settings and original configuration restored | PASS: all 11 GNOME values match backup; Snap config semantically identical |
+| Original Snap restart | PASS: authenticated runtime PID [process ID omitted], MODE_VIDEO, playing=true, volume=50, mute=false, static=true |
+| Installed extension/native protected files and backup integrity | PASS: hashes unchanged, all 13 backup files verified; DING/integration remain ACTIVE |
+| Bridge ownership | Same baseline: separate bridge bus name unowned before and after; not a new bridge functionality PASS |
+| Snap/Flatpak packaging acceptance | NOT TESTED |
+
+Recovery completed with no recorded M1 PID left. Snap **2.0.7 x3** is restored;
+no need to execute the already-completed idempotent restoration again. The
+backup/evidence remain local in `build/m1p-rfvzu880/`, including `state.json`,
+`ready.json`, `<private-evidence-file>` and `snap-restored.log`.
+
+**Blocked and stopped.** A revised, narrowly reviewed handling of native dconf
+runtime access is required before another attempt; no copying/linking dconf,
+global environment replacement or broad runtime write exception is assumed.
+The decoder evidence also requires diagnosis before a valid visual/performance
+claim. Ask for approval of the revised isolation approach before retrying.
+No push, PR #1 change, merge, tag, release or publication occurred.
