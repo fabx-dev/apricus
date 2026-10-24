@@ -1119,3 +1119,136 @@ live retry. Detailed VLC evidence is retained without altering renderer or
 hardware settings. No production code, installed extension, AppArmor, services,
 autostart, Agent-A worktree or PR #1 changed. No sudo, logout/login, package
 replacement, push, PR, merge, tag, release or publication occurred.
+
+## Strategy change — prepare temporary Snap removal ([validation date omitted])
+
+The user abandoned further Landlock adaptation/another VM and authorized
+**preparation only**, requiring their intervention before sudo or actual
+removal. Future M1 runs must use normal native config/cache and the real GNOME
+session, with no Landlock/sitecustomize and no make install. **No Snap was
+stopped/removed and no M1 runtime was launched in this preparation.** The old
+automatic-Snap-reinstall supervisor is explicitly **not applicable** to this
+strategy. At the end of future source tests, restore native settings/data and
+ask whether to reinstall the old Snap or keep source M1 available; no automatic
+Snap installation is authorized.
+
+### New inventory, backup and package evidence
+
+Current branch `feat/gnome-policy-stop`, preparation base `9b73d7c`.
+Snap **apricus 2.0.7 x3** remains running, server **[process ID omitted]**, player **[process ID omitted]**,
+tracker/forkserver **[process IDs omitted]**. `apricus-channel-poc 0.1 x1` is separately
+installed and must remain untouched. Both host integration and DING are ACTIVE.
+Authenticated read-only Snap IPC confirms playing=true, video mode, volume
+**50**, mute **false**, static **true**. Selected wallpaper is the Hawaii AVC
+video, with Kelp-Dark and LA-Downtown-Night in the saved two-item playlist.
+
+New private recovery directory (0700):
+**`<private-evidence-dir>`**. New standalone backup-only tooling lives in
+`tests/manual/m1_native/`; no old adapter or production source was changed.
+
+- `user-data.tar.gz`: full `~/snap/apricus` tree, including common/revision
+  data/config/cache; native Apricus and legacy Hidamari configs, existing
+  relevant caches/VLC data, and evidence-only host extension copy. All **131
+  regular files** can be read to EOF from the archive. Original absent-path
+  state, autostart/service absence and environment are recorded in manifest.
+- `system-data-readable.tar.gz`: readable `/var/snap/apricus` state, **24 files**;
+  no sudo needed. Its hash is recorded in `additional-evidence.json` and the
+  supplemental integrity index.
+- `manifest.json`, `runtime.json`, full relevant GSettings schema outputs and
+  `dconf-dump.txt`: full config/playlist/state plus settings/connection/snapshot
+  inventories. The full dconf dump is evidence only, not a blanket restore plan.
+- `verify.py`: standalone system-Python verification of retained-file hashes
+  and archive readability. `preparation.sha256` covers supplemental evidence.
+  `procedure.md` contains an independent, GUI-free removal/recovery/reinstall
+  procedure, with explicit user gates and **no automatic reinstall**.
+- The two older runtime backup sets (`m1p-rfvzu880` and `m1p-48pantki`) remain
+  untouched; both 13-file sets and copied restore-script hashes were verified.
+  Their old automatic-restart behavior must not be used for the new strategy.
+
+Retained candidate package copied from the previously preserved artifact:
+`apricus_2.0.7_previous.snap`, **123387904 bytes**, SHA256:
+
+```text
+<artifact-sha256>
+```
+
+It was extracted **only into this new evidence directory**, not installed.
+Content comparison against mounted `/snap/apricus/x3`: **8708 regular files**,
+**6243 symlink targets**, **693 directories**, no mismatch. No symlink content
+was followed as if it were an archive regular file. Results are recorded in
+`package-content-comparison.json`.
+
+**Exact installed compressed-blob checksum remains PENDING**: the installed
+`/var/lib/snapd/snaps/apricus_x3.snap` is root-owned mode 0600. Its size and mounted
+contents match the retained candidate, but this is not represented as a verified
+byte-for-byte blob hash. No sudo or block-device permission bypass was attempted.
+Before removal, ask the user to run `sudo sha256sum` on that installed file and
+compare with the hash above. A mismatch is a blocker requiring a separately
+approved copy of the actual installed blob. Same payload can be reinstalled
+using the retained package; snapd may assign a new local xN revision, so the
+procedure does not falsely guarantee reinstalling the local label `x3`.
+
+### Native environment readiness, without starting M1
+
+Existing independent `.venv` has all six required modules discoverable.
+HOME remains `<private-path>`; XDG_CONFIG_HOME is unset (normal `~/.config`),
+XDG_RUNTIME_DIR `<runtime-dir>`, session bus `<runtime-dir>/bus`, DISPLAY `<display>`,
+WAYLAND_DISPLAY `<wayland-display>`, DCONF_PROFILE unset. Source config resolves to
+**`~/.config/apricus/config.json`**, legacy to `~/.config/hidamari/config.json`.
+These ordinary native paths are backed up, not redirected to an experimental
+profile. User media/repositories are not copied or removed.
+
+A normal Ubuntu Python startup loads `/usr/lib/python3.14/sitecustomize.py`
+(Apport), not the old test hook. To comply with the literal no-sitecustomize
+constraint, `inspect_environment.py` was executed with the venv Python **-S**,
+adding only source, venv site-packages and system GI import paths. It confirmed
+no sitecustomize/Landlock module, all dependency specs present and unchanged
+real GNOME paths. Output retained as `native-environment.json`. This is an
+import-only inspection, **not an application/window launch**. Actual source
+launcher/child propagation will be prepared after the privileged checkpoint;
+there is no claim that normal-environment runtime already passed. Existing
+production GTK3/XWayland selection is not rebranded as native Wayland rendering.
+
+### Planned reversible sequence and matrix
+
+After privileged hash confirmation and explicit removal approval: recheck live
+state and prepare a new final checkpoint if anything changed, quit the identified
+Snap normally and verify all descendants/other Apricus instances gone. Request
+user execution of a fresh `snap save apricus`/check-snapshot if adopted, record
+its ID, then remove **only `apricus`**, **without --purge**. Never touch the PoC,
+extension, DING, services, personal files or another worktree. No removal command
+has been executed in this phase.
+
+Future source tests must stop on smoke errors before benchmarks. After source
+shutdown, preserve generated files, restore only reviewed application settings
+and changed native files from staged backup (never blindly extract extension
+or shared cache contents), compare original GNOME values and backup integrity,
+then ask about reinstall. The recovery guide calls out old revision-relative
+wallpaper URIs that may be unavailable until a user-approved reinstall; an
+alternative preserved image must not be silently called exact URI restoration.
+Optional reinstall uses the verified local payload with `snap install
+--dangerous`, restores only apricus via the fresh verified snapshot, checks new
+revision/path mapping and connections, and starts `/snap/bin/apricus -b` only
+after source M1 is gone. Every privileged action remains user-gated.
+
+| Current stage / requirement | Result |
+|---|---|
+| Exact installed version/revision and running-process inventory | PASS, 2.0.7 x3 |
+| Candidate package retained/readable, matching mounted contents | PASS |
+| Installed root-only blob's exact SHA256 | **PENDING USER INTERVENTION** |
+| New user/system-data backup readability and configuration capture | PASS |
+| Old backups retained/integrity verified | PASS |
+| GUI-independent recovery/reinstall procedure | PREPARED, not executed/tested as a reinstall |
+| Native dependency/path inspection without sitecustomize/Landlock | PASS, inspection only |
+| Snap normal quit/removal | NOT TESTED / NOT PERFORMED |
+| Native M1 first visible frame, STOP/resources, RESUME | NOT TESTED |
+| Native M1 DING clicks/dragging and Overview | NOT TESTED |
+| Native M1 playlist/stream/web/persistence/static matrix | NOT TESTED |
+| Native M1 CPU >=60s / RSS/PSS/process/thread/latencies | NOT TESTED, no measurements |
+| End-of-test native restoration / reinstall choice | NOT APPLICABLE YET; tests not started |
+| Current Snap/session unchanged | PASS; no IPC mutation, removal, reinstall or M1 launch |
+
+**Stopped before sudo and removal; awaiting the user's privileged checksum and
+explicit confirmation.** No production code, Landlock adapter, extension,
+AppArmor, DING, master/integration branch or PR #1 changed. No push, PR, merge,
+tag, release or publication. No new M1 Snap/Flatpak package validation started.
