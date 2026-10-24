@@ -84,17 +84,78 @@ expect 15–40 min.
   the archived `~/.var/app/...` dir and the recorded GSettings URIs.
 - Verify: no apricus processes, original URIs restored, extensions ACTIVE.
 
-## 8. Validation matrix (per packaged variant, after install approval)
+## 8. Validation matrix — Flatpak results ([validation date omitted], authorized --user install)
 
-Avvio GUI/server, bridge/integration state (Snap slot; Flatpak has no
-`--own-name` for the bridge bus name, so bridge telemetry is expected-limited
-there), first visible frame (user-confirmed), STOP + resource release, RESUME
-+ new adoption, static + fallback, STOP persistence, playlist, DING/Overview,
-orphan check, config integrity, final restore. Benchmarks only after smoke
-PASS; keep GNOME-packaged numbers separate from source/Xvfb numbers.
+Bundle: `<test-flatpak-bundle>` (52,625,152 bytes),
+sha256 `941ac5f47d9f3190914ab61c63d7673434dcc56b635057b067b91b417a1f9f4`,
+built from worktree HEAD `26138c3` (M1 sources identical to validated
+`9940bf3`; only docs/test-tooling added after). App-ID
+`io.github.fabx_dev.Apricus`, runtime org.gnome.Platform 50, Sdk 50.
+Manifest finish-args untouched: no `--own-name`, no new permission.
+Install used `--no-deps -y` (no runtime changes, no remotes added, no sudo).
+Throwaway `apricusN-origin` remotes vanished with uninstall; only pre-existing
+flathub remains.
+
+Prior `~/.var/app/io.github.fabx_dev.Apricus` (51 files) backed up with hashes
+before install, quarantined after test, restored byte-identical (51/51 hash
+match). GNOME URIs (incl. pre-existing screensaver `/tmp/frame.png`) restored
+exactly. M1 + children fully terminated, no orphans. Snap still absent. PoC,
+extensions ACTIVE.
+
+| Check | Result |
+|---|---|
+| GUI/server start, Hawaii first frame | PASS (user-confirmed animation) |
+| STOP: player gone, server alive, static applied | PASS (user-confirmed Hawaii still) |
+| RESUME: new player + adoption + video | PASS (reply 32 ms, playing 1124 ms; user-confirmed) |
+| Double STOP/RESUME | PASS (idempotent, 1 player) |
+| STOP persistence across reload | PASS (no player, stays stopped) |
+| Wallpaper change while STOPPED (Kelp: cache miss) | PASS (fallback applied, no player) |
+| Playlist advance/freeze/resume (2s+3s clips) | PASS (7 advances, 0 while stopped, resumes) |
+| Public HTTP stream | PASS (playing; thumbnail static cached) |
+| Loopback HTTP stream | NOT APPLICABLE: SSRF guard refuses local addresses by design (clean warning, lifecycle works) |
+| Local web page (file in xdg-videos) | PASS (user-confirmed render; WebKit procs present; snapshot works in bundled WebKit, no cairo failure) |
+| Static OFF | PASS (background byte-identical before/after STOP) |
+| Missing-cache fallback | PASS (69-byte neutral PNG) |
+| 5x STOP/RESUME + orphan check | PASS (0 leftovers) |
+| Extension adoption of new windows | PASS (12 events) |
+| DING/Overview with video | PASS pre-reload; FAIL (covered Home icon) after an external extension reload — see below |
+| Bridge bus telemetry | NOT TESTED as service: app cannot own `io.github.fabxdev.Apricus.GnomeBridge` without `--own-name` (expected sandbox limitation, no permission added to work around it) |
+
+Observed sandbox differences vs native: first STOP took ~3.9 s (single sample;
+native ~40–140 ms) — reported, not root-caused; bundled WebKit snapshot works
+where system WebKit hit the cairo converter issue.
+
+### Extension-reload cover-up (real finding, no fix applied)
+
+At [event time omitted] a session event (Nautilus/FileManager1 activation) reloaded the
+integration extension and relaunched DING — not caused by this test (extensions
+and Nautilus untouched). `disable()` returns adopted actors to the normal
+stack; the reload scan saw 1 window with 0 role matches, so the live video
+window was never re-adopted and stayed above DING's fresh icons (Home hidden;
+user-confirmed, and confirmed visible again after STOP). After RESUME the new
+window was adopted ([event time omitted]) and video + icon coexist (user-confirmed).
+Mechanism and both directions are evidenced in the journal; native
+applicability NOT TESTED. No extension/player fix applied (extension changes
+require separate approval; no speculative renderer/SSRF/config change made).
+
+### Flatpak benchmarks (15 CPUs, Hawaii 1080p, machine-normalized %)
+
+| State | CPU mean / max | RSS mean | PSS mean | Procs | Threads |
+|---|---|---|---|---|---|
+| PLAYING 60s | 2.87% / 3.23% | 398 MB | 352 MB | 4 | 26 |
+| STOPPED 60s | 0.00% / 0.00% | 76 MB | 60 MB | 3 | 6 |
+| RESUMED 60s | 2.26% / 2.87% | 399 MB | 350 MB | 4 | 26 |
+
+Versus native source: same profile shape (playing ≈2.6%, stopped 0%, same
+process counts); Flatpak PSS moderately higher (+~20 MB), consistent with
+sandbox overhead. No RESUME spike beyond playing level. Xvfb numbers not
+compared.
 
 ## 9. Current status
 
-- Tests: PASS (392). Packaging diff: none. Snap build: PREPARED, gated on
-  sudo approval. Flatpak build: RUNNING (log retained). Installs: NOT
-  PERFORMED. No production/sandbox/permission changes.
+- Tests: PASS (392). Packaging diff: none. Snap build/install: NOT STARTED,
+  still gated (no release workflow invoked, no tags).
+- Flatpak matrix complete with one documented integration finding; restore
+  verified (data 51/51, URIs exact, no processes, Snap absent).
+- No merge/push/PR/tag/release/publication. No production/sandbox/permission
+  changes.
