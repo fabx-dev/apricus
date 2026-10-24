@@ -91,3 +91,29 @@ def test_launcher_has_no_runtime_command():
     )
     assert result.returncode != 0
     assert "Preflight only" in result.stderr
+
+
+@pytest.mark.parametrize(
+    "log,expected",
+    [
+        ("normal probe output", True),
+        ("dconf-CRITICAL **: unable to create file", False),
+        ("dconf will not work properly.", False),
+    ],
+)
+def test_preflight_rejects_native_dconf_failure_even_with_matching_values(log, expected):
+    import importlib.util
+    import sys
+
+    # These manual modules have no activation/launch side effects on import.
+    old_path = sys.path[:]
+    try:
+        sys.path.insert(0, str(ADAPTER))
+        spec = importlib.util.spec_from_file_location(
+            "m1_diagnostic_launcher", ADAPTER / "launcher.py"
+        )
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        assert module.native_dconf_clean(log) is expected
+    finally:
+        sys.path[:] = old_path

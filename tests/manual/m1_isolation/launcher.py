@@ -20,6 +20,11 @@ WORKTREE = Path(__file__).resolve().parents[3]
 ADAPTER = Path(__file__).resolve().parent
 
 
+def native_dconf_clean(log):
+    """Do not accept matching cached values when native initialization failed."""
+    return "dconf-CRITICAL" not in log and "dconf will not work properly" not in log
+
+
 def stable_files():
     home = Path.home()
     roots = [
@@ -222,6 +227,10 @@ def main():
         for role in ("server", "video", "web", "gui")
     }
     checks = {
+        # Matching values alone miss broken dconf change-notification setup.
+        "native_dconf_initialization_clean": native_dconf_clean(
+            (root / "evidence/probe.log").read_text(errors="replace")
+        ),
         "all_probes_completed": completed.returncode == 0
         and len(records) == 11
         and {row["label"] for row in records} == labels,

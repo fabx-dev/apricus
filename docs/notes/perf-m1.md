@@ -722,3 +722,137 @@ global environment replacement or broad runtime write exception is assumed.
 The decoder evidence also requires diagnosis before a valid visual/performance
 claim. Ask for approval of the revised isolation approach before retrying.
 No push, PR #1 change, merge, tag, release or publication occurred.
+
+## Restricted adapter diagnosis — no new GNOME runtime ([validation date omitted])
+
+Scope: user authorized diagnosis/minimal test-tool correction only, explicitly
+requiring a stop before granting real dconf write rights. The running Snap was
+not stopped, M1 was not launched on the desktop, and neither production code,
+installed extension, AppArmor, services nor any other worktree was changed.
+
+### Exact native dconf operation and proposed minimum
+
+New reproducible tool: `tests/manual/m1_isolation/diagnose_dconf.py`.
+Evidence: `<private-evidence-dir>/{host.trace,guarded.trace,report.json}`.
+`strace -f -yy` on system Python/Gio, using identical protected environment and
+only a GSettings read/change subscription, establishes:
+
+```text
+host: openat(AT_FDCWD, "/run/user/1000/dconf/user", O_RDWR|O_CREAT, 0600) = fd
+host: pwrite64(fd, "\0", 1, 1) = 1
+host: mmap(NULL, 1, PROT_READ, MAP_SHARED, fd, 0) = address
+guarded: openat(...same path..., O_RDWR|O_CREAT, 0600) = -1 EACCES
+```
+
+The only intentional control difference is applying the unchanged Landlock
+guard. This reproduces the denial without GTK, VLC, wallpaper or M1 startup.
+It is **not** a denied read-only mmap: the writable open is denied first.
+Even a read API needs a native write: dconf writes NUL to the second byte of its
+runtime shared-memory marker to ensure allocation before mapping the first byte
+for change/invalidation tracking. No ftruncate or writable mapping of that
+marker was observed in this reader initialization. The already existing marker
+is 2 bytes; the actual configuration database is a different, 10460-byte file
+at `<private-path>`, opened O_RDONLY|O_CLOEXEC and mapped
+PROT_READ|MAP_PRIVATE. The guarded reader can still return cached/current values
+while emitting fatal-quality diagnostics about broken native initialization.
+
+The resolved paths equal the paths above; marker/database and their immediate
+parents are not symlinks. The report records inode/device/size for both. The
+fallback lookup `/run/dconf/user/1000` returns ENOENT; it is not an alias to the
+runtime marker. No database copy, replacement or symlink was created. The normal
+host control's dconf library itself performs the demonstrated marker pwrite;
+no application setting was changed and protected state before/after matches.
+Installed libdconf1 is **0.49.0-4**. The upstream implementation corroborates
+the observed allocation sequence and explains avoiding SIGBUS:
+<https://raw.githubusercontent.com/GNOME/dconf/master/shm/dconf-shm.c> (source
+reference only; syscall evidence comes from the installed host library).
+
+**No exception applied, no new write permission granted.** The narrow candidate
+for later approval is `LANDLOCK_ACCESS_FS_WRITE_FILE` (**bit 1 only**) on the
+already-existing, verified regular file `/run/user/1000/dconf/user`, through a
+file-specific PATH_BENEATH rule. Read rights are already unhandled/allowed by
+the existing policy. The trace does not justify granting TRUNCATE, REMOVE_FILE,
+MAKE_REG, directory-wide writes, config-tree writes or permission to create a
+missing marker. O_CREAT on this existing file does not itself demonstrate a
+need for directory creation rights. Missing/replaced marker/inode must fail
+closed and be rechecked, not broadened to its parent.
+
+This rule is a **proposal, not verified sufficient under the actual guard**:
+testing it would grant the write permission the user explicitly reserved for
+approval. Landlock cannot constrain WRITE_FILE to offset 1 or a NUL payload;
+the file-specific exception would permit other content writes to that inode.
+If dconf replaces/unlinks the marker during a later session write, the original
+inode rule may no longer cover it. No promise of replacement safety or future
+writer behavior is made from these reader traces.
+
+### Corrected preflight acceptance
+
+Minimal test-adapter correction: `launcher.py` now rejects `dconf-CRITICAL` or
+`dconf will not work properly` in captured native probe logs. Three new
+regression cases prevent returning PASS solely because GSettings values match.
+No Landlock policy was changed; there is deliberately no dconf allowlist entry.
+
+Final preflight evidence: **`build/m1p-kshjhzay/`**, exit 1, **FAIL** for
+`native_dconf_initialization_clean`. All **12 existing checks PASS**: 11 contexts
+complete under spawn/forkserver/thread/exec, all 11 host values and 13 protected
+variables agree, application path/cache aliases stay private, all 55 escape
+write probes are denied, stable profiles/source hashes/Snap identities/bus
+owners remain unchanged, and probe helpers exit. This corrects the earlier
+overly permissive preflight verdict; it is not a successful runtime preflight.
+HOME, XDG_CONFIG_HOME, XDG_RUNTIME_DIR and DCONF_PROFILE were not changed.
+
+### Separate H.264 findings
+
+Original complete available log remains at
+`build/m1p-rfvzu880/evidence/live-server.log` (337 lines). It contains the FFmpeg
+H.264 buffer errors but **does not contain verbose VLC module-selection or vout
+allocation messages**. Missing original verbose detail cannot be acquired
+retroactively without another reproduction; this phase did not restart M1.
+The original effective decoder plugin/vout therefore cannot be conclusively
+named from that log alone. `[h264 @ ...]` identifies the FFmpeg codec context,
+not the complete selected renderer/hardware path.
+
+Read-only ffprobe of the original Hawaii file reports H.264 High, level 4.0,
+1920x1080, yuv420p, 30000/1001 fps. The native VLC avcodec plugin exists and its
+`ldd` output has no missing dependency. Native packages: VLC/libvlc **3.0.23-1**,
+libavcodec62 **8.0.1-3ubuntu2**. The running Snap remains server [process ID omitted] / player
+[process ID omitted]. Read-only `/proc/<pid>/maps` shows its mounted avcodec plugin and
+libavcodec **60.31.102**, plus its own LibVLC and GL/X11-related plugins.
+Mapped libraries prove availability/loading, **not which vout is actively used**.
+The two environments do not use the same FFmpeg ABI/build. Supporting inventory:
+`<private-evidence-dir>/{media.json,native-avcodec-ldd.txt,snap-mapped-plugins.json}`.
+
+New `diagnose_codec.py` acquired **complete `-vvv` messages and syscall traces**
+for two short native VLC-only probes with isolated config/cache/data/temp,
+dummy interface and dummy video output, no Apricus and no wallpaper window:
+`<private-evidence-dir>/{host,guarded}/vlc.stderr` and the matching `.trace` files.
+Both logs explicitly select video decoder **avcodec**, **Lavc62.11.100**, software
+pixel format **yuv420p** after hardware-format probing, and output **vdummy**;
+both report **Received first picture**, exit 0, no `get_buffer() failed`, no
+`thread_get_buffer() failed` or `no frame!`, and no EACCES in the traced syscalls.
+Normal hardware capability/context probing can contact the existing display;
+these are not embedded-renderer or live-desktop acceptance tests.
+
+The original Apricus config was renderer `auto`, audio volume 50, mute false,
+with `--no-disable-screensaver` and pulse output. The test adapter only appended
+a private public `--config` argument to the unchanged production option builder.
+The diagnostic dummy/no-audio/3-second settings are deliberately different and
+are **not production fixes**. Decoder availability and basic decoding under the
+guard are established; a generic missing-H.264-plugin hypothesis is unsupported.
+The original embedded allocation/render/hardware failure is **not reproduced or
+resolved**. Neither dconf denial nor a particular renderer is declared its cause.
+No LibVLC binding/library/renderer options or production code were modified.
+
+### Disposition
+
+Both diagnostic reports show host settings, stable file metadata/hashes, Snap
+process identities, bus owners and production sources unchanged. The final
+preflight independently confirms the same. Adapter tests: **8 passed**; Ruff
+lint/format checks pass. Snap remains running throughout; no recovery/restart
+was needed in this phase. No GNOME extension or autostart/service modification,
+sudo, push, PR #1 change, merge, tag, release or publication.
+
+**Stopped before granting real dconf writes, as instructed.** Another positive
+preflight cannot honestly be reported under the present rights. Further work
+requires separate approval for the precisely scoped runtime-marker write rule;
+another real GNOME M1 run remains unauthorized.

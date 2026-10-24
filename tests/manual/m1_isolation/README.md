@@ -16,6 +16,20 @@ original Snap restored. **Do not repeat live validation with the current guard.*
 No filesystem exceptions were broadened. See the report's live-attempt section;
 the earlier successful read-only probes do not establish live compatibility.
 
+### Diagnosis without a new GNOME runtime
+
+`diagnose_dconf.py` traces native host/guarded GSettings reads with `strace`,
+including `pwrite64`. The normal dconf client initializes its real runtime marker
+even for read APIs; the guarded probe never grants write permission. No settings
+setter or Apricus application is invoked. `diagnose_codec.py` captures complete
+verbose VLC logs for short dummy-output decoding, with/without the existing
+guard, using private config/cache/data/temp. It does not reproduce an embedded
+player or certify its renderer. Both retain before/after host-state evidence.
+
+The preflight now fails on native dconf critical messages, even when values
+match. **Current result: FAIL**, pending separate permission for the demonstrated
+runtime-marker write requirement. No dconf exception has been applied.
+
 Run from the dedicated M1 worktree using its independent environment:
 
 ```sh
