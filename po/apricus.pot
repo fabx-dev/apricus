@@ -935,3 +935,18 @@ msgstr ""
 #: src/apricus/menu.py:105
 msgid "Quit Apricus"
 msgstr ""
+
+msgid "Stop wallpaper"
+msgstr ""
+
+msgid "Resume wallpaper"
+msgstr ""
+
+msgid "Stopped"
+msgstr ""
+
+msgid "Playback unavailable"
+msgstr ""
+
+msgid "Could not change wallpaper playback."
+msgstr ""

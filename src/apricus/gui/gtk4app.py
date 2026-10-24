@@ -423,6 +423,19 @@ class ControlPanel(Adw.Application):
         else:
             paused = True
         icon_name, act_text = self._sidebar_activity_state(server_ok, mode, paused)
+        if server_ok:
+            try:
+                state = server.playback_state
+                if state in ("stopped", "paused", "unavailable"):
+                    playing = False
+                    act_text = {
+                        "stopped": _("Stopped"),
+                        "paused": _("Paused"),
+                        "unavailable": _("Playback unavailable"),
+                    }[state]
+                    icon_name = "media-playback-stop-symbolic" if state == "stopped" else icon_name
+            except (GLib.Error, AttributeError):
+                pass
         show_eq = bool(playing and self._animations_enabled() and eq is not None)
         if eq is not None:
             eq.set_visible(show_eq)
@@ -1324,6 +1337,9 @@ class ControlPanel(Adw.Application):
         self.np_play_btn.set_tooltip_text(_("Play / Pause"))
         self.np_play_btn.connect("clicked", self.on_play_pause)
         transport.append(self.np_play_btn)
+        self.np_stop_btn = Gtk.Button(label=_("Stop wallpaper"))
+        self.np_stop_btn.connect("clicked", self.on_stop_resume)
+        transport.append(self.np_stop_btn)
         self.np_mute_btn = Gtk.ToggleButton()
         self.np_mute_btn.add_css_class("flat")
         self.np_mute_btn.set_tooltip_text(_("Mute / Unmute"))
@@ -1461,7 +1477,26 @@ class ControlPanel(Adw.Application):
             empty.set_visible(not has_content)
         if not has_content:
             return
-        self.np_badge.set_text(self._np_badge(mode, paused))
+        state = None
+        if server is not None:
+            try:
+                state = server.playback_state
+            except (GLib.Error, AttributeError):
+                pass
+        stopped = state == "stopped"
+        if stopped:
+            paused = True
+        badge = {
+            "stopped": _("Stopped"),
+            "playing": _("Playing"),
+            "paused": _("Paused"),
+            "unavailable": _("Playback unavailable"),
+        }.get(state, self._np_badge(mode, paused))
+        self.np_badge.set_text(badge)
+        stop_btn = getattr(self, "np_stop_btn", None)
+        if stop_btn is not None:
+            stop_btn.set_label(_("Resume wallpaper") if stopped else _("Stop wallpaper"))
+            stop_btn.set_sensitive(server is not None)
         playing = not paused and mode in (MODE_VIDEO, MODE_STREAM, MODE_PLAYLIST)
         settings = Gtk.Settings.get_default()
         animations = bool(settings and settings.props.gtk_enable_animations)
@@ -1474,6 +1509,8 @@ class ControlPanel(Adw.Application):
         self.np_play_btn.set_icon_name(
             "media-playback-start-symbolic" if paused else "media-playback-pause-symbolic"
         )
+        # WebKit had no working PAUSE API; STOP/RESUME is supported in M1.
+        self.np_play_btn.set_sensitive(mode != MODE_WEBPAGE or stopped)
         is_playlist = mode == MODE_PLAYLIST
         self.np_volume.set_sensitive(not is_playlist)
         self.np_mute_btn.set_sensitive(not is_playlist)
@@ -4150,7 +4187,9 @@ class ControlPanel(Adw.Application):
         self.config[key] = want
         ConfigUtil().save(self.config)
         if key == CONFIG_KEY_STATIC_WALLPAPER and want:
-            if self.config.get(CONFIG_KEY_MODE) == MODE_NULL:
+            if self.config.get(CONFIG_KEY_MODE) == MODE_NULL or self.config.get(
+                "is_stopped", False
+            ):
                 self._toast(_("No video playing — static wallpaper will apply to the next video"))
             else:
                 self._toast(_("Preparing static wallpaper…"))
@@ -4258,6 +4297,9 @@ class ControlPanel(Adw.Application):
         if server is None:
             self._show_server_missing()
             return
+        if getattr(server, "playback_state", None) == "stopped":
+            self.on_stop_resume()
+            return
         prev = server.is_paused_by_user
         server.is_paused_by_user = not prev
         if not prev:
@@ -4265,6 +4307,27 @@ class ControlPanel(Adw.Application):
         else:
             server.start_playback()
         self._refresh_all()
+
+    def on_stop_resume(self, *_args):
+        server = self._server()
+        if server is None:
+            self._show_server_missing()
+            return
+        self.np_stop_btn.set_sensitive(False)
+
+        def work():
+            try:
+                if server.playback_state == "stopped":
+                    server.resume_playback()
+                else:
+                    server.stop_playback()
+            except (GLib.Error, AttributeError) as error:
+                logger.warning("[GUI4] Stop/Resume failed: %s", error)
+                GLib.idle_add(self._toast, _("Could not change wallpaper playback."))
+            finally:
+                GLib.idle_add(self._refresh_all)
+
+        threading.Thread(target=work, daemon=True).start()
 
     def on_playlist_apply(self, *_args):
         self._apply_queue()

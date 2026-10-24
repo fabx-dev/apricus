@@ -535,6 +535,7 @@ class VideoPlayer(BasePlayer):
         <property name="volume" type="i" access="readwrite"/>
         <property name="is_mute" type="b" access="readwrite"/>
         <property name="is_playing" type="b" access="read"/>
+        <property name="playback_state" type="s" access="read"/>
         <property name="is_paused_by_user" type="b" access="readwrite"/>
         <property name="last_error" type="s" access="read"/>
         <method name='preview_static'>
@@ -705,6 +706,8 @@ class VideoPlayer(BasePlayer):
     FIRST_FRAME_TIMEOUT_SEC = 20
 
     def _apply_source(self, data_source, setup_handlers):
+        self._static_token = getattr(self, "_static_token", 0) + 1
+        self._static_in_flight = None
         # New media, new verdict: drop the previous resolution failure so a
         # stale error can never mask the fresh attempt (and vice versa).
         self._resolve_error = None
@@ -844,7 +847,7 @@ class VideoPlayer(BasePlayer):
             if default_source.startswith(("http://", "https://")):
                 threading.Thread(
                     target=self._generate_stream_static,
-                    args=(default_source,),
+                    args=(default_source, self._static_token, self._static_selection()),
                     daemon=True,
                 ).start()
         elif self.config[CONFIG_KEY_STATIC_WALLPAPER] and self.mode == MODE_PLAYLIST:
@@ -885,6 +888,8 @@ class VideoPlayer(BasePlayer):
 
     def _play_queue_item(self, window, mkey=None, model=None):
         """Play window._queue[window._queue_index]. Main thread only."""
+        if getattr(self, "_closing", False) or ConfigUtil().load().get("is_stopped", False):
+            return
         if getattr(window, "_transitioning", False):
             logger.debug("[Playlist] Transition already in progress, skipping")
             return
@@ -909,6 +914,8 @@ class VideoPlayer(BasePlayer):
 
     def _on_media_end(self, window):
         """Advance the queue. Invoked on the GTK main thread via idle_add."""
+        if getattr(self, "_closing", False) or ConfigUtil().load().get("is_stopped", False):
+            return False
         queue = getattr(window, "_queue", [])
         if not queue:
             return False
@@ -968,11 +975,17 @@ class VideoPlayer(BasePlayer):
         if not key:
             return
         try:
-            positions = self.config.setdefault(CONFIG_KEY_PLAYLIST_POS, {})
+            # Do not overwrite a concurrent server STOP/GUI preference with
+            # the player's older config snapshot.
+            latest = ConfigUtil().load()
+            if latest.get("is_stopped", False):
+                return
+            positions = latest.setdefault(CONFIG_KEY_PLAYLIST_POS, {})
             if not isinstance(positions, dict):
-                positions = self.config[CONFIG_KEY_PLAYLIST_POS] = {}
+                positions = latest[CONFIG_KEY_PLAYLIST_POS] = {}
             positions[key] = int(index)
-            ConfigUtil().save(self.config)
+            ConfigUtil().save(latest)
+            self.config[CONFIG_KEY_PLAYLIST_POS] = positions
         except Exception as e:  # noqa: BLE001 - static frame matters more
             logger.debug(f"[Playlist] position save skipped: {e}")
 
@@ -1062,6 +1075,8 @@ class VideoPlayer(BasePlayer):
 
     def start_playback(self, dbus_context=None):
         _authorize("player.start_playback", dbus_context)
+        if getattr(self, "_closing", False) or ConfigUtil().load().get("is_stopped", False):
+            return
         if self._should_playback_start():
             for _monitor, window in self.windows.items():
                 window.play_fade(
@@ -1095,7 +1110,65 @@ class VideoPlayer(BasePlayer):
         digest = hashlib.sha1(os.path.abspath(video_path).encode()).hexdigest()[:16]
         return os.path.join(CONFIG_DIR, f"static-{digest}.png")
 
+    @property
+    def playback_state(self):
+        return "playing" if self._is_actually_playing() else "paused"
+
+    def _static_run(self, *args, **kwargs):
+        # Created on the main thread before scheduling a worker.
+        return self._static_jobs.run(*args, **kwargs)
+
+    def _prepare_static_jobs(self):
+        from apricus.child_jobs import ChildJobs
+
+        if not hasattr(self, "_static_jobs"):
+            self._static_jobs = ChildJobs()
+
+    def _static_probe(self, args, **kwargs):
+        result = self._static_run(args, stdout=subprocess.PIPE, **kwargs)
+        if result.returncode:
+            raise subprocess.CalledProcessError(result.returncode, args)
+        return result.stdout
+
+    @staticmethod
+    def _static_selection(config=None):
+        import json
+
+        latest = config if config is not None else ConfigUtil().load()
+        return json.dumps(
+            {key: latest.get(key) for key in ("mode", "data_source", "playlist")},
+            sort_keys=True,
+        )
+
+    def _publish_generated(self, temporary, cached, token, selection=None):
+        # Commit the cache AND apply it on the main loop under the same epoch
+        # check. A late worker cannot overwrite a newer frame's cache either.
+        def commit():
+            try:
+                latest = ConfigUtil().load()
+                if (
+                    token == getattr(self, "_static_token", 0)
+                    and not getattr(self, "_closing", False)
+                    and self.config.get(CONFIG_KEY_STATIC_WALLPAPER, True)
+                    and not latest.get("is_stopped", False)
+                    and latest.get(CONFIG_KEY_STATIC_WALLPAPER, True)
+                    and (selection is None or selection == self._static_selection(latest))
+                ):
+                    os.replace(temporary, cached)
+                    self._apply_static_wallpaper(cached)
+            except OSError as error:
+                logger.debug("[StaticWallpaper] commit skipped: %s", error)
+            finally:
+                try:
+                    os.remove(temporary)
+                except FileNotFoundError:
+                    pass
+            return False
+
+        GLib.idle_add(commit)
+
     def set_static_wallpaper(self, video=None):
+        self._prepare_static_jobs()
         if not self.wallpaper.supports_static:
             return
         video = video or self.data_source["Default"]
@@ -1119,7 +1192,7 @@ class VideoPlayer(BasePlayer):
         self._static_in_flight = video
         thread = threading.Thread(
             target=self._generate_static_wallpaper,
-            args=(video, cached, self._static_token),
+            args=(video, cached, self._static_token, self._static_selection()),
             daemon=True,
         )
         thread.start()
@@ -1142,23 +1215,23 @@ class VideoPlayer(BasePlayer):
             tmp_path,
         ]
 
-    def _generate_static_wallpaper(self, video, cached, token):
-        _width, _height, duration = mediacache.probe_video(video)
+    def _generate_static_wallpaper(self, video, cached, token, selection=None):
+        _width, _height, duration = mediacache.probe_video(video, check_output=self._static_probe)
         if duration is None:
             duration = 0
         # Find the golden ratio
         ss = time.strftime("%H:%M:%S", time.gmtime(duration / 3.14))
         # Keep a proper image extension so ffmpeg infers the muxer.
-        tmp_path = f"{cached}.tmp.png"
+        tmp_path = f"{cached}.{token}.tmp.png"
         try:
-            ret = subprocess.run(
+            ret = self._static_run(
                 self._static_ffmpeg_cmd(video, ss, tmp_path),
                 shell=False,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.STDOUT,
                 timeout=60,
             )
-        except subprocess.TimeoutExpired:
+        except (subprocess.TimeoutExpired, OSError):
             logger.warning("[StaticWallpaper] ffmpeg timed out")
             self._release_static_in_flight(video, token)
             return
@@ -1166,24 +1239,8 @@ class VideoPlayer(BasePlayer):
             logger.warning("[StaticWallpaper] frame extraction failed")
             self._release_static_in_flight(video, token)
             return
-        # Sharp frame, no blur: the static wallpaper sits underneath the video
-        # and blur only added startup cost for no visible benefit.
-        try:
-            os.replace(tmp_path, cached)
-        except OSError as e:
-            logger.warning(f"[StaticWallpaper] {e}")
-            self._release_static_in_flight(video, token)
-            return
-        finally:
-            if os.path.isfile(tmp_path) and tmp_path != cached:
-                try:
-                    os.remove(tmp_path)
-                except OSError:
-                    pass
-        perf.mark("player: static cache refreshed")
-        if token == getattr(self, "_static_token", None):
-            self._release_static_in_flight(video, token)
-            GLib.idle_add(self._apply_static_wallpaper, cached)
+        self._release_static_in_flight(video, token)
+        self._publish_generated(tmp_path, cached, token, selection)
 
     def _release_static_in_flight(self, video, token):
         """Clear the generation guard, unless a newer request superseded it."""
@@ -1194,12 +1251,22 @@ class VideoPlayer(BasePlayer):
             self._static_in_flight = None
 
     def _apply_static_wallpaper(self, static_wallpaper_path):
+        latest = ConfigUtil().load()
+        if (
+            getattr(self, "_closing", False)
+            or not self.config.get(CONFIG_KEY_STATIC_WALLPAPER, True)
+            or latest.get("is_stopped", False)
+            or not latest.get(CONFIG_KEY_STATIC_WALLPAPER, True)
+        ):
+            return False
         self._last_static_path = static_wallpaper_path
         self.wallpaper.apply_static(static_wallpaper_path)
         return False
 
-    def _generate_stream_static(self, url):
+    def _generate_stream_static(self, url, token=None, selection=None):
         """Pin a downloaded thumbnail as static for streams (background)."""
+        if token is None:
+            token = getattr(self, "_static_token", 0)
         from apricus.stream_thumbs import check_magic, decode_size
         from apricus.utils import public_http_url, valid_http_url
         from apricus.yt_utils import base_options
@@ -1240,7 +1307,8 @@ class VideoPlayer(BasePlayer):
                 if data is None:
                     return
             cached = self._static_cache_path(url)
-            tmp_path = f"{cached}.tmp.png"
+            fd, tmp_path = tempfile.mkstemp(suffix=".tmp.png", prefix=cached + ".")
+            os.close(fd)
             loader = GdkPixbuf.PixbufLoader.new()
             loader.write_bytes(GLib.Bytes(data))
             loader.close()
@@ -1249,7 +1317,6 @@ class VideoPlayer(BasePlayer):
                 return
             try:
                 pixbuf.savev(tmp_path, "png", [], [])
-                os.replace(tmp_path, cached)
             except Exception:
                 try:
                     os.remove(tmp_path)
@@ -1259,10 +1326,9 @@ class VideoPlayer(BasePlayer):
         except Exception as e:  # noqa: BLE001 - static stays as-is
             logger.debug(f"[StaticWallpaper] stream static failed: {e}")
             return
-        GLib.idle_add(self._apply_static_wallpaper, cached)
+        self._publish_generated(tmp_path, cached, token, selection)
 
-    @staticmethod
-    def _extract_remote_frame(url):
+    def _extract_remote_frame(self, url):
         """Single 8-bit frame from a direct video URL, or None."""
         from apricus.utils import public_http_url, valid_http_url
 
@@ -1273,7 +1339,7 @@ class VideoPlayer(BasePlayer):
         fd, tmp = tempfile.mkstemp(suffix=".png", prefix="apricus-static-")
         os.close(fd)
         try:
-            ret = subprocess.run(
+            ret = self._static_run(
                 VideoPlayer._static_ffmpeg_cmd(url, "00:00:03", tmp),
                 shell=False,
                 stdout=subprocess.DEVNULL,
@@ -1305,6 +1371,8 @@ class VideoPlayer(BasePlayer):
         if not self.wallpaper.supports_static or not video_path:
             return False
         _authorize("player.preview_static", dbus_context)
+        self._prepare_static_jobs()
+        self._static_token = getattr(self, "_static_token", 0) + 1
         cached = self._static_cache_path(video_path)
         if os.path.isfile(cached):
             self._apply_static_wallpaper(cached)
@@ -1312,7 +1380,9 @@ class VideoPlayer(BasePlayer):
             return True
         if video_path.startswith(("http://", "https://")):
             threading.Thread(
-                target=self._generate_stream_static, args=(video_path,), daemon=True
+                target=self._generate_stream_static,
+                args=(video_path, self._static_token, self._static_selection()),
+                daemon=True,
             ).start()
         return False
 
@@ -1328,6 +1398,7 @@ class VideoPlayer(BasePlayer):
         cached frame applied synchronously.
         """
         _authorize("player.refresh_static", dbus_context)
+        self._prepare_static_jobs()
         if not self.wallpaper.supports_static:
             return False
         if self.mode == MODE_STREAM:
@@ -1340,7 +1411,9 @@ class VideoPlayer(BasePlayer):
                     self._apply_static_wallpaper(cached)
                     return True
                 threading.Thread(
-                    target=self._generate_stream_static, args=(source,), daemon=True
+                    target=self._generate_stream_static,
+                    args=(source, getattr(self, "_static_token", 0), self._static_selection()),
+                    daemon=True,
                 ).start()
                 return True
             self.set_static_wallpaper(source)
@@ -1375,14 +1448,22 @@ class VideoPlayer(BasePlayer):
 
     def reload_config(self, dbus_context=None):
         _authorize("player.reload_config", dbus_context)
+        self._static_token = getattr(self, "_static_token", 0) + 1
+        self._static_in_flight = None
+        self._prepare_static_jobs()
         self.config = ConfigUtil().load()
 
     def quit_player(self, restore_wallpaper=True, dbus_context=None):
         _authorize("player.quit", dbus_context)
+        self._closing = True
+        self._static_token = getattr(self, "_static_token", 0) + 1
+        if hasattr(self, "_static_jobs"):
+            self._static_jobs.close()
         # NOTE: we intentionally do NOT restore the pre-Apricus wallpaper:
         # the last static frame stays as the desktop background across
         # logins, so re-entering the session never shows a bare default.
-        self.wallpaper.prune_cache(self._live_cache_paths())
+        if not ConfigUtil().load().get("is_stopped", False):
+            self.wallpaper.prune_cache(self._live_cache_paths())
 
         # Cleanup handlers
         if self.active_handler:
@@ -1411,6 +1492,9 @@ def main():
     setup_logging()
     logger.info(f"[Player] pid={os.getpid()}")
     app = VideoPlayer()
+    import signal
+
+    GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGTERM, lambda: app.quit_player(False))
     try:
         from apricus.utils import is_snap
 

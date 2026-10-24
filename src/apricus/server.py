@@ -19,6 +19,7 @@ from apricus.commons import (
     CONFIG_KEY_PAUSE_WHEN_MAXIMIZED,
     CONFIG_KEY_PLAYLIST,
     CONFIG_KEY_STATIC_WALLPAPER,
+    CONFIG_KEY_STOPPED,
     CONFIG_KEY_SYSTRAY,
     CONFIG_KEY_VOLUME,
     DBUS_NAME_PLAYER,
@@ -32,6 +33,7 @@ from apricus.commons import (
     resolve_video_dir,
 )
 from apricus.monitor import Monitors
+from apricus.stop_support import finish_process, stopped_background
 from apricus.utils import ConfigUtil, EndSessionHandler, _authorize, get_video_paths, is_snap
 
 # NOTE: menu and the player mains pin Gtk 3 namespaces at import time
@@ -49,12 +51,14 @@ def _gui_gtk4_target(version, pkgdatadir, localedir):
 
 
 def _video_player_target():
+    os.setsid()
     from apricus.player.video_player import main as video_player_main
 
     video_player_main()
 
 
 def _web_player_target():
+    os.setsid()
     from apricus.player.web_player import main as web_player_main
 
     web_player_main()
@@ -93,6 +97,8 @@ class ApricusServer:
         </method>
         <method name='pause_playback'/>
         <method name='start_playback'/>
+        <method name='stop_playback'/>
+        <method name='resume_playback'/>
         <method name="reload"/>
         <method name="respawn_player"/>
         <method name="feeling_lucky"/>
@@ -102,6 +108,7 @@ class ApricusServer:
         <property name="volume" type="i" access="readwrite"/>
         <property name="is_mute" type="b" access="readwrite"/>
         <property name="is_playing" type="b" access="read"/>
+        <property name="playback_state" type="s" access="read"/>
         <property name="is_paused_by_user" type="b" access="readwrite"/>
         <property name="is_static_wallpaper" type="b" access="readwrite"/>
         <property name="is_pause_when_maximized" type="b" access="readwrite"/>
@@ -159,8 +166,11 @@ class ApricusServer:
     def _load_config(self):
         self.config = ConfigUtil().load()
 
-    def _save_config(self):
-        ConfigUtil().save(self.config)
+    def _save_config(self, *, manual_stop=None):
+        if manual_stop is None:
+            ConfigUtil().save(self.config)
+        else:
+            ConfigUtil().save(self.config, manual_stop=manual_stop)
 
     def _setup_player(self, mode, data_source=None, monitor=None, force_respawn=False):
         """Setup and run player"""
@@ -196,6 +206,12 @@ class ApricusServer:
         # disk, so runtime mode switches via D-Bus must not rely on callers
         # saving first (the GUI used to mask this by saving itself).
         self._save_config()
+
+        if self.config.get(CONFIG_KEY_STOPPED, False):
+            # Changes/reload/respawn while stopped update selection, never play.
+            self._apply_stopped_background()
+            self._refresh_systray(mode)
+            return
 
         # Pre-apply the new video's cached static frame so the switch shows
         # the incoming wallpaper instead of the previous one. Best-effort:
@@ -290,6 +306,57 @@ class ApricusServer:
         except (GLib.Error, AttributeError):
             return False
 
+    def _apply_stopped_background(self):
+        # With the option OFF leave the existing desktop background untouched.
+        if not self.config.get(CONFIG_KEY_STATIC_WALLPAPER, True):
+            return
+        from apricus.backends import create_wallpaper_backend
+
+        backend = create_wallpaper_backend()
+        if backend.supports_static:
+            backend.apply_static(stopped_background(self.config))
+
+    def stop_playback(self, dbus_context=None):
+        """Persistent manual STOP. Destroy only the player, never server/GUI.
+
+        Unlike PAUSE this reclaims the entire VLC/WebKit process, including
+        decoder allocations. RESUME creates fresh handles; none are reused.
+        """
+        _authorize("stop_playback", dbus_context)
+        self._load_config()
+        self.config[CONFIG_KEY_STOPPED] = True
+        # Persist before shutdown so crash/reload cannot accidentally autoplay.
+        self._save_config(manual_stop=True)
+        proc = getattr(self, "player_process", None)
+        if proc is not None:
+            group = None
+            try:
+                if os.getpgid(proc.pid) == proc.pid:
+                    group = proc.pid
+            except ProcessLookupError:
+                pass
+            # A blocked stream resolver must not hold the server on a D-Bus
+            # call timeout. Players handle SIGTERM on their GLib main loop;
+            # the bounded process-group fallback handles an unresponsive one.
+            if proc.is_alive():
+                proc.terminate()
+            proc.join(timeout=0.75)
+            finish_process(proc, group)
+            self.player_process = None
+        # Old process/async callbacks are gone before changing the background.
+        self._load_config()
+        self._apply_stopped_background()
+
+    def resume_playback(self, dbus_context=None):
+        """Only this explicit operation clears manual STOP; repeat is a no-op."""
+        _authorize("resume_playback", dbus_context)
+        self._load_config()
+        if not self.config.get(CONFIG_KEY_STOPPED, False):
+            return
+        self.config[CONFIG_KEY_STOPPED] = False
+        self._save_config(manual_stop=False)
+        self.reload()
+
     @staticmethod
     def _preview_static(mode, data_source):
         video = None
@@ -369,9 +436,10 @@ class ApricusServer:
         if player:
             player.pause_playback()
 
-    @staticmethod
-    def start_playback(dbus_context=None):
+    def start_playback(self, dbus_context=None):
         _authorize("start_playback", dbus_context)
+        if self.config.get(CONFIG_KEY_STOPPED, False):
+            return
         player = get_instance(DBUS_NAME_PLAYER)
         if player:
             player.start_playback()
@@ -402,6 +470,8 @@ class ApricusServer:
         """
         _authorize("player.respawn", dbus_context)
         self._load_config()
+        if self.config.get(CONFIG_KEY_STOPPED, False):
+            return False
         mode = self.config.get(CONFIG_KEY_MODE, MODE_NULL)
         if mode not in (MODE_VIDEO, MODE_STREAM, MODE_PLAYLIST, MODE_WEBPAGE):
             logger.warning(f"[Server] respawn_player: unknown mode {mode!r}")
@@ -504,10 +574,24 @@ class ApricusServer:
 
     @property
     def is_playing(self):
+        if self.config.get(CONFIG_KEY_STOPPED, False):
+            return False
         player = get_instance(DBUS_NAME_PLAYER)
         if player is not None:
             return player.is_playing
         return False
+
+    @property
+    def playback_state(self):
+        if self.config.get(CONFIG_KEY_STOPPED, False):
+            return "stopped"
+        player = get_instance(DBUS_NAME_PLAYER)
+        if player is None:
+            return "unavailable"
+        try:
+            return player.playback_state
+        except (GLib.Error, AttributeError):
+            return "playing" if player.is_playing else "paused"
 
     @property
     def is_paused_by_user(self):
@@ -536,6 +620,9 @@ class ApricusServer:
     def is_static_wallpaper(self, is_static_wallpaper):
         self.config[CONFIG_KEY_STATIC_WALLPAPER] = is_static_wallpaper
         self._save_config()
+        if self.config.get(CONFIG_KEY_STOPPED, False):
+            self._apply_stopped_background()
+            return
         player = get_instance(DBUS_NAME_PLAYER)
         if player is not None:
             player.reload_config()

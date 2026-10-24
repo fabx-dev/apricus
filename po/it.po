@@ -1017,3 +1017,18 @@ msgstr "Esci da Apricus"
 
 #~ msgid "Restart Apricus to apply a new renderer"
 #~ msgstr "Riavvia Apricus per applicare il nuovo renderer"
+
+msgid "Stop wallpaper"
+msgstr "Ferma wallpaper"
+
+msgid "Resume wallpaper"
+msgstr "Riprendi wallpaper"
+
+msgid "Stopped"
+msgstr "Fermato"
+
+msgid "Playback unavailable"
+msgstr "Riproduzione non disponibile"
+
+msgid "Could not change wallpaper playback."
+msgstr "Impossibile modificare la riproduzione del wallpaper."

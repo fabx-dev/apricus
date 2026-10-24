@@ -1024,3 +1024,18 @@ msgstr "Apricus を終了"
 
 #~ msgid "Restart Apricus to apply a new renderer"
 #~ msgstr "新しいレンダラーを適用するには Apricus を再起動してください"
+
+msgid "Stop wallpaper"
+msgstr "壁紙を停止"
+
+msgid "Resume wallpaper"
+msgstr "壁紙を再開"
+
+msgid "Stopped"
+msgstr "停止中"
+
+msgid "Playback unavailable"
+msgstr "再生できません"
+
+msgid "Could not change wallpaper playback."
+msgstr "壁紙の再生状態を変更できませんでした。"

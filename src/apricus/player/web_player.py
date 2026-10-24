@@ -262,16 +262,21 @@ class WebPlayer(BasePlayer):
         return os.path.join(CONFIG_DIR, f"static-{digest}.png")
 
     def _save_web_snapshot(self, raw_source, pixbuf):
+        latest = ConfigUtil().load()
+        if latest.get("is_stopped", False):
+            return
+        if (
+            latest.get(CONFIG_KEY_MODE) != MODE_WEBPAGE
+            or raw_source not in (latest.get(CONFIG_KEY_DATA_SOURCE) or {}).values()
+        ):
+            return
         try:
             os.makedirs(CONFIG_DIR, exist_ok=True)
             cached = self._static_cache_path(raw_source)
             tmp = f"{cached}.tmp.png"
             pixbuf.savev(tmp, "png", [], [])
             os.replace(tmp, cached)
-            if (
-                self.config.get(CONFIG_KEY_STATIC_WALLPAPER, True)
-                and self.wallpaper.supports_static
-            ):
+            if latest.get(CONFIG_KEY_STATIC_WALLPAPER, True) and self.wallpaper.supports_static:
                 self.wallpaper.apply_static(cached)
         except Exception as e:  # noqa: BLE001
             logger.debug(f"[WebPlayer] static save failed: {e}")
@@ -412,6 +417,9 @@ def main():
     setup_logging()
     setup_render_device()
     app = WebPlayer()
+    import signal
+
+    GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGTERM, lambda: app.quit_player(False))
     try:
         from apricus.utils import is_snap
 

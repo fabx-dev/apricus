@@ -1024,3 +1024,18 @@ msgstr "Quitter Apricus"
 
 #~ msgid "Restart Apricus to apply a new renderer"
 #~ msgstr "Redémarrez Apricus pour appliquer le nouveau moteur de rendu"
+
+msgid "Stop wallpaper"
+msgstr "Arrêter le fond d’écran"
+
+msgid "Resume wallpaper"
+msgstr "Reprendre le fond d’écran"
+
+msgid "Stopped"
+msgstr "Arrêté"
+
+msgid "Playback unavailable"
+msgstr "Lecture indisponible"
+
+msgid "Could not change wallpaper playback."
+msgstr "Impossible de modifier la lecture du fond d’écran."

@@ -1018,3 +1018,18 @@ msgstr "Salir de Apricus"
 
 #~ msgid "Restart Apricus to apply a new renderer"
 #~ msgstr "Reinicia Apricus para aplicar el nuevo renderizador"
+
+msgid "Stop wallpaper"
+msgstr "Detener fondo"
+
+msgid "Resume wallpaper"
+msgstr "Reanudar fondo"
+
+msgid "Stopped"
+msgstr "Detenido"
+
+msgid "Playback unavailable"
+msgstr "Reproducción no disponible"
+
+msgid "Could not change wallpaper playback."
+msgstr "No se pudo cambiar la reproducción del fondo."
