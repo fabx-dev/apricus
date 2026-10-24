@@ -1488,3 +1488,13 @@ still passing.
 
 **Stopped after a complete functional matrix and benchmarks. Do not start
 Snap/Flatpak package validation.**
+
+### Package validation preparation ([validation date omitted], no installs)
+
+Functional Wayland validation is PASS with documented limits. Package work is
+tracked separately in `docs/notes/packaging-m1.md`: 392 automated tests pass,
+M1 packaging is byte-identical to the reviewed integration branch (no M1
+packaging commits), Flatpak experimental build running locally
+(artifact-only, no remote), Snap experimental build prepared but gated on
+explicit sudo approval. No installs, tags, releases or publications performed.
+No production, sandbox, SSRF-guard or renderer changes.
