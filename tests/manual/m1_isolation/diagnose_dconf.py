@@ -2,16 +2,18 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Read-only GSettings API probes; trace native dconf initialization writes.
 
-Never grants dconf write access under Landlock or launches Apricus. The host
-control uses the normal dconf client, which itself writes its runtime marker.
+Opt-in --allow-marker-write uses only the approved existing-inode WRITE_FILE
+rule. Never launches Apricus or modifies GSettings values.
 """
 
 import json
 import os
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 
+from landlock_guard import check_dconf, dconf_identity
 from launcher import WORKTREE, app_bus_owners, snap_processes, source_hashes, stable_files
 from m1_bootstrap import PROTECTED
 from m1_probe import host_settings
@@ -32,6 +34,10 @@ def main():
     os.umask(0o077)
     root = Path(tempfile.mkdtemp(prefix="m1-dconf-", dir=WORKTREE / "build"))
     before = snapshot()
+    allow = sys.argv[1:] == ["--allow-marker-write"]
+    if sys.argv[1:] and not allow:
+        raise SystemExit("Only optional --allow-marker-write is supported")
+    identity = dconf_identity()
     runtime = Path(os.environ["XDG_RUNTIME_DIR"]) / "dconf/user"
     paths = {}
     for path in (runtime, Path.home() / ".config/dconf/user"):
@@ -56,9 +62,11 @@ loop.run()
     for label in ("host", "guarded"):
         prefix = ""
         if label == "guarded":
+            exception = f", dconf={identity!r}" if allow else ""
             prefix = (
                 f"import sys; sys.path.insert(0,{str(Path(__file__).parent.resolve())!r}); "
-                f"from landlock_guard import restrict_writes; restrict_writes(({str(root)!r},));\n"
+                f"from landlock_guard import restrict_writes,check_dconf; "
+                f"restrict_writes(({str(root)!r},){exception});\n"
             )
         result = subprocess.run(
             [
@@ -84,6 +92,7 @@ loop.run()
         traces[label] = dict(
             returncode=result.returncode, stdout=result.stdout, stderr=result.stderr
         )
+        check_dconf(identity)
     after = snapshot()
     report = dict(
         paths=paths,
@@ -91,7 +100,8 @@ loop.run()
         after=after,
         host_state_unchanged=before == after,
         traces=traces,
-        dconf_write_exception_granted=False,
+        dconf_write_exception_granted=allow,
+        dconf_identity=identity,
         no_apricus_launched=True,
     )
     (root / "report.json").write_text(json.dumps(report, indent=2))

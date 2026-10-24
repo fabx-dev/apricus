@@ -63,11 +63,47 @@ def settings():
 
 def blocked_write_checks(label):
     import m1_bootstrap as shim
+    from landlock_guard import check_dconf
+
+    dconf = json.loads(os.environ["APRICUS_M1_DCONF_IDENTITY"])
+    check_dconf(dconf)
+    # Opening the existing marker for write is now allowed, but truncating it
+    # is not. Request its existing size: even a faulty guard cannot erase data
+    # in this negative test. No bytes are written by this test.
+    fd = os.open(dconf["path"], os.O_RDWR)
+    try:
+        try:
+            os.ftruncate(fd, os.fstat(fd).st_size)
+        except PermissionError:
+            pass
+        else:
+            raise AssertionError("dconf TRUNCATE unexpectedly allowed")
+    finally:
+        os.close(fd)
 
     sentinel = shim.ROOT / "control/sentinel"
     alias = shim.PROFILE / "t" / f"escape-{os.getpid()}-{label}"
     alias.symlink_to(sentinel)
-    results = {}
+    results = {"dconf_truncate": "DENIED"}
+    stable = Path.home() / "snap/apricus/current/.config/apricus/config.json"
+    try:
+        fd = os.open(stable, os.O_WRONLY)
+    except PermissionError:
+        results["stable_config_write_open"] = "DENIED"
+    else:
+        os.close(fd)
+        raise AssertionError("Stable Snap config writable")
+    for name, target in (
+        ("dconf_sibling_create", Path(dconf["path"]).parent / f"m1-denied-{os.getpid()}-{label}"),
+        ("outside_create", shim.ROOT / "control" / f"denied-{os.getpid()}-{label}"),
+    ):
+        try:
+            fd = os.open(target, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+        except PermissionError:
+            results[name] = "DENIED"
+        else:
+            os.close(fd)
+            raise AssertionError(f"Outside creation allowed: {name}")
     for name, target in (("python", sentinel), ("symlink", alias)):
         try:
             target.write_bytes(b"must-not-write")
@@ -97,6 +133,7 @@ def blocked_write_checks(label):
     else:
         raise AssertionError("Cross-boundary hardlink unexpectedly succeeded")
     alias.unlink()
+    check_dconf(dconf)
     return results
 
 
@@ -253,6 +290,7 @@ def emit(role, label):
         else:
             raise AssertionError("Application startup guard failed")
     result = dict(
+        dconf_identity=json.loads(os.environ["APRICUS_M1_DCONF_IDENTITY"]),
         role=role,
         label=label,
         pid=os.getpid(),

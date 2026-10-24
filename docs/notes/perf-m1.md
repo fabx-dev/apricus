@@ -856,3 +856,116 @@ sudo, push, PR #1 change, merge, tag, release or publication.
 preflight cannot honestly be reported under the present rights. Further work
 requires separate approval for the precisely scoped runtime-marker write rule;
 another real GNOME M1 run remains unauthorized.
+
+## Approved file-only dconf exception — positive preflight ([validation date omitted])
+
+The user authorized testing WRITE_FILE on the **already-existing** runtime marker
+only, without another desktop M1 run or Snap shutdown. This section supersedes
+the previous blocked preflight disposition, not the earlier failed live result.
+
+### Rule and resource validation
+
+Only test tooling changed. `landlock_guard.restrict_writes(..., dconf=identity)`
+adds a file-specific PATH_BENEATH rule with allowed mask **2**,
+`LANDLOCK_ACCESS_FS_WRITE_FILE`. The existing read policy is unchanged.
+**No TRUNCATE, MAKE_REG, REMOVE_FILE, dconf-directory or generic runtime rights**
+are added. AppArmor and the dconf implementation/profile are unchanged.
+
+Before the rule is applied, the adapter verifies the canonical path
+`/run/user/1000/dconf/user`, rejects symlinks including ancestors, requires a
+regular existing file, UID/GID 1000, mode **0600**, and link count 1. It opens an
+O_PATH|O_NOFOLLOW|O_CLOEXEC descriptor, checks its device/inode and adds the rule
+to that FD's resource, not its parent. Expected identity is inherited by every
+new interpreter and rechecked in forked roles. Missing or unsafe resources are
+not created or repaired. The launcher checks identity/permissions every 50 ms
+while the private probe process group runs and before/after it; replacement
+causes interruption and re-evaluation, not automatic rebinding. This polling is
+not an atomic guarantee against a transient malicious filesystem replacement.
+
+Observed stable resource: device **89**, inode **1142**, UID/GID **1000/1000**,
+mode **0600**, nlink **1**. No replacement/identity change occurred. WRITE_FILE
+does **not** limit writes to a particular byte or payload: any content write to
+this inode is possible; only the normal dconf client's demonstrated allocation
+pwrite is needed here. It is a runtime notification marker, **not** the actual
+`~/.config/dconf/user` settings database. The latter's hash and metadata are now
+also explicitly included in the protected-file comparison.
+
+### Syscall evidence and preflight
+
+`<private-evidence-dir>/{host.trace,guarded.trace,report.json}` retains the repeat
+probe, with the explicit `--allow-marker-write` switch. Under the approved guard:
+
+```text
+openat(..., "/run/user/1000/dconf/user", O_RDWR|O_CREAT, 0600) = fd
+pwrite64(fd, "\0", 1, 1) = 1
+mmap(NULL, 1, PROT_READ, MAP_SHARED, fd, 0) = address
+```
+
+No native dconf critical error remains. Existing-file O_CREAT succeeds without
+granting creation rights on its parent. GSettings values, protected files,
+Snap identities and session variables match the host control.
+
+Final preflight: **PASS**, all **15 checks** true, evidence root
+**`build/m1p-01ja42ur/`**. `marker.json` fingerprints the exact adapter used;
+per-role JSON and logs are retained under `evidence/`. No server/player/GUI
+instance was constructed; imports and safe fixture/config/cache writes only.
+
+| Check | Result |
+|---|---|
+| Existing-marker identity and safe owner/mode/path | PASS, same in all 11 contexts |
+| Native dconf initialization | PASS, no dconf critical diagnostics |
+| 11 real GNOME values / 13 protected environment variables | PASS, host and child contexts agree |
+| Host settings remain unchanged | PASS, values plus actual dconf DB hash/metadata unchanged |
+| Private config/legacy/static/cache/thumbnail/stream/WebKit/VLC/temp paths | PASS, original alias checks retained |
+| spawn/forkserver server/video/web/GUI imports; thread/exec workers | PASS, 11 contexts, helpers exit |
+| Kernel write boundary | PASS, **99 denial checks**, 9 per context |
+| Actual dconf marker ftruncate | DENIED in every context; requested existing size, so no destructive truncation even if a policy bug existed |
+| Creation in dconf parent and outside profile | DENIED in every context |
+| Actual stable Snap config write-open | DENIED in every context; no content modification attempted |
+| Existing sentinel Python/native/shell/symlink/hardlink escapes | DENIED; original sentinel content preserved |
+| Snap processes, app bus owners, installed extension/stable files | PASS, unchanged within the whole probe window |
+| Production files | PASS, unchanged |
+
+The rule never grants REMOVE_FILE; no attempt was made to unlink the real marker
+as a destructive test. Same-size ftruncate checks the independently mediated
+TRUNCATE permission without erasing the marker. Normal dconf initialization
+writes its second byte and may update runtime-marker timestamps; that expected
+activity is not presented as a byte-for-byte frozen runtime file.
+
+Tests: **11 passed**, including identity-change and unexpected-runtime rejection,
+native-error preflight rejection, and logging-helper lifetime. Ruff lint/format
+checks pass. Python 3.14 emits an existing ctypes packed-structure deprecation
+warning; the actual Linux ABI structure/rule succeeded in the syscall preflight.
+
+### H.264 preparation, deliberately separate
+
+No new decoding run was needed, no VLC option was changed, and the earlier
+dummy-output diagnosis is not promoted to an embedded-renderer PASS. New dormant
+`tests/manual/m1_isolation/vlc_diagnostics.py` prepares public LibVLC file logging
+with explicit FILE* lifetime, and timestamped process-map/status/media-statistics
+snapshots. It has **no automatic hook, VLC import, playback or option changes**.
+Its lifecycle is tested with a fake Instance; actual LibVLC logging integration
+is still pending a separately authorized test.
+
+For that future adapter integration, attach immediately after the real Instance
+is created and before media/player setup. Keep complete native logs and stderr:
+the public logging API cannot recover Instance-construction messages, and FFmpeg
+may emit directly to stderr. Collect mapped plugin versions, module-selection
+messages and media statistics before the first error/teardown, and correlate
+with a full subprocess-following syscall trace covering allocation/shared-memory
+and file denials. Never substitute dummy output or disable hardware in the real
+test to make it pass. Tracing/logging overhead must be separated from latency
+measurements. No cause for the historical H.264 failure is asserted here.
+
+### Final disposition
+
+Snap remained running with unchanged recorded identities (server **[process ID omitted]**,
+player **[process ID omitted]**, helpers **[process IDs omitted]**); no restart or restoration was
+needed. Real session settings, original extension and stable Apricus profiles
+remain intact. No sudo, service/autostart changes, production edits, other
+worktree access, PR #1 change, push, merge, tag, release or publication.
+
+**Stopped after the positive preflight. No new GNOME M1 runtime started.**
+Any future marker replacement or new native denial remains a reason to stop,
+not to grant directory permissions. A fresh inventory/backup and explicit
+authorization are still required before a real-session validation retry.

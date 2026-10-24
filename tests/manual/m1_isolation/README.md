@@ -30,6 +30,55 @@ The preflight now fails on native dconf critical messages, even when values
 match. **Current result: FAIL**, pending separate permission for the demonstrated
 runtime-marker write requirement. No dconf exception has been applied.
 
+### Approved existing-marker exception (supersedes the preceding status)
+
+The user subsequently authorized **WRITE_FILE only** on the existing regular
+file `/run/user/1000/dconf/user`. The preflight now passes its verified identity
+to every interpreter; no directory rule is added. The guard requires UID/GID
+1000, mode 0600, one link, no symlink in the path, the expected real runtime,
+and matching device/inode. Missing/unsafe/replaced resources fail closed; no
+creation, repair or replacement is attempted. The controller checks identity
+every 50 ms while probes run and before/after; each guard and role checks too.
+This is not an atomic filesystem replacement monitor: a future replacement
+requires stopping/re-evaluation, not dynamically widening/rebinding the rule.
+
+No TRUNCATE, MAKE_REG, REMOVE_FILE or parent-directory rights are granted.
+Reads remain allowed by the original policy. WRITE_FILE is not byte-scoped and
+can write other marker contents; the native client normally writes NUL at offset
+1. This exception is for the runtime notification marker, not the configuration
+database. Native dconf content initialization may update marker timestamps.
+
+Repeat the approved syscall probe without starting Apricus:
+
+```sh
+PYTHONDONTWRITEBYTECODE=1 .venv/bin/python tests/manual/m1_isolation/diagnose_dconf.py --allow-marker-write
+```
+
+Then run the usual preflight launcher. It retains database hashes/metadata,
+real GSettings equality and stable-profile write-denial checks, adds marker
+identity checks, same-size ftruncate denial, sibling/outside creation denial,
+and denial of a write-open on the actual stable Snap config (no content write).
+Latest result: **PASS**, `build/m1p-01ja42ur/`. This is NOT permission to run M1.
+
+### Future VLC diagnostics, not enabled here
+
+`vlc_diagnostics.py` is dormant tooling, with no import-time hook or VLC import.
+For a separately approved future test, attach `NativeLog` to the real LibVLC
+Instance immediately after creation and before media/player startup; use the
+public file-logging API, then unset/close before Instance release. It adds no VLC
+options and preserves the real binding class. Capture stderr separately because
+the logging API cannot recover Instance-construction messages or FFmpeg's direct
+stderr output. `snapshot()` can retain per-player mapped libraries/status and
+media statistics at first-playing, first-error, and before teardown.
+
+Before that future test, integrate these helpers only in the adapter, retain
+complete logs (not only filtered errors), and wrap the controlled source launch
+with `strace -f -yy` for openat/mmap/ftruncate/memfd_create/shm syscalls. Correlate
+timestamps, decoder/vout module-selection and frame/allocation messages with
+denied syscalls. Account for logging/tracing overhead in performance results.
+The helper's FILE lifetime is unit-tested with a fake Instance; actual native
+logging coverage and future live integration are **not tested/enabled** here.
+
 Run from the dedicated M1 worktree using its independent environment:
 
 ```sh

@@ -207,7 +207,8 @@ def activate():
             pass
     from landlock_guard import restrict_writes
 
-    ABI = restrict_writes((PROFILE, EVIDENCE))
+    dconf = json.loads(os.environ["APRICUS_M1_DCONF_IDENTITY"])
+    ABI = restrict_writes((PROFILE, EVIDENCE), dconf=dconf)
     sys.addaudithook(audit)
     from apricus import commons
 

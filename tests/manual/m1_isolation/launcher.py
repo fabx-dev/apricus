@@ -6,6 +6,7 @@
 import hashlib
 import json
 import os
+import signal
 import stat
 import subprocess
 import sys
@@ -13,6 +14,7 @@ import tempfile
 import time
 from pathlib import Path
 
+from landlock_guard import check_dconf, dconf_identity
 from m1_bootstrap import PROTECTED
 from m1_probe import host_settings
 
@@ -38,6 +40,7 @@ def stable_files():
         home / ".local/share/gnome-shell/extensions/apricus-integration@fabx-dev",
     ]
     files = [
+        Path(os.environ.get("XDG_CONFIG_HOME") or home / ".config") / "dconf/user",
         home / ".config/autostart/io.github.fabx_dev.Apricus.desktop",
         home / ".config/systemd/user/apricus.service",
         home / ".local/bin/apricus",
@@ -114,6 +117,7 @@ def main():
     if Path(sys.prefix).resolve() != WORKTREE / ".venv":
         raise SystemExit("Use only the independent M1 .venv/bin/python")
     os.umask(0o077)
+    dconf = dconf_identity()
     build = WORKTREE / "build"
     if build.is_symlink():
         raise SystemExit("Do not use a symlinked build directory")
@@ -167,6 +171,7 @@ def main():
     env.update(
         APRICUS_M1_PREFLIGHT_ROOT=str(root),
         APRICUS_M1_PHASE="preflight",
+        APRICUS_M1_DCONF_IDENTITY=json.dumps(dconf),
         APRICUS_M1_HOST_ENV=json.dumps(before["environment"]),
         PYTHONPATH=os.pathsep.join((str(ADAPTER), str(WORKTREE / "src"))),
         PYTHONDONTWRITEBYTECODE="1",
@@ -185,14 +190,26 @@ def main():
     assert {key: env.get(key) for key in PROTECTED} == before["environment"]
     print(f"Evidence root: {root}", flush=True)
     with (root / "evidence/probe.log").open("w") as log:
-        completed = subprocess.run(
+        completed = subprocess.Popen(
             [sys.executable, str(ADAPTER / "m1_probe.py")],
             env=env,
             cwd=WORKTREE,
             stdout=log,
             stderr=log,
-            timeout=300,
+            start_new_session=True,
         )
+        deadline = time.monotonic() + 300
+        try:
+            while completed.poll() is None:
+                check_dconf(dconf)
+                if time.monotonic() > deadline:
+                    raise TimeoutError("Preflight timed out")
+                time.sleep(0.05)
+            check_dconf(dconf)
+        except BaseException:
+            os.killpg(completed.pid, signal.SIGTERM)
+            completed.wait(timeout=10)
+            raise
     after = dict(
         environment={key: os.environ.get(key) for key in PROTECTED},
         settings=host_settings(),
@@ -227,6 +244,9 @@ def main():
         for role in ("server", "video", "web", "gui")
     }
     checks = {
+        "dconf_identity_unchanged": dconf_identity() == dconf,
+        "dconf_identity_equal_in_children": bool(records)
+        and all(row["dconf_identity"] == dconf for row in records),
         # Matching values alone miss broken dconf change-notification setup.
         "native_dconf_initialization_clean": native_dconf_clean(
             (root / "evidence/probe.log").read_text(errors="replace")
@@ -237,7 +257,7 @@ def main():
         "all_kernel_guards_verified": bool(records)
         and all(
             row["landlock_abi"] >= 3
-            and len(row["denials"]) == 5
+            and len(row["denials"]) == 9
             and set(row["denials"].values()) == {"DENIED"}
             for row in records
         ),
@@ -261,6 +281,7 @@ def main():
         roles=[(row["label"], row["pid"]) for row in records],
         bootstrap_pids=[row["pid"] for row in bootstraps],
         no_wallpaper_started=True,
+        dconf_exception=dict(identity=dconf, allowed_access="WRITE_FILE", mask=2),
         root=str(root),
     )
     (root / "report.json").write_text(json.dumps(report, indent=2))

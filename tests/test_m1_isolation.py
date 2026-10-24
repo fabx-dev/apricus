@@ -117,3 +117,49 @@ def test_preflight_rejects_native_dconf_failure_even_with_matching_values(log, e
         assert module.native_dconf_clean(log) is expected
     finally:
         sys.path[:] = old_path
+
+
+def manual_module(name):
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(name, ADAPTER / f"{name}.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_dconf_changed_identity_fails_closed(monkeypatch):
+    module = manual_module("landlock_guard")
+    monkeypatch.setattr(module, "dconf_identity", lambda: {"inode": 2})
+    with pytest.raises(RuntimeError, match="identity/permissions changed"):
+        module.check_dconf({"inode": 1})
+
+
+def test_dconf_unapproved_runtime_fails_closed(monkeypatch):
+    module = manual_module("landlock_guard")
+    monkeypatch.setenv("XDG_RUNTIME_DIR", "/unexpected/runtime")
+    with pytest.raises(RuntimeError, match="approved only"):
+        module.dconf_identity()
+
+
+def test_future_native_logging_lifetime_without_loading_vlc(tmp_path):
+    import ctypes
+
+    module = manual_module("vlc_diagnostics")
+    calls = []
+
+    class FakeInstance:
+        def log_set_file(self, stream):
+            assert ctypes.cast(stream, ctypes.c_void_p).value
+            calls.append("set")
+
+        def log_unset(self):
+            calls.append("unset")
+
+    logger = module.NativeLog(
+        FakeInstance(), tmp_path, file_pointer_type=ctypes.POINTER(ctypes.c_char)
+    )
+    assert logger.path.exists()
+    logger.close()
+    logger.close()
+    assert calls == ["set", "unset"]
