@@ -60,6 +60,7 @@ from apricus.utils import (
     ConfigUtil,
     get_video_paths,
     init_translations,
+    is_flatpak,
     is_gnome,
     is_snap,
     is_wayland,
@@ -152,11 +153,26 @@ class ControlPanel(Adw.Application):
         self.config = ConfigUtil().load()
         self.playlist_paths = list((self.config.get("playlist") or {}).get("Default", []))
 
+    def do_startup(self):
+        Adw.Application.do_startup(self)
+        from apricus.gnome_bridge import start
+
+        self._gnome_bridge = start(self._refresh_integration_row)
+
     def do_shutdown(self):
+        from apricus.gnome_bridge import stop
+
+        stop()
         pool = getattr(self, "_stream_thumb_pool", None)
         if pool is not None:
             pool.shutdown(wait=False, cancel_futures=True)
             self._stream_thumb_pool = None
+        subscription = getattr(self, "_integration_subscription", None)
+        if subscription is not None:
+            subscription.unsubscribe()
+        timer = getattr(self, "_integration_timer", None)
+        if timer:
+            GLib.source_remove(timer)
         Gio.Application.do_shutdown(self)
 
     def do_activate(self):
@@ -3733,6 +3749,68 @@ class ControlPanel(Adw.Application):
             "state-set", self._on_settings_flag, CONFIG_KEY_MUTE_WHEN_MAXIMIZED
         )
         box.append(behaviour)
+        if is_gnome() and is_wayland():
+            icons = Adw.PreferencesGroup()
+            icons.set_title(_("Desktop icons"))
+            self.integ_row = Adw.ActionRow()
+            self.integ_row.set_title(_("Keep icons above video"))
+            self.integ_switch = Gtk.Switch()
+            self.integ_switch.set_valign(Gtk.Align.CENTER)
+            self.integ_switch.connect("state-set", self._on_integration_toggled)
+            self.integ_row.add_suffix(self.integ_switch)
+            icons.add(self.integ_row)
+            self._host_cmd = None
+            self.prep_row = Adw.ActionRow()
+            self.prep_row.set_title(_("Prepare host installation"))
+            self.prep_row.set_subtitle(
+                _("Export the extension files, then run one command on the host")
+            )
+            self.prep_btn = Gtk.Button(label=_("Prepare"))
+            self.prep_btn.set_valign(Gtk.Align.CENTER)
+            self.prep_btn.connect("clicked", self._on_prepare_host_install)
+            self.prep_row.add_suffix(self.prep_btn)
+            verify_btn = Gtk.Button(label=_("Verify status"))
+            verify_btn.set_valign(Gtk.Align.CENTER)
+            verify_btn.connect(
+                "clicked", lambda button: self._on_prepare_host_install(button, verify=True)
+            )
+            self.prep_row.add_suffix(verify_btn)
+            icons.add(self.prep_row)
+            self.cmd_row = Adw.ActionRow()
+            self.cmd_row.set_title(_("Run on the host"))
+            self.cmd_row.set_subtitle(_("Log out and back in afterwards"))
+            self.cmd_row.set_subtitle_selectable(True)
+            self.copy_btn = Gtk.Button(label=_("Copy"))
+            self.copy_btn.set_valign(Gtk.Align.CENTER)
+            self.copy_btn.connect("clicked", self._on_copy_host_command)
+            self.cmd_row.add_suffix(self.copy_btn)
+            self.check_btn = Gtk.Button(label=_("Check again"))
+            self.check_btn.set_valign(Gtk.Align.CENTER)
+            self.check_btn.connect("clicked", self._on_check_integration)
+            self.cmd_row.add_suffix(self.check_btn)
+            icons.add(self.cmd_row)
+            box.append(icons)
+            self._refresh_integration_row()
+            window = getattr(self, "window", None)
+            if window is not None:
+                window.connect("notify::is-active", lambda *_: self._refresh_integration_row())
+            stack = getattr(self, "stack", None)
+            if stack is not None:
+                stack.connect(
+                    "notify::visible-child-name", lambda *_: self._refresh_integration_row()
+                )
+            # Also update receipt expiry while Settings stays open.
+            self._integration_timer = GLib.timeout_add_seconds(30, self._poll_integration)
+            if not (is_snap() or is_flatpak()):
+                try:
+                    self._integration_subscription = SessionBus().subscribe(
+                        sender="org.gnome.Shell.Extensions",
+                        object="/org/gnome/Shell/Extensions",
+                        signal="ExtensionStateChanged",
+                        signal_fired=lambda *_: self._refresh_integration_row(),
+                    )
+                except Exception as e:
+                    logger.debug("[GUI4] Integration subscription unavailable: %s", e)
         startup = Adw.PreferencesGroup()
         startup.set_title(_("Startup"))
         self.autostart_row, self.autostart_switch = self._settings_switch_row(
@@ -3777,6 +3855,231 @@ class ControlPanel(Adw.Application):
         info.add(about_row)
         box.append(info)
         return self._scroll_page(self._clamp_page(box))
+
+    def _poll_integration(self):
+        window = getattr(self, "window", None)
+        stack = getattr(self, "stack", None)
+        if window is not None and stack is not None and window.is_active():
+            if stack.get_visible_child_name() == "settings":
+                self._refresh_integration_row()
+        return True
+
+    def _refresh_integration_row(self):
+        """Show the GNOME Shell integration state (never raises)."""
+        row = getattr(self, "integ_row", None)
+        switch = getattr(self, "integ_switch", None)
+        if row is None:
+            return
+        try:
+            from apricus.gnome_shell import EXTENSION_UUID, integration_status
+
+            state, detail = integration_status()
+        except Exception:  # noqa: BLE001 - status must never break settings
+            from apricus.gnome_shell import EXTENSION_UUID
+
+            state, detail = "unknown", {}
+        switch_on, sensitive = False, False
+        if state == "active":
+            subtitle = _("Active — icons stay above the video")
+            switch_on, sensitive = True, True
+        elif state == "loaded":
+            subtitle = _("Loaded — integration is not operational")
+        elif state == "disabled":
+            if is_snap() or is_flatpak():
+                subtitle = (
+                    _("Installed but disabled — enable it manually: gnome-extensions enable")
+                    + f" {EXTENSION_UUID}"
+                )
+            else:
+                subtitle = _("Installed but disabled — turn on to keep icons above video")
+                switch_on, sensitive = False, True
+        elif state == "needs_logout":
+            subtitle = _("Enabled — log out and back in to activate it")
+            switch_on, sensitive = True, True
+        elif state == "not_discovered":
+            subtitle = _("Installed — log out and back in so GNOME finds it")
+            switch_on, sensitive = False, True
+        elif state == "not_installed":
+            subtitle = _("Not installed — native packages include it; see README")
+        elif state == "incompatible":
+            supported = ", ".join(detail.get("supported") or []) or "?"
+            subtitle = _("Unsupported GNOME {shell} (supports {supported})").format(
+                shell=detail.get("shell") or "?", supported=supported
+            )
+        elif state == "error":
+            subtitle = _("Failed to load — check the journal for errors")
+        elif state == "stale":
+            receipt = detail.get("receipt", {})
+            last = (
+                _("Active")
+                if receipt.get("loaded")
+                else (_("Enabled") if receipt.get("enabled") else _("Disabled"))
+            )
+            subtitle = _("Verification expired — last result: {status}").format(status=last)
+        else:
+            subtitle = _("Status unavailable")
+        receipt = detail.get("receipt")
+        if detail.get("bridge") and state == "active":
+            subtitle += " · " + _("Wallpaper windows adopted: {count}").format(
+                count=detail.get("adopted", 0)
+            )
+        if receipt and isinstance(receipt.get("checked_at"), (int, float)):
+            stamp = time.strftime("%d/%m %H:%M", time.localtime(receipt["checked_at"]))
+            subtitle += " · " + _("Last host check: {time}").format(time=stamp)
+        if (is_snap() or is_flatpak()) and state in ("active", "disabled", "needs_logout"):
+            action = "disable" if switch_on else "enable"
+            subtitle += (
+                " · " + _("Run on the host") + f": gnome-extensions {action} {EXTENSION_UUID}"
+            )
+        row.set_subtitle(subtitle)
+        if switch is not None:
+            self._integration_updating = True
+            try:
+                switch.set_active(switch_on)
+                switch.set_state(switch_on)
+                switch.set_sensitive(sensitive and not (is_snap() or is_flatpak()))
+            finally:
+                self._integration_updating = False
+        self._refresh_host_install_rows(state)
+
+    def _refresh_host_install_rows(self, state):
+        """Show the guided host install only where the sandbox needs it."""
+        prep = getattr(self, "prep_row", None)
+        cmd_row = getattr(self, "cmd_row", None)
+        if prep is None or cmd_row is None:
+            return
+        # Sandbox note: inside Snap/Flatpak the host extension dir is
+        # invisible, so a genuinely missing extension and an unreachable
+        # Shell look identical ("unknown"). Keep Prepare available where
+        # the user may still need the host command (missing, unknown,
+        # expired receipt, or installed-but-disabled); hide it once the
+        # flow is complete (active, waiting for login) or when it cannot
+        # help (error, incompatible).
+        show = (is_snap() or is_flatpak()) and state in (
+            "not_installed",
+            "unknown",
+            "stale",
+            "disabled",
+        )
+        prep.set_visible(show)
+        cmd = getattr(self, "_host_cmd", None)
+        export_dir = getattr(self, "_host_export_dir", None)
+        if (
+            cmd
+            and export_dir
+            and state in ("active", "disabled", "needs_logout", "stale", "error", "incompatible")
+        ):
+            from apricus.gnome_shell import host_verify_command
+
+            cmd = self._host_cmd = host_verify_command(export_dir)
+        cmd_row.set_visible(bool(show and cmd))
+        if cmd:
+            cmd_row.set_subtitle(cmd)
+        prep.set_subtitle(
+            _("Prepare exports installation and verification commands; run them on the host")
+        )
+
+    def _on_prepare_host_install(self, _button, verify=False):
+        """Export ZIP + installer for the host (never executes anything)."""
+        try:
+            from apricus.gnome_shell import (
+                host_verify_command,
+                integration_status,
+                prepare_host_install,
+            )
+
+            _export_dir, cmd = prepare_host_install()
+            self._host_export_dir = _export_dir
+            state, detail = integration_status()
+            installed = state in (
+                "active",
+                "disabled",
+                "needs_logout",
+                "stale",
+                "error",
+                "incompatible",
+            )
+            if "receipt" in detail:
+                installed = detail["receipt"].get("installed", False)
+            if verify or installed:
+                cmd = host_verify_command(_export_dir)
+        except Exception as e:  # noqa: BLE001 - show the failure inline
+            self._toast(_("Could not prepare installation files ({err})").format(err=e))
+            return
+        self._host_cmd = cmd
+        self._refresh_integration_row()
+        self._toast(_("Files ready — run the command on the host"))
+
+    def _on_copy_host_command(self, _button):
+        cmd = getattr(self, "_host_cmd", None)
+        if not cmd:
+            return
+        try:
+            display = Gdk.Display.get_default()
+            if display is None:
+                raise RuntimeError("no display")
+            clipboard = display.get_clipboard()
+            set_text = getattr(clipboard, "set_text", None)
+            if set_text is not None:
+                set_text(cmd)
+            else:
+                # Some Gtk4 bindings (observed on 4.22) do not expose
+                # GdkClipboard.set_text: offer plain text via a provider.
+                provider = Gdk.ContentProvider.new_for_bytes(
+                    "text/plain;charset=utf-8", GLib.Bytes(cmd.encode("utf-8"))
+                )
+                clipboard.set_content(provider)
+        except Exception as e:  # noqa: BLE001 - clipboard best effort
+            self._toast(_("Could not copy ({err})").format(err=e))
+            return
+        self._toast(_("Command copied"))
+
+    def _on_check_integration(self, _button):
+        """Re-read the real extension status (e.g. after a host install)."""
+        self._host_cmd = getattr(self, "_host_cmd", None)
+        self._refresh_integration_row()
+        if is_snap() or is_flatpak():
+            self._toast(
+                _(
+                    "Reads the last host check; run the verification command on the host to update it"
+                )
+            )
+
+    def _on_integration_toggled(self, switch, state):
+        """Enable/disable the Shell extension on explicit user action."""
+        if getattr(self, "_integration_updating", False):
+            return True
+        if is_snap() or is_flatpak():
+            self._refresh_integration_row()
+            return True
+        want = bool(state)
+        self._integration_updating = True
+        failure = None
+        try:
+            from apricus.gnome_shell import EXTENSION_UUID
+            from apricus.utils import gnome_extension_set_disable, gnome_extension_set_enable
+
+            operation = gnome_extension_set_enable if want else gnome_extension_set_disable
+            if not operation(EXTENSION_UUID):
+                raise RuntimeError("Shell did not confirm")
+        except Exception as e:
+            failure = e
+            logger.warning("[GUI4] Integration toggle failed: %s", e)
+        finally:
+            self._integration_updating = False
+        # Only the observed Shell state controls the displayed position.
+        self._refresh_integration_row()
+        if failure is not None:
+            action = "enable" if want else "disable"
+            self.integ_row.set_subtitle(
+                _(
+                    "Could not switch automatically; run on the host: gnome-extensions {action} {uuid}"
+                ).format(action=action, uuid=EXTENSION_UUID)
+            )
+        elif not want:
+            self._toast(_("Integration disabled — using basic stacking"))
+        # Suppress GTK's default handler, which would overwrite our refresh.
+        return True
 
     @staticmethod
     def _short_config_path():
@@ -3846,6 +4149,11 @@ class ControlPanel(Adw.Application):
         self.config = ConfigUtil().load()
         self.config[key] = want
         ConfigUtil().save(self.config)
+        if key == CONFIG_KEY_STATIC_WALLPAPER and want:
+            if self.config.get(CONFIG_KEY_MODE) == MODE_NULL:
+                self._toast(_("No video playing — static wallpaper will apply to the next video"))
+            else:
+                self._toast(_("Preparing static wallpaper…"))
         return False
 
     def _on_open_config(self, *_args):

@@ -66,9 +66,6 @@
         {
             "name": "totem-pl-parser",
             "buildsystem": "meson",
-            "config-opts": [
-                "-Dlibdir=lib"
-            ],
             "sources": [
                 {
                     "type": "archive",

@@ -1,0 +1,67 @@
+name: Snap test build (manual, no publication)
+
+# Test-only Snap build for the GNOME integration branch.
+# Safety properties (do NOT weaken them):
+# - manual trigger only: never runs on push, PR, tags or schedules;
+# - no Snap Store credentials are used or referenced anywhere;
+# - no snapcraft login/upload/release step exists in this file;
+# - the only output is a workflow artifact (.snap), never a release.
+# To publish, use .github/workflows/release-packages.yml from a tag.
+
+on:
+  # Runs for this PR from the branch (GitHub only registers manual
+  # workflows from the default branch, so workflow_dispatch cannot
+  # trigger a branch-only file). Still test-only: no credentials,
+  # no publish step, artifact upload only.
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build-snap-test:
+    name: Build test-only .snap
+    runs-on: ubuntu-24.04
+    # Bounded like CI: a stuck runner must fail instead of hanging.
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        # No ref override: on pull_request this checks out the merge
+        # commit (branch HEAD + master), the same tree CI tests. The
+        # exact SHAs are recorded below for provenance.
+
+      - name: Record provenance
+        run: |
+          git rev-parse HEAD | tee commit-sha.txt
+          git log -1 --format='%H %s' | tee -a commit-sha.txt
+
+      - name: Install Snapcraft
+        run: |
+          sudo snap install snapcraft --classic
+
+      - name: Build Snap (destructive-mode on clean core24 runner)
+        timeout-minutes: 40
+        run: |
+          sudo snapcraft pack --destructive-mode
+          mkdir -p dist
+          mv apricus_*.snap dist/
+          ls -la dist/
+
+      - name: Verify .snap contents (no install, no publish)
+        run: |
+          unsquashfs -d /tmp/snap-check dist/apricus_*.snap usr/bin/apricus usr/share/apricus >/dev/null
+          head -n1 /tmp/snap-check/usr/bin/apricus | grep -q "/usr/bin/env python3"
+          test -f /tmp/snap-check/usr/share/apricus/gnome-extension/install-host.sh
+          test -f "/tmp/snap-check/usr/share/apricus/gnome-extension/apricus-integration@fabx-dev/metadata.json"
+          sha256sum dist/apricus_*.snap | tee dist/apricus.snap.sha256
+          cp commit-sha.txt dist/
+          rm -rf /tmp/snap-check
+
+      - name: Upload test .snap artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: apricus-test-snap
+          path: |
+            dist/apricus_*.snap
+            dist/apricus.snap.sha256
+            dist/commit-sha.txt

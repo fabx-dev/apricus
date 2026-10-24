@@ -173,14 +173,26 @@ apricus --systemd-enable    # disable anytime with: apricus --systemd-disable
 
 | Desktop Environment | Session | Playback | Desktop Icons | Static Wallpaper | Auto-Pause on Maximize |
 |---|---|---|---|---|---|
-| **GNOME** (Ubuntu, Fedora, Debian, Zorin OS) | Wayland & X11 | ✅ Full | ⚠️ X11 sessions only (3) | ✅ Supported | ✅ X11 (Wayland planned) |
+| **GNOME** (Ubuntu, Fedora, Debian, Zorin OS) | Wayland & X11 | ✅ Full | ✅ With Shell integration (4) / X11 native | ✅ Supported | ✅ X11 (Wayland planned) |
 | **Budgie / Pantheon** | X11 | ✅ Works | — | ❌ GNOME only | ✅ Supported |
 | **Cinnamon / XFCE / MATE** | X11 | ⚠️ Partial (1) | ⚠️ Conflicts with desktop manager | ❌ GNOME only | ✅ Supported |
 | **KDE Plasma** | Wayland / X11 | ❌ Not supported (2) | — | — | — |
 
 1. On Cinnamon, XFCE and MATE, the file manager (`nemo-desktop`, `xfdesktop`, `caja`) draws its own opaque desktop window; desktop icons must be disabled for the video layer to remain visible.
 2. KDE Plasma's `plasmashell` manages its own background surface and blocks external `_NET_WM_WINDOW_TYPE_DESKTOP` windows (use a native Plasma wallpaper plugin on KDE).
-3. On GNOME **Wayland** sessions the live wallpaper may cover desktop icons (DING / GTK4-DING): the compositor ignores X11 restacking of desktop-layer windows and DING always lowers itself below other desktop windows, so no application-side workaround exists (verified against Mutter 18 and the DING sources). Workaround: log in with an **X11 session** ("Ubuntu on Xorg" at login), where icon stacking works normally. A proper fix requires either compositor support (not available on GNOME, which has no layer-shell protocol) or a DING-side change; tracked for a future release.
+3. On GNOME **Wayland** without the Shell integration below, a live wallpaper may cover desktop icons (DING / GTK4-DING): the compositor ignores X11 restacking of desktop-layer windows and DING always lowers itself below other desktop windows, so no application-side workaround exists (verified against Mutter 18 and the DING sources). Either enable the integration (4) or log in with an **X11 session** ("Ubuntu on Xorg" at login), where icon stacking works natively.
+4. **GNOME Wayland desktop-icons integration** (GNOME Shell 49–51; runtime-verified on 50): Apricus ships a tiny companion extension, `apricus-integration@fabx-dev` (source in `gnome-extension/`), that hosts the wallpaper windows in the Shell's background layer — below DING icons and application windows. Icons stay above because the Shell parents our windows into its background group, whatever output module VLC picks. (Note, verified live on VLC 3.0.23: libvlc ignores `--vout` for embedded `set_xwindow` playback — Instance options, media `:vout` options, `APRICUS_VOUT` and vlcrc alike; the vout-display probe always runs with filter "any", so VLC uses its automatic pick, `gl` on this stack. Only the `cvlc` CLI honors `--vout`.) Hardware decoding stays automatic where drivers support surface download; where only a virtual GPU exists the player falls back to software decoding. Native `.deb`/`.rpm` packages install the extension to `/usr/share/gnome-shell/extensions/` automatically; local `make install` puts it under `~/.local/share/gnome-shell/extensions/`. Enable once with `gnome-extensions enable apricus-integration@fabx-dev`, then log out and back in. Snap/Flatpak cannot install host extensions from their sandbox (no extra sandbox permissions are used for this): download the extension ZIP (`gnome-extension/build-zip.sh` produces `dist/apricus-integration@fabx-dev.zip`) and run `gnome-extension/install-host.sh --zip <file.zip> --enable` on the host (same shared installer for both; no sudo, touches only `~/.local`), or unzip it manually into `~/.local/share/gnome-shell/extensions/` and enable it the same way. Without the extension, GNOME Wayland falls back to legacy stacking (icons may be covered); Xorg and other desktops are unaffected. Note: with the integration active, right-clicking the wallpaper reaches DING instead of Apricus — use the control center for wallpaper actions. Video rendering is automatic: Apricus lets VLC pick its default output and keeps icons above the video through the Shell background-layer adoption described above. A previous Settings → Video Rendering selector was removed because it had no real effect — under LibVLC 3 the requested module is always ignored for embedded playback (see `docs/notes/vlc3-vout-investigation.md`). Old configurations carrying a `video_renderer` value keep loading unchanged; the stored value is simply not exposed anymore. Snap/Flatpak users: Settings guides the host install (Prepare → run the shown command on the host → Check again), no sandbox escape involved.
+
+   - Supported GNOME versions (static API review vs runtime test):
+
+     | GNOME | Static API review | Runtime tested | Shipped |
+     |---|---|---|---|
+     | 49 | yes (background group, restack, overview hooks identical to 50) | no | yes (pending runtime test) |
+     | 50 | yes | yes, Wayland + DING | yes |
+     | 51 | yes (same APIs on main branch) | no | yes (pending runtime test) |
+   - **Setup status**: on GNOME Wayland, Settings distinguishes loaded, operational/Active, disabled and unavailable states. The strict-Snap test build receives automatic status and a wallpaper-adoption count from the updated host extension; **zero wallpaper windows does not mean disabled**. Snap/Flatpak switches remain read-only, with guided host installation and host-check fallback when needed. The row never appears on other sessions. See [bridge protocol, validation and limits](docs/notes/gnome-status-bridge.md); this branch is not a new Store release.
+   - **Updating the host extension**: re-run the same install command (Settings shows it, or `install-host.sh --zip <file.zip> --enable`): files are overwritten in place, then log out/in. Removing Apricus (Snap/Flatpak/deb/rpm) never touches `~/.local/share/gnome-shell/extensions/` — to remove it manually: `gnome-extensions disable apricus-integration@fabx-dev` (if enabled), log out/in, then delete `~/.local/share/gnome-shell/extensions/apricus-integration@fabx-dev`. No `sudo` is ever needed for the per-user install.
+   - **Troubleshooting**: after install+enable, the video stays behind the icons only once the Shell loads the extension (logout/login required). Confirm with `journalctl --user -g apricus-integration` (expect `enabled, code revision N` and `adopted "…" into the background layer`). If the extension disappears after a GNOME upgrade, it was fenced by `shell-version`: wait for an Apricus update that declares the new Shell.
 
 ### Additional Notes
 
@@ -211,3 +223,37 @@ make update-po
 - **Author & Maintainer**: [fabx-dev](https://github.com/fabx-dev)
 - **Original Upstream Project**: [Hidamari](https://github.com/jeffshee/hidamari) by Jeff Shee
 - **License**: GPL-3.0-or-later (see [COPYING](COPYING))
+
+### Desktop icons status and host verification
+
+Settings updates the integration status when the panel regains focus, when
+Settings opens, and while Settings is visible. Native installations also listen
+for GNOME extension state changes. Refreshing the panel never enables or disables
+the extension. A failed switch operation restores the observed GNOME state.
+
+Snap/Flatpak show a read-only switch and host commands because their sandbox
+cannot control GNOME Shell. In the strict-Snap test build, the updated extension
+pushes status to a dedicated, versioned session D-Bus service in the GUI.
+Register/Update/Unregister and a 90-second lease (renewed every 30 seconds)
+provide automatic updates without **Check again**; operational status and the
+number of adopted wallpaper windows are separate. The receiver validates the
+sender against the current Shell bus owner and daemon credentials. This is
+not cryptographic certification of an extension. No Snap → host signals or
+generic player RPC are exposed to the Shell. The slot needs Snap Store name
+approval before distribution; none has been requested in this work.
+
+Native and Flatpak keep their existing detection paths. When the bridge has
+not provided evidence, **Prepare** exports the helpers; before installation
+it offers the install command, and afterwards a separate `--check` command.
+**Verify status** always prepares the verification command, even when the host
+state is unavailable.
+`install-host.sh --zip <path> --check` only refreshes `status.json`; it never
+copies extension files or enables the extension. Run this command after logging
+back in, then use **Check again** for this fallback. The last host-check time is
+shown, and after 15 minutes the result is explicitly marked expired. A failed
+host query is reported as unavailable, never as a disabled extension.
+The receipt is unsigned evidence of a past check, not continuous liveness;
+once the current GUI has a valid bridge registration, an old receipt cannot
+hide its later invalidation. [Validation notes](docs/notes/gnome-status-bridge.md)
+separate real strict-Snap results from the VM suspend blocker and the existing
+playlist-heading limitation.

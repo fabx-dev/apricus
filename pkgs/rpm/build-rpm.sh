@@ -188,6 +188,7 @@ cp -a "${STAGE_DIR}/usr" "%{buildroot}/usr"
 %{_datadir}/icons/hicolor/*/apps/io.github.fabx_dev.Apricus.png
 %{_datadir}/licenses/io.github.fabx_dev.Apricus
 %{_datadir}/locale/*/LC_MESSAGES/apricus.mo
+%{_datadir}/gnome-shell/extensions/apricus-integration@fabx-dev/
 EOF
 
 rpmbuild --define "_topdir $RPMTOP" -bb "$RPMTOP/SPECS/apricus.spec"

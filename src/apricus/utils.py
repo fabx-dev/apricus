@@ -41,6 +41,8 @@ from apricus.commons import (
     CONFIG_KEY_FADE_INTERVAL,
     CONFIG_KEY_MUTE_WHEN_MAXIMIZED,
     CONFIG_KEY_PLAYLIST,
+    CONFIG_KEY_PLAYLIST_POS,
+    CONFIG_KEY_RENDERER,
     CONFIG_KEY_SHUFFLE,
     CONFIG_KEY_STREAM_FAVORITES,
     CONFIG_KEY_STREAM_HISTORY,
@@ -54,7 +56,9 @@ from apricus.commons import (
     LEGACY_CONFIG_PATH,
     LOGGER_NAME,
     MODE_VIDEO,
+    RENDERER_AUTO,
     TRANSLATION_DOMAIN,
+    VALID_RENDERERS,
     ensure_template_monitors,
 )
 
@@ -902,6 +906,21 @@ class ConfigUtil:
                     # video_dir was added after v4 without a version bump:
                     # default it instead of wiping the whole config.
                     config.setdefault(CONFIG_KEY_VIDEO_DIR, None)
+                    # Stored renderer id (same no-bump policy): no UI
+                    # exposes it anymore, but old configs may carry it —
+                    # sanitize to a known id, defaulting to automatic.
+                    if config.get(CONFIG_KEY_RENDERER) not in VALID_RENDERERS:
+                        config[CONFIG_KEY_RENDERER] = RENDERER_AUTO
+                    # Per-monitor playlist positions: same no-bump backfill,
+                    # sanitized to non-negative ints.
+                    pos = config.get(CONFIG_KEY_PLAYLIST_POS)
+                    if not isinstance(pos, dict):
+                        pos = {}
+                    config[CONFIG_KEY_PLAYLIST_POS] = {
+                        str(k): v
+                        for k, v in pos.items()
+                        if isinstance(v, int) and not isinstance(v, bool) and v >= 0
+                    }
                     # Stream pick-list, same no-bump policy (sanitized).
                     config[CONFIG_KEY_STREAM_HISTORY] = self._sanitize_stream_entries(
                         config.get(CONFIG_KEY_STREAM_HISTORY)

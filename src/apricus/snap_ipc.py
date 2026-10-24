@@ -143,6 +143,7 @@ class ServiceProxy:
         "show_gui",
         "quit",
         "preview_static",
+        "refresh_static",
         "switch_media",
         "reload_config",
         "quit_player",

@@ -14,6 +14,12 @@ from gi.repository import Gdk, Gio, GLib, Gtk
 from pydbus import SessionBus
 
 from apricus.commons import DBUS_NAME_PLAYER, DBUS_PROJECT, LOGGER_NAME
+from apricus.gnome_shell import (
+    WALLPAPER_WINDOW_ROLE,
+    _shell_settings,
+    integration_active,
+    log_status,
+)
 from apricus.utils import _authorize, gnome_desktop_icon_workaround, is_snap
 
 logger = logging.getLogger(LOGGER_NAME)
@@ -33,15 +39,27 @@ _xlib_handle = None
 
 
 def _x11_lib():
-    """ctypes handle for libX11, cached. None when unavailable."""
+    """ctypes handle for libX11, cached, with all signatures declared.
+
+    None when unavailable. Signatures are applied at load time so no
+    call site can pass a truncated pointer (segfault, uncatchable).
+    """
     global _xlib_handle
     if _xlib_handle is None:
         for lib in ("libX11.so.6", "libX11.so"):
             try:
-                _xlib_handle = ctypes.cdll.LoadLibrary(lib)
-                break
+                handle = ctypes.cdll.LoadLibrary(lib)
             except OSError:
                 continue
+            for name, (argtypes, restype) in _X11_FUNCS.items():
+                try:
+                    func = getattr(handle, name)
+                except AttributeError:
+                    continue
+                func.argtypes = argtypes
+                func.restype = restype
+            _xlib_handle = handle
+            break
     return _xlib_handle
 
 
@@ -82,6 +100,32 @@ class _XPropertyEvent(ctypes.Structure):
     ]
 
 
+# Exact ctypes signatures for every libX11 entry point we call.
+# Declared once, applied in _x11_lib(): without explicit argtypes,
+# ctypes truncates 64-bit pointers to C int and libX11 segfaults
+# (fatal, uncatchable — observed in the Flatpak sandbox).
+_X11_FUNCS = {
+    "XOpenDisplay": ([ctypes.c_char_p], ctypes.c_void_p),
+    "XInternAtom": (
+        [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_int],
+        ctypes.c_ulong,
+    ),
+    "XDefaultRootWindow": ([ctypes.c_void_p], ctypes.c_ulong),
+    "XSendEvent": (
+        [
+            ctypes.c_void_p,
+            ctypes.c_ulong,
+            ctypes.c_int,
+            ctypes.c_long,
+            ctypes.POINTER(_XClientMessageEvent),
+        ],
+        ctypes.c_int,
+    ),
+    "XFlush": ([ctypes.c_void_p], ctypes.c_int),
+    "XCloseDisplay": ([ctypes.c_void_p], ctypes.c_int),
+}
+
+
 def _x11_restack_below(xid):
     """Ask the WM (EWMH) to place window *xid* below its siblings.
 
@@ -94,17 +138,11 @@ def _x11_restack_below(xid):
     if lib is None:
         return False
     try:
-        lib.XOpenDisplay.argtypes = [ctypes.c_char_p]
-        lib.XOpenDisplay.restype = ctypes.c_void_p
         dpy = lib.XOpenDisplay(None)
         if not dpy:
             return False
         try:
-            lib.XInternAtom.argtypes = [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_int]
-            lib.XInternAtom.restype = ctypes.c_ulong
             msgtype = lib.XInternAtom(dpy, b"_NET_RESTACK_WINDOW", False)
-            lib.XDefaultRootWindow.argtypes = [ctypes.c_void_p]
-            lib.XDefaultRootWindow.restype = ctypes.c_ulong
             root = lib.XDefaultRootWindow(dpy)
             ev = _XClientMessageEvent()
             ev.type = _X11_CLIENT_MESSAGE
@@ -117,14 +155,6 @@ def _x11_restack_below(xid):
             ev.data[2] = _NET_RESTACK_WINDOW_DETAIL_BELOW
             ev.data[3] = 0
             ev.data[4] = 0
-            lib.XSendEvent.argtypes = [
-                ctypes.c_void_p,
-                ctypes.c_ulong,
-                ctypes.c_int,
-                ctypes.c_long,
-                ctypes.POINTER(_XClientMessageEvent),
-            ]
-            lib.XSendEvent.restype = ctypes.c_int
             lib.XSendEvent(dpy, root, False, _X_SUBSTRUCTURE_MASK, ctypes.byref(ev))
             lib.XFlush(dpy)
             return True
@@ -244,6 +274,9 @@ class BasePlayer(Gtk.Application):
     def _schedule_lower(self):
         """Coalesce restack requests: run at 60 ms and 320 ms (after DING's
         idle_add and 250 ms _moveIntoPlace timer)."""
+        if getattr(self, "_shell_managed", False):
+            # The Shell extension owns stacking now; stay out of its way.
+            return False
         if getattr(self, "_lower_pending", False):
             return False
         self._lower_pending = True
@@ -265,6 +298,8 @@ class BasePlayer(Gtk.Application):
     def request_lower(self):
         """Thread-safe entry point for media-ready hooks (first frame,
         page loaded, hot-switch) to re-assert bottom stacking."""
+        if getattr(self, "_shell_managed", False):
+            return
         GLib.idle_add(self._schedule_lower)
 
     def _start_stacking_safety_net(self):
@@ -361,15 +396,29 @@ class BasePlayer(Gtk.Application):
         return True
 
     def do_activate(self):
+        # When the Shell extension hosts our windows in the background
+        # layer, it owns stacking: skip the in-app guard, safety net and
+        # the DING reload so the two never compete.
+        self._evaluate_shell_managed()
+        if not getattr(self, "_shell_status_logged", False):
+            log_status()
+            self._shell_status_logged = True
         for monitor in self.windows:
             window = self.windows[monitor]
             if window is None:
                 window = self.new_window(monitor)
                 window.set_type_hint(Gdk.WindowTypeHint.DESKTOP)
+                # Identity for the Shell extension (WM_WINDOW_ROLE): only
+                # wallpaper windows carry it, never the settings window.
+                try:
+                    window.set_role(WALLPAPER_WINDOW_ROLE)
+                except Exception:  # noqa: BLE001 - role is advisory only
+                    pass
                 # Never steal focus or raise above the desktop icons.
                 # (Video windows additionally disable focus themselves;
                 # WebWindow keeps keyboard focus for interactive pages and
-                # relies on the stacking guard below instead.)
+                # relies on the stacking guard below instead, unless the
+                # Shell extension is managing stacking.)
                 window.set_keep_below(True)
                 window.set_focus_on_map(False)
                 window.connect("map-event", lambda *_: self._schedule_lower())
@@ -382,6 +431,22 @@ class BasePlayer(Gtk.Application):
             # over DING. show_all() maps without activating.
             if not window.get_visible():
                 window.show_all()
+        # Watch for the integration being toggled mid-session (event-driven
+        # GSettings notify, no polling): enabling/disabling must take effect
+        # without restarting the player.
+        self._watch_shell_integration()
+        if self._shell_managed:
+            logger.info("[Player] stacking managed by GNOME Shell integration")
+            return
+        self._start_legacy_stacking()
+
+    def _evaluate_shell_managed(self):
+        """Recompute whether the Shell extension owns stacking right now."""
+        self._shell_managed = bool(integration_active())
+        return self._shell_managed
+
+    def _start_legacy_stacking(self):
+        """(Re)start the in-app stacking guard (idempotent parts stay so)."""
         self._lower_desktop_windows()
         self._watch_stacking()
         self._start_stacking_safety_net()
@@ -389,6 +454,69 @@ class BasePlayer(Gtk.Application):
             GLib.timeout_add(delay_ms, self._lower_desktop_windows)
         # Workaround for DING extension
         gnome_desktop_icon_workaround()
+
+    def _watch_shell_integration(self):
+        """Re-evaluate integration when extensions are toggled (no polling).
+
+        The Shell loads newly enabled extensions only after login, but a
+        running player must still adopt when the user enables ours
+        mid-session (and fall back when it is disabled): recreating the
+        wallpaper windows triggers the proven window-created adoption.
+        """
+        if getattr(self, "_integration_watched", False):
+            return
+        # Gio.Settings.new() aborts the process when the schema is absent
+        # (Flatpak runtime); _shell_settings() probes safely first.
+        settings = _shell_settings()
+        if settings is None:
+            logger.debug("[Player] Shell integration watcher unavailable")
+            return
+        # Keep a reference: without it the proxy is GC'd and notify stops.
+        self._integration_settings = settings
+        try:
+            settings.connect("changed::enabled-extensions", self._on_shell_integration_changed)
+            self._integration_watched = True
+        except Exception:  # noqa: BLE001 - best effort only
+            logger.debug("[Player] Shell integration watch failed")
+
+    def _on_shell_integration_changed(self, *_args):
+        was_managed = bool(getattr(self, "_shell_managed", False))
+        try:
+            now_managed = bool(integration_active())
+        except Exception:  # noqa: BLE001 - never break on a settings signal
+            logger.debug("[Player] integration re-check failed")
+            return
+        if now_managed == was_managed:
+            return
+        self._shell_managed = now_managed
+        log_status()
+        if now_managed:
+            logger.info(
+                "[Player] Shell integration became active: "
+                "recreating wallpaper windows for adoption"
+            )
+            self._recreate_wallpaper_windows()
+        else:
+            logger.info("[Player] Shell integration no longer active: resuming legacy stacking")
+            self._start_legacy_stacking()
+
+    def _recreate_wallpaper_windows(self):
+        """Destroy and recreate wallpaper windows (adoptable fresh ones)."""
+        for monitor, window in list(self.windows.items()):
+            if window is None:
+                continue
+            cleanup = getattr(window, "cleanup", None)
+            if callable(cleanup):
+                try:
+                    cleanup()
+                except Exception:  # noqa: BLE001 - best effort
+                    pass
+            try:
+                window.destroy()
+            except Exception:  # noqa: BLE001 - best effort
+                pass
+            self.windows[monitor] = None
+        self.do_activate()
 
     @property
     @abstractmethod

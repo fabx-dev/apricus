@@ -94,6 +94,7 @@ class ApricusServer:
         <method name='pause_playback'/>
         <method name='start_playback'/>
         <method name="reload"/>
+        <method name="respawn_player"/>
         <method name="feeling_lucky"/>
         <method name='show_gui'/>
         <method name='quit'/>
@@ -161,7 +162,7 @@ class ApricusServer:
     def _save_config(self):
         ConfigUtil().save(self.config)
 
-    def _setup_player(self, mode, data_source=None, monitor=None):
+    def _setup_player(self, mode, data_source=None, monitor=None, force_respawn=False):
         """Setup and run player"""
         # The GUI shares this file: reload so we never persist a stale
         # in-memory copy over a newer on-disk config (and vice versa).
@@ -205,7 +206,9 @@ class ApricusServer:
 
         # Reuse the live player when staying inside the VLC family: no
         # unmap/respawn gap, the windows (and their covers) survive.
-        if self._try_switch_media(mode):
+        # Forced respawns always recreate the player so a fresh VLC
+        # instance picks up changed options.
+        if not force_respawn and self._try_switch_media(mode):
             perf.mark(f"server: player switched in place [{mode}]")
             self._refresh_systray(mode)
             return
@@ -388,6 +391,26 @@ class ApricusServer:
         else:
             raise ValueError("[Server] Unknown mode")
 
+    def respawn_player(self, dbus_context=None):
+        """Terminate the live player and start a fresh one, same mode/sources.
+
+        Unlike reload(), this always recreates the player process (no
+        in-place media switch), so a new VLC instance picks up changed
+        options. Volume, mute, playlists and per-monitor assignments are
+        preserved from the config; the playlist position restarts from
+        the queue head.
+        """
+        _authorize("player.respawn", dbus_context)
+        self._load_config()
+        mode = self.config.get(CONFIG_KEY_MODE, MODE_NULL)
+        if mode not in (MODE_VIDEO, MODE_STREAM, MODE_PLAYLIST, MODE_WEBPAGE):
+            logger.warning(f"[Server] respawn_player: unknown mode {mode!r}")
+            return False
+        if mode == MODE_NULL:
+            return False
+        self._setup_player(mode, force_respawn=True)
+        return True
+
     def feeling_lucky(self, dbus_context=None):
         """Random play a video from the directory"""
         _authorize("feeling_lucky", dbus_context)
@@ -516,6 +539,15 @@ class ApricusServer:
         player = get_instance(DBUS_NAME_PLAYER)
         if player is not None:
             player.reload_config()
+            if is_static_wallpaper:
+                # Apply immediately when enabled mid-playback: the player
+                # setup path only covers fresh (re)starts, so without this
+                # the flag would sit idle until the next video change.
+                try:
+                    if player.mode in [MODE_VIDEO, MODE_STREAM, MODE_PLAYLIST]:
+                        player.refresh_static()
+                except (GLib.Error, AttributeError):
+                    pass
 
     @property
     def is_pause_when_maximized(self):

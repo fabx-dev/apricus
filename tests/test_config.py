@@ -144,6 +144,38 @@ def test_stream_keys_backfilled_without_version_bump(tmp_path, monkeypatch):
     assert loaded["version"] == commons.CONFIG_VERSION
 
 
+def test_renderer_key_backfilled_and_sanitized(tmp_path, monkeypatch):
+    """Old configs without video_renderer default to auto; junk is reset."""
+    import json
+    from unittest.mock import patch
+
+    from apricus import commons
+    from apricus.utils import ConfigUtil
+
+    new_dir = tmp_path / "apricus"
+    new_dir.mkdir()
+    legacy = dict(commons.CONFIG_TEMPLATE)
+    del legacy["video_renderer"]
+    (new_dir / "config.json").write_text(json.dumps(legacy))
+    monkeypatch.setattr(commons, "CONFIG_DIR", str(new_dir))
+    monkeypatch.setattr(commons, "CONFIG_PATH", str(new_dir / "config.json"))
+    import apricus.utils as U
+
+    monkeypatch.setattr(U, "CONFIG_DIR", str(new_dir))
+    monkeypatch.setattr(U, "CONFIG_PATH", str(new_dir / "config.json"))
+
+    with patch("apricus.monitor.MonitorInfo.monitors", return_value=[]):
+        assert ConfigUtil().load()["video_renderer"] == "auto"
+    legacy["video_renderer"] = "gl"
+    (new_dir / "config.json").write_text(json.dumps(legacy))
+    with patch("apricus.monitor.MonitorInfo.monitors", return_value=[]):
+        assert ConfigUtil().load()["video_renderer"] == "gl"
+    legacy["video_renderer"] = "vulkan-rtx"
+    (new_dir / "config.json").write_text(json.dumps(legacy))
+    with patch("apricus.monitor.MonitorInfo.monitors", return_value=[]):
+        assert ConfigUtil().load()["video_renderer"] == "auto"
+
+
 def test_load_versionless_modern_config_stamps_and_keeps_data(tmp_path, monkeypatch):
     """A current-shape config that lost its version stamp must load (not
     raise TypeError) and keep user data instead of mis-migrating."""
@@ -615,3 +647,30 @@ def test_fetch_public_legit_redirect_chain_works(monkeypatch):
     data, status, ctype, reason = fetch_public("http://93.184.216.34/v.mp4", 5, 65536)
     assert (data, status, ctype, reason) == (b"DATA", 200, "video/mp4", "ok")
     assert t.requested == ["http://93.184.216.34/v.mp4", "https://93.184.216.34/v.mp4"]
+
+
+def test_playlist_position_backfilled_and_sanitized(tmp_path, monkeypatch):
+    import json
+    from unittest.mock import patch
+
+    from apricus import commons
+    from apricus.utils import ConfigUtil
+
+    new_dir = tmp_path / "apricus2"
+    new_dir.mkdir()
+    legacy = dict(commons.CONFIG_TEMPLATE)
+    del legacy["playlist_position"]
+    (new_dir / "config.json").write_text(json.dumps(legacy))
+    monkeypatch.setattr(commons, "CONFIG_DIR", str(new_dir))
+    monkeypatch.setattr(commons, "CONFIG_PATH", str(new_dir / "config.json"))
+    import apricus.utils as U
+
+    monkeypatch.setattr(U, "CONFIG_DIR", str(new_dir))
+    monkeypatch.setattr(U, "CONFIG_PATH", str(new_dir / "config.json"))
+
+    with patch("apricus.monitor.MonitorInfo.monitors", return_value=[]):
+        assert ConfigUtil().load()["playlist_position"] == {}
+    legacy["playlist_position"] = {"M#1": 3, "bad": "x", "neg": -1}
+    (new_dir / "config.json").write_text(json.dumps(legacy))
+    with patch("apricus.monitor.MonitorInfo.monitors", return_value=[]):
+        assert ConfigUtil().load()["playlist_position"] == {"M#1": 3}

@@ -2392,6 +2392,280 @@ def shell_refresh_reveals_banner_and_badges():
     assert obj._app_logo_image(28).get_pixel_size() == 28
 
 
+@check
+def integration_row_reflects_status():
+    from unittest.mock import patch
+    import apricus.gui.gtk4app as appmod
+    import apricus.gnome_shell as shell
+
+    class Row:
+        def set_subtitle(self, text):
+            self.subtitle = text
+
+    class Switch:
+        active = False
+        sensitive = True
+        events = 0
+
+        def set_active(self, active):
+            if self.active != active:
+                self.active = active
+                self.events += 1
+                assert self.events < 20, "recursive signal loop"
+                # Gtk emits state-set for programmatic changes as well.
+                result = obj._on_integration_toggled(self, active)
+                assert result is True
+
+        def set_state(self, state):
+            pass
+
+        def set_sensitive(self, sensitive):
+            self.sensitive = sensitive
+
+    obj = appmod.ControlPanel.__new__(appmod.ControlPanel)
+    obj.integ_row, obj.integ_switch = Row(), Switch()
+    obj._toast = lambda text: None
+    current = ["active", {}]
+    with patch.object(shell, "integration_status", side_effect=lambda: tuple(current)), patch.object(
+        appmod, "is_snap", return_value=False
+    ), patch.object(appmod, "is_flatpak", return_value=False), patch(
+        "apricus.utils.gnome_extension_set_enable"
+    ) as enable, patch("apricus.utils.gnome_extension_set_disable") as disable:
+        # Refresh must never send enable/disable, including the initial ON.
+        for status, on, sensitive in [
+            ("active", True, True), ("disabled", False, True),
+            ("needs_logout", True, True), ("not_discovered", False, True),
+            ("not_installed", False, False), ("incompatible", False, False),
+            ("error", False, False), ("unknown", False, False), ("stale", False, False),
+        ]:
+            current[:] = [status, {}]
+            obj._refresh_integration_row()
+            assert obj.integ_switch.active is on
+            assert obj.integ_switch.sensitive is sensitive
+        enable.assert_not_called()
+        disable.assert_not_called()
+
+        def enabled(uuid):
+            current[:] = ["active", {}]
+            return True
+
+        enable.side_effect = enabled
+        # Requested signal state matters, even when get_active is unavailable.
+        assert obj._on_integration_toggled(obj.integ_switch, True) is True
+        enable.assert_called_once_with(shell.EXTENSION_UUID)
+        assert obj.integ_switch.active is True
+
+        def disabled(uuid):
+            current[:] = ["disabled", {}]
+            return True
+
+        disable.side_effect = disabled
+        assert obj._on_integration_toggled(obj.integ_switch, False) is True
+        disable.assert_called_once_with(shell.EXTENSION_UUID)
+        assert obj.integ_switch.active is False
+        enable.reset_mock()
+        disable.reset_mock()
+        enable.side_effect = RuntimeError("denied")
+        obj._on_integration_toggled(obj.integ_switch, True)
+        assert obj.integ_switch.active is False
+        assert "gnome-extensions enable" in obj.integ_row.subtitle
+        enable.assert_called_once()
+        disable.assert_not_called()
+
+        # Sandboxes never pretend the switch can control the host Shell.
+        with patch.object(appmod, "is_snap", return_value=True):
+            current[:] = ["active", {}]
+            obj._refresh_integration_row()
+            assert obj.integ_switch.active is True
+            assert obj.integ_switch.sensitive is False
+            obj._on_integration_toggled(obj.integ_switch, False)
+            disable.assert_not_called()
+            current[:] = ["stale", {"receipt": {"loaded": True, "checked_at": 12345}}]
+            obj._refresh_integration_row()
+            assert "expired" in obj.integ_row.subtitle
+            assert "Last host check" in obj.integ_row.subtitle
+
+
+@check
+def host_install_rows_guide_sandbox_setup():
+    import sys
+    import types
+    from unittest.mock import patch
+
+    import apricus.gui.gtk4app as appmod
+
+    states = {}
+
+    class _Row:
+        def __init__(self, name):
+            self._name = name
+
+        def set_subtitle(self, text):
+            states[self._name] = text
+
+        def set_visible(self, visible):
+            states[self._name + ":visible"] = visible
+
+    class _Switch:
+        def set_active(self, active):
+            states["active"] = active
+
+        def set_state(self, state):
+            pass
+
+        def set_sensitive(self, sensitive):
+            states["sensitive"] = sensitive
+
+    def _toasts(self, message):
+        states.setdefault("toasts", []).append(message)
+
+    fake_shell = types.ModuleType("apricus.gnome_shell")
+    fake_shell.EXTENSION_UUID = "apricus-integration@fabx-dev"
+    fake_shell.integration_status = lambda: states["status"]
+    fake_shell.prepare_host_install = lambda: ("/tmp/x", "bash /tmp/x/install.sh")
+    fake_shell.host_verify_command = lambda path: "bash /tmp/x/install.sh --check"
+    old_mod = sys.modules.get("apricus.gnome_shell")
+    sys.modules["apricus.gnome_shell"] = fake_shell
+    try:
+        obj = appmod.ControlPanel.__new__(appmod.ControlPanel)
+        obj.integ_row, obj.integ_switch = _Row("statusline"), _Switch()
+        obj.prep_row, obj.cmd_row = _Row("prepline"), _Row("cmdline")
+        obj._toast = _toasts.__get__(obj)
+        with patch.object(appmod, "is_snap", return_value=True), patch.object(
+            appmod, "is_flatpak", return_value=False
+        ):
+            # Missing extension in a sandbox: prepare row shown, no command yet.
+            states["status"] = ("not_installed", {})
+            obj._host_cmd = None
+            obj._refresh_integration_row()
+            assert states["prepline:visible"] is True
+            assert states["cmdline:visible"] is False
+            # Verification is available even with unknown/missing host state.
+            obj._on_prepare_host_install(None, verify=True)
+            assert states["cmdline"].endswith("--check")
+            # Prepare exports files and reveals the exact host command.
+            obj._on_prepare_host_install(None)
+            assert states["cmdline"] == "bash /tmp/x/install.sh"
+            assert states["cmdline:visible"] is True
+            assert any("host" in t for t in states.get("toasts", []))
+            # Copy without a display reports the failure instead of crashing.
+            with patch.object(appmod.Gdk.Display, "get_default", return_value=None):
+                obj._on_copy_host_command(None)
+            assert any("copy" in t.lower() for t in states.get("toasts", []))
+            # Copy with a clipboard lacking set_text (Gtk 4.22 bindings)
+            # falls back to a bytes content provider and succeeds.
+            class _ClipboardNoSetText:
+                def __init__(self):
+                    self.provider = None
+
+                def set_content(self, provider):
+                    self.provider = provider
+
+            class _DisplayWithClipboard:
+                def __init__(self):
+                    self.clipboard = _ClipboardNoSetText()
+
+                def get_clipboard(self):
+                    return self.clipboard
+
+            states["toasts"] = []
+            with patch.object(appmod.Gdk.Display, "get_default", return_value=_DisplayWithClipboard()):
+                obj._on_copy_host_command(None)
+            assert states.get("toasts") == ["Command copied"], states.get("toasts")
+            # Unknown in a sandbox also offers Prepare (host dir invisible:
+            # missing and unverifiable look the same, export is harmless).
+            states["status"] = ("unknown", {})
+            with patch.object(appmod, "is_snap", return_value=True):
+                obj._refresh_integration_row()
+                assert states["prepline:visible"] is True
+            # Verification stays available after installation.
+            states["status"] = ("disabled", {})
+            obj._refresh_integration_row()
+            assert states["prepline:visible"] is True
+            assert states["cmdline:visible"] is True
+            obj._on_prepare_host_install(None)
+            assert states["cmdline"].endswith("--check")
+            # Once the flow is complete (or only a login is pending) the
+            # guided rows get out of the way.
+            states["status"] = ("active", {})
+            obj._host_cmd = None
+            obj._refresh_integration_row()
+            assert states["prepline:visible"] is False
+            assert states["cmdline:visible"] is False
+            states["status"] = ("needs_logout", {})
+            obj._refresh_integration_row()
+            assert states["prepline:visible"] is False
+        # Outside a sandbox the rows never appear.
+        with patch.object(appmod, "is_snap", return_value=False), patch.object(
+            appmod, "is_flatpak", return_value=False
+        ):
+            states["status"] = ("not_installed", {})
+            obj._host_cmd = None
+            obj._refresh_integration_row()
+            assert states["prepline:visible"] is False
+    finally:
+        if old_mod is not None:
+            sys.modules["apricus.gnome_shell"] = old_mod
+        else:
+            sys.modules.pop("apricus.gnome_shell", None)
+
+
+@check
+def integration_timer_uses_gtk4_window_api():
+    from types import SimpleNamespace
+
+    assert hasattr(app.Gtk.Window, "is_active")
+    assert not hasattr(app.Gtk.Window, "get_is_active")
+    state = {"active": True, "page": "settings", "refreshes": 0}
+    def refresh():
+        state["refreshes"] += 1
+    obj = SimpleNamespace(
+        window=SimpleNamespace(is_active=lambda: state["active"]),
+        stack=SimpleNamespace(get_visible_child_name=lambda: state["page"]),
+        _refresh_integration_row=refresh,
+    )
+    for _ in range(5):
+        assert app.ControlPanel._poll_integration(obj) is True
+    assert state["refreshes"] == 5
+    state["active"] = False
+    assert app.ControlPanel._poll_integration(obj) is True
+    state["active"] = True
+    state["page"] = "library"
+    assert app.ControlPanel._poll_integration(obj) is True
+    obj.window = None
+    assert app.ControlPanel._poll_integration(obj) is True
+    assert state["refreshes"] == 5
+
+
+@check
+def static_flag_toasts_and_persists():
+    from types import SimpleNamespace
+
+    import apricus.gui.gtk4app as appmod
+
+    for mode, expected in (
+        ("MODE_VIDEO", "Preparing static wallpaper…"),
+        ("MODE_NULL", "No video playing — static wallpaper will apply to the next video"),
+    ):
+        config = _base_config()
+        config["mode"] = mode
+        store = _ConfigStore(config)
+        old = _patch_config(None, store)
+        try:
+            obj, _server = _panel(dict(config), [])
+            seen = []
+            obj._toast = seen.append
+            switch = SimpleNamespace(get_active=lambda: True)
+            assert (
+                obj._on_settings_flag(switch, True, appmod.CONFIG_KEY_STATIC_WALLPAPER)
+                is False
+            )
+            assert store.config["is_static_wallpaper"] is True
+            assert seen == [expected], (mode, seen)
+        finally:
+            appmod.ConfigUtil = old
+
+
 def main():
     name = sys.argv[1]
     try:
@@ -2432,6 +2706,14 @@ def _run(check):
 
 def test_apply_sends_edited_queue_not_stale_config():
     _run("apply_sends_edited_queue")
+
+
+def test_integration_timer_uses_gtk4_window_api():
+    _run("integration_timer_uses_gtk4_window_api")
+
+
+def test_static_flag_toasts_and_persists():
+    _run("static_flag_toasts_and_persists")
 
 
 def test_apply_empty_queue_sends_nothing():
@@ -2763,3 +3045,11 @@ def test_toast_records_message():
 
 def test_shell_refresh_reveals_banner_and_badges():
     _run_display("shell_refresh_reveals_banner_and_badges")
+
+
+def test_integration_row_reflects_status():
+    _run("integration_row_reflects_status")
+
+
+def test_host_install_rows_guide_sandbox_setup():
+    _run("host_install_rows_guide_sandbox_setup")

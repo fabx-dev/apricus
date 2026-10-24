@@ -30,6 +30,8 @@ from apricus.commons import (
     CONFIG_KEY_MUTE_WHEN_MAXIMIZED,
     CONFIG_KEY_PAUSE_WHEN_MAXIMIZED,
     CONFIG_KEY_PLAYLIST,
+    CONFIG_KEY_PLAYLIST_POS,
+    CONFIG_KEY_RENDERER,
     CONFIG_KEY_SHUFFLE,
     CONFIG_KEY_STATIC_WALLPAPER,
     CONFIG_KEY_VOLUME,
@@ -38,19 +40,110 @@ from apricus.commons import (
     MODE_PLAYLIST,
     MODE_STREAM,
     MODE_VIDEO,
+    RENDERER_AUTO,
+    VOUT_MODULES,
 )
+from apricus.gnome_shell import integration_active
 from apricus.menu import build_menu
 from apricus.player.base_player import BasePlayer
 from apricus.utils import (
     ActiveHandler,
     ConfigUtil,
     _authorize,
+    is_gnome,
+    is_wayland,
     setup_logging,
 )
 from apricus.yt_utils import get_best_audio, get_formats, get_optimal_video
 from apricus.yt_utils import youtube_dl as yt_dlp
 
 logger = logging.getLogger(LOGGER_NAME)
+
+
+def _vlc_options(disable_audio: bool, vout):
+    """VLC instance options for one player window (pure logic, tested).
+
+    *vout* is ``None`` (VLC default) or a canonical module name from
+    :data:`VOUT_MODULES`. Use :func:`resolve_renderer_vout` to compute it.
+    NOTE: under LibVLC 3 the value is currently inert for embedded
+    playback (see docs/notes/vlc3-vout-investigation.md); it is still
+    passed in canonical form so a future libvlc gets a valid name.
+    Keeping the option building here lets tests pin the exact flags per
+    renderer without a display.
+    """
+    if disable_audio:
+        options = [
+            "--no-disable-screensaver",
+            "--no-interact",
+            "--no-audio",
+            "--aout=none",
+        ]
+    else:
+        options = ["--no-disable-screensaver", "--no-interact", "--aout=pulse"]
+    if vout in VOUT_MODULES.values():
+        options.append(f"--vout={vout}")
+    return options
+
+
+# APRICUS_VOUT accepts canonical module names and historic UI ids / VLC
+# shortcut spellings (hyphen vs underscore).
+_ENV_VOUT_ALIASES = {
+    "gl": "opengl",
+    "opengl": "opengl",
+    "xcb": "xcb_x11",
+    "x11": "xcb_x11",
+    "xcb_x11": "xcb_x11",
+    "xcb-x11": "xcb_x11",
+    "xv": "xcb_xv",
+    "xvideo": "xcb_xv",
+    "xcb_xv": "xcb_xv",
+    "xcb-xv": "xcb_xv",
+}
+
+
+def _canonical_vout(name):
+    """Canonical VLC module name, or None when unknown/unset."""
+    if not name:
+        return None
+    name = str(name).strip().lower()
+    if name in VOUT_MODULES.values():
+        return name
+    return _ENV_VOUT_ALIASES.get(name)
+
+
+def resolve_renderer_vout(explicit=RENDERER_AUTO):
+    """Decide the VLC video output module name, or None for VLC default.
+
+    Precedence: ``APRICUS_VOUT`` env override > saved *explicit* selection
+    > automatic policy. The automatic policy selects ``opengl`` when the GNOME
+    Shell integration is active, ``xcb_x11`` on GNOME Wayland without it,
+    and leaves VLC's default elsewhere (Xorg keeps hardware presentation).
+    Unknown values fall back to automatic with a warning: raw strings are
+    never passed to VLC.
+
+    NOTE (verdict C, see docs/notes/vlc3-vout-investigation.md): under
+    LibVLC 3 the media player shadows the "vout" variable with its own
+    empty one, so every renderer currently yields VLC's automatic pick
+    for embedded playback. Values are still canonical so a future
+    libvlc gets a valid module name.
+    """
+    env = _canonical_vout(os.environ.get("APRICUS_VOUT", ""))
+    if env is not None:
+        return env
+    if os.environ.get("APRICUS_VOUT", "").strip():
+        logger.warning(f"[Player] ignoring unknown APRICUS_VOUT={os.environ.get('APRICUS_VOUT')!r}")
+    if explicit in ("gl", "xcb", "xv"):
+        return VOUT_MODULES[explicit]
+    if explicit != RENDERER_AUTO:
+        logger.warning(f"[Player] ignoring unknown renderer {explicit!r}, using automatic")
+    try:
+        if integration_active():
+            return VOUT_MODULES["gl"]
+    except Exception:  # noqa: BLE001 - detection is best-effort
+        logger.debug("[Player] integration check failed, using session default")
+    if is_gnome() and is_wayland():
+        return VOUT_MODULES["xcb"]
+    return None
 
 
 class Fade:
@@ -111,7 +204,7 @@ class VLCWidget(Gtk.DrawingArea):
 
     __gtype_name__ = "VLCWidget"
 
-    def __init__(self, width, height, disable_audio=False):
+    def __init__(self, width, height, disable_audio=False, renderer=RENDERER_AUTO):
         Gtk.DrawingArea.__init__(self)
 
         # Spawn a VLC instance and create a new media player to embed.
@@ -120,17 +213,21 @@ class VLCWidget(Gtk.DrawingArea):
         # --aout=pulse: Force PulseAudio output. VLC's PipeWire audio-output
         #   plugin segfaults (pw_thread_loop_lock) when multiple instances are
         #   active, e.g. one per monitor. See the Flatpak, which uses Pulse too.
+        # Video output (--vout): resolved by resolve_renderer_vout() from the
+        # saved selection, APRICUS_VOUT and the automatic policy.
+        # NOTE (verdict C, see docs/notes/vlc3-vout-investigation.md):
+        # under LibVLC 3 this value is inert for embedded playback via
+        # set_xwindow — the media player shadows the "vout" variable
+        # with its own empty one, so the vout-display probe always runs
+        # with filter "any" and VLC uses its automatic pick. The option
+        # is still passed in canonical form for forward compatibility.
+        # Icons stay above video via the GNOME Shell companion extension
+        # (background-layer adoption), not via the vout choice.
         # Playlist mode never needs audio: opening/closing the audio output
         # on every transition locks up PipeWire, so it is disabled entirely.
-        if disable_audio:
-            vlc_options = [
-                "--no-disable-screensaver",
-                "--no-interact",
-                "--no-audio",
-                "--aout=none",
-            ]
-        else:
-            vlc_options = ["--no-disable-screensaver", "--no-interact", "--aout=pulse"]
+        # Option building lives in _vlc_options() (unit-tested).
+        vout = resolve_renderer_vout(renderer)
+        vlc_options = _vlc_options(disable_audio, vout)
         self.instance = vlc.Instance(vlc_options)
         self.player = self.instance.media_player_new()
 
@@ -157,7 +254,9 @@ class VLCWidget(Gtk.DrawingArea):
 
 
 class PlayerWindow(Gtk.ApplicationWindow):
-    def __init__(self, name, width, height, *args, mode=MODE_VIDEO, **kwargs):
+    def __init__(
+        self, name, width, height, *args, mode=MODE_VIDEO, renderer=RENDERER_AUTO, **kwargs
+    ):
         super().__init__(*args, **kwargs)
         # Keyboard/mouse input is handled by VLC flags below (both disabled):
         # never take keyboard focus so clicks can't raise us over DING.
@@ -170,7 +269,9 @@ class PlayerWindow(Gtk.ApplicationWindow):
         self.height = height
         self.name = name
         self._mode = mode
-        self.__vlc_widget = VLCWidget(width, height, disable_audio=(mode == MODE_PLAYLIST))
+        self.__vlc_widget = VLCWidget(
+            width, height, disable_audio=(mode == MODE_PLAYLIST), renderer=renderer
+        )
         # Opaque black until the first frame lands: otherwise the theme
         # background flashes through on every video switch.
         self.override_background_color(Gtk.StateFlags.NORMAL, Gdk.RGBA(0, 0, 0, 1))
@@ -439,6 +540,8 @@ class VideoPlayer(BasePlayer):
         <method name='preview_static'>
             <arg type='s' name='video_path' direction='in'/>
         </method>
+        <method name='refresh_static'>
+        </method>
         <method name='switch_media'>
             <arg type='s' name='mode' direction='in'/>
         </method>
@@ -481,6 +584,10 @@ class VideoPlayer(BasePlayer):
         # via playback_error()/last_error so the GUI banner fires instead of
         # leaving a silent black monitor. Reset on every _apply_source().
         self._resolve_error = None
+        # Monotonic timestamp (seconds) of the last media (re)start, used to
+        # report "no frames yet" when playback runs but nothing is ever
+        # displayed (e.g. an unusable video output). None disables the check.
+        self._media_started_at = None
         GLib.idle_add(self._deferred_capture_original)
 
     def _deferred_capture_original(self):
@@ -489,8 +596,14 @@ class VideoPlayer(BasePlayer):
 
     def new_window(self, gdk_monitor):
         rect = gdk_monitor.get_geometry()
+        renderer = (self.config or {}).get(CONFIG_KEY_RENDERER, RENDERER_AUTO)
         return PlayerWindow(
-            gdk_monitor.get_model(), rect.width, rect.height, application=self, mode=self.mode
+            gdk_monitor.get_model(),
+            rect.width,
+            rect.height,
+            application=self,
+            mode=self.mode,
+            renderer=renderer,
         )
 
     def do_activate(self):
@@ -586,10 +699,16 @@ class VideoPlayer(BasePlayer):
         perf.mark(f"player: switched [{mode}]")
         return False
 
+    # Seconds without a first frame before playback_error() reports
+    # "No video frames received yet". Generous on purpose: slow streams may
+    # legitimately take a while; this guards mode transitions.
+    FIRST_FRAME_TIMEOUT_SEC = 20
+
     def _apply_source(self, data_source, setup_handlers):
         # New media, new verdict: drop the previous resolution failure so a
         # stale error can never mask the fresh attempt (and vice versa).
         self._resolve_error = None
+        self._media_started_at = time.monotonic()
 
         # Stable config keys for live monitors (unique models keep the bare
         # model; duplicates get Model#i). Order matches self.windows.
@@ -690,12 +809,20 @@ class VideoPlayer(BasePlayer):
                     logger.warning(f"[Playlist] No videos for {mkey}, monitor stays blank")
                     continue
                 window._queue = queue
-                window._queue_index = 0
+                # Resume where the queue left off (persisted across player
+                # respawns); shuffles restart.
+                saved_pos = self.config.get(CONFIG_KEY_PLAYLIST_POS) or {}
+                if shuffle:
+                    window._queue_index = 0
+                else:
+                    window._queue_index = self._restored_queue_index(
+                        saved_pos, mkey, monitor.get_model(), len(queue)
+                    )
                 window._transitioning = False
                 if not getattr(window, "_end_attached", False):
                     window.attach_end_reached(lambda w=window: self._on_media_end(w))
                     window._end_attached = True
-                self._play_queue_item(window)
+                self._play_queue_item(window, mkey, monitor.get_model())
         else:
             raise ValueError("Invalid mode")
 
@@ -756,7 +883,7 @@ class VideoPlayer(BasePlayer):
                 return queue[0]
         return None
 
-    def _play_queue_item(self, window):
+    def _play_queue_item(self, window, mkey=None, model=None):
         """Play window._queue[window._queue_index]. Main thread only."""
         if getattr(window, "_transitioning", False):
             logger.debug("[Playlist] Transition already in progress, skipping")
@@ -775,6 +902,8 @@ class VideoPlayer(BasePlayer):
             window.set_media(media)
             window.play()
             window.centercrop(width, height)
+            self._media_started_at = time.monotonic()
+            self._save_queue_index(mkey or model, window._queue_index)
         finally:
             window._transitioning = False
 
@@ -784,8 +913,68 @@ class VideoPlayer(BasePlayer):
         if not queue:
             return False
         window._queue_index = (window._queue_index + 1) % len(queue)
-        self._play_queue_item(window)
+        monitor = next((m for m, w in self.windows.items() if w is window), None)
+        if monitor is not None:
+            try:
+                model = monitor.get_model()
+            except Exception:  # noqa: BLE001 - best effort only
+                model = ""
+            self._play_queue_item(window, self._stable_monitor_key(monitor), model)
+        else:
+            self._play_queue_item(window)
         return False
+
+    @staticmethod
+    def _restored_queue_index(saved, key, model, length):
+        """Resume position for a playlist, clamped into the current queue."""
+        if not isinstance(length, int) or length <= 0:
+            return 0
+        try:
+            position = (saved or {}).get(key, (saved or {}).get(model, 0))
+        except AttributeError:
+            return 0
+        if not isinstance(position, int) or isinstance(position, bool) or position < 0:
+            return 0
+        return position % length
+
+    def _stable_monitor_key(self, monitor):
+        """Stable per-monitor key for persisting playlist position."""
+        try:
+            from apricus.monitor import assign_keys
+
+            infos = []
+            monitors = []
+            for m in self.windows:
+                infos.append(
+                    {
+                        "name": m.get_model(),
+                        "x": m.get_geometry().x,
+                        "y": m.get_geometry().y,
+                    }
+                )
+                monitors.append(m)
+            for m, info in zip(monitors, assign_keys(infos), strict=True):
+                if m is monitor:
+                    return info["key"]
+            return monitor.get_model()
+        except Exception:  # noqa: BLE001 - best effort, fall back to model
+            try:
+                return monitor.get_model()
+            except Exception:  # noqa: BLE001 - last resort
+                return "Default"
+
+    def _save_queue_index(self, key, index):
+        """Persist the current playlist position (survives respawns)."""
+        if not key:
+            return
+        try:
+            positions = self.config.setdefault(CONFIG_KEY_PLAYLIST_POS, {})
+            if not isinstance(positions, dict):
+                positions = self.config[CONFIG_KEY_PLAYLIST_POS] = {}
+            positions[key] = int(index)
+            ConfigUtil().save(self.config)
+        except Exception as e:  # noqa: BLE001 - static frame matters more
+            logger.debug(f"[Playlist] position save skipped: {e}")
 
     @property
     def volume(self):
@@ -827,11 +1016,37 @@ class VideoPlayer(BasePlayer):
         """
         if getattr(self, "_resolve_error", None):
             return self._resolve_error
+        first_frame_seen = False
         for window in self.windows.values():
             err = window.playback_error()
             if err is not None:
                 return err
+            if getattr(window, "_first_frame_reported", False):
+                first_frame_seen = True
+        if (
+            not first_frame_seen
+            and getattr(self, "_media_started_at", None) is not None
+            and (time.monotonic() - self._media_started_at) > self.FIRST_FRAME_TIMEOUT_SEC
+            and self._is_actually_playing()
+        ):
+            # Decoding claims to play but shows nothing: broken output,
+            # not a pause (paused players report is_playing() False) and
+            # not startup buffering (deadline is generous on purpose).
+            # A first frame arriving later clears this automatically.
+            return "No video frames received yet"
         return None
+
+    def _is_actually_playing(self):
+        """True when libVLC itself reports playback on any window.
+
+        Unlike ``is_playing`` (the user-pause flag), this is False for
+        manual pauses, screen-lock pauses and auto-pause on maximize, so
+        the no-frames verdict never fires when no frames are expected.
+        """
+        try:
+            return any(w.is_playing() for w in self.windows.values())
+        except Exception:  # noqa: BLE001 - never break error reporting
+            return False
 
     @property
     def last_error(self):
@@ -884,6 +1099,11 @@ class VideoPlayer(BasePlayer):
         if not self.wallpaper.supports_static:
             return
         video = video or self.data_source["Default"]
+        if getattr(self, "_static_in_flight", None) == video:
+            # A generation for this exact video is already running (e.g. a
+            # repeated toggle): don't stack another ffmpeg behind it.
+            perf.mark("player: static generation already running")
+            return
         cached = self._static_cache_path(video)
         if os.path.isfile(cached):
             # Instant path: show last frame immediately, no ffmpeg involved.
@@ -896,6 +1116,7 @@ class VideoPlayer(BasePlayer):
             perf.mark("player: static refresh skipped (fast mode)")
             return
         self._static_token = getattr(self, "_static_token", 0) + 1
+        self._static_in_flight = video
         thread = threading.Thread(
             target=self._generate_static_wallpaper,
             args=(video, cached, self._static_token),
@@ -939,9 +1160,11 @@ class VideoPlayer(BasePlayer):
             )
         except subprocess.TimeoutExpired:
             logger.warning("[StaticWallpaper] ffmpeg timed out")
+            self._release_static_in_flight(video, token)
             return
         if ret.returncode != 0 or not os.path.isfile(tmp_path):
             logger.warning("[StaticWallpaper] frame extraction failed")
+            self._release_static_in_flight(video, token)
             return
         # Sharp frame, no blur: the static wallpaper sits underneath the video
         # and blur only added startup cost for no visible benefit.
@@ -949,6 +1172,7 @@ class VideoPlayer(BasePlayer):
             os.replace(tmp_path, cached)
         except OSError as e:
             logger.warning(f"[StaticWallpaper] {e}")
+            self._release_static_in_flight(video, token)
             return
         finally:
             if os.path.isfile(tmp_path) and tmp_path != cached:
@@ -958,7 +1182,16 @@ class VideoPlayer(BasePlayer):
                     pass
         perf.mark("player: static cache refreshed")
         if token == getattr(self, "_static_token", None):
+            self._release_static_in_flight(video, token)
             GLib.idle_add(self._apply_static_wallpaper, cached)
+
+    def _release_static_in_flight(self, video, token):
+        """Clear the generation guard, unless a newer request superseded it."""
+        if (
+            token == getattr(self, "_static_token", None)
+            and getattr(self, "_static_in_flight", None) == video
+        ):
+            self._static_in_flight = None
 
     def _apply_static_wallpaper(self, static_wallpaper_path):
         self._last_static_path = static_wallpaper_path
@@ -1081,6 +1314,46 @@ class VideoPlayer(BasePlayer):
             threading.Thread(
                 target=self._generate_stream_static, args=(video_path,), daemon=True
             ).start()
+        return False
+
+    def refresh_static(self, dbus_context=None):
+        """Generate and apply the static frame for the current content.
+
+        Invoked when the user enables the static-wallpaper flag mid-playback,
+        so the frame applies without re-applying the video or restarting the
+        player. Generation runs in the usual background thread (a repeated
+        call for the same video while one is running is ignored); playback
+        itself is untouched — only the final wallpaper.apply_static runs on
+        the main loop. Returns True when a generation was started or a
+        cached frame applied synchronously.
+        """
+        _authorize("player.refresh_static", dbus_context)
+        if not self.wallpaper.supports_static:
+            return False
+        if self.mode == MODE_STREAM:
+            source = (self.data_source or {}).get("Default", "")
+            if not source:
+                return False
+            if source.startswith(("http://", "https://")):
+                cached = self._static_cache_path(source)
+                if os.path.isfile(cached):
+                    self._apply_static_wallpaper(cached)
+                    return True
+                threading.Thread(
+                    target=self._generate_stream_static, args=(source,), daemon=True
+                ).start()
+                return True
+            self.set_static_wallpaper(source)
+            return True
+        if self.mode == MODE_PLAYLIST:
+            first = self._first_queued_video()
+            if not first:
+                return False
+            self.set_static_wallpaper(first)
+            return True
+        if self.mode == MODE_VIDEO:
+            self.set_static_wallpaper()
+            return True
         return False
 
     def _live_cache_paths(self):

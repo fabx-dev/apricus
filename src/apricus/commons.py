@@ -113,10 +113,31 @@ CONFIG_KEY_FIRST_TIME = "is_first_time"
 CONFIG_KEY_VIDEO_DIR = "video_dir"
 CONFIG_KEY_PLAYLIST = "playlist"
 CONFIG_KEY_SHUFFLE = "playlist_shuffle"
+CONFIG_KEY_PLAYLIST_POS = "playlist_position"
 CONFIG_KEY_STREAM_HISTORY = "stream_history"
 CONFIG_KEY_STREAM_FAVORITES = "stream_favorites"
 CONFIG_KEY_WEB_HISTORY = "web_history"
 CONFIG_KEY_WEB_FAVORITES = "web_favorites"
+CONFIG_KEY_RENDERER = "video_renderer"
+# Video renderer ids (stored in config for backward compatibility;
+# no UI exposes them anymore — see docs/notes/vlc3-vout-investigation.md).
+# Values are never translated.
+RENDERER_AUTO = "auto"
+RENDERER_GL = "gl"
+RENDERER_XCB = "xcb"
+RENDERER_XV = "xv"
+VALID_RENDERERS = frozenset({RENDERER_AUTO, RENDERER_GL, RENDERER_XCB, RENDERER_XV})
+# Canonical VLC video-output module names for each renderer id,
+# kept for forward compatibility (see
+# docs/notes/vlc3-vout-investigation.md). Under LibVLC 3 these values
+# are inert: the media player shadows the "vout" variable with its own
+# empty one, so VLC always uses its automatic pick. Unknown strings
+# are rejected instead of being handed to VLC.
+VOUT_MODULES = {
+    RENDERER_GL: "opengl",
+    RENDERER_XCB: "xcb_x11",
+    RENDERER_XV: "xcb_xv",
+}
 CONFIG_TEMPLATE = {
     CONFIG_KEY_VERSION: CONFIG_VERSION,
     CONFIG_KEY_MODE: MODE_NULL,
@@ -137,6 +158,10 @@ CONFIG_TEMPLATE = {
     # back to "Default". Shuffled order is computed at apply time.
     CONFIG_KEY_PLAYLIST: None,  # seeded per-process, see ensure_template_monitors()
     CONFIG_KEY_SHUFFLE: False,
+    # Per-monitor playlist positions ({monitor_key: index}) so a player
+    # respawn (mode reload) resumes the current item instead of
+    # restarting the queue. Backfilled like video_dir.
+    CONFIG_KEY_PLAYLIST_POS: {},
     # Stream pick-list (no version bump: backfilled like video_dir).
     # History entries: {url, title, site, kind, last_used}.
     CONFIG_KEY_STREAM_HISTORY: [],
@@ -145,6 +170,7 @@ CONFIG_TEMPLATE = {
     # Web pick-list, same policy (entries may also be local .html paths).
     CONFIG_KEY_WEB_HISTORY: [],
     CONFIG_KEY_WEB_FAVORITES: [],
+    CONFIG_KEY_RENDERER: RENDERER_AUTO,
 }
 
 

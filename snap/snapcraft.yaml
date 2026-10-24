@@ -30,6 +30,7 @@ apps:
     common-id: io.github.fabx_dev.Apricus
     desktop: usr/share/applications/io.github.fabx_dev.Apricus.desktop
     autostart: io.github.fabx_dev.Apricus.desktop
+    slots: [gnome-status]
     environment:
       PYTHONPATH: $SNAP/usr/share/apricus:$SNAP/gnome-platform/usr/lib/python3/dist-packages:$SNAP/usr/lib/python3/dist-packages
       LD_LIBRARY_PATH: $SNAP/usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR:$SNAP/usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR/vlc:$SNAP/usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR/blas:$SNAP/usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR/lapack:$LD_LIBRARY_PATH
@@ -50,6 +51,14 @@ apps:
       - desktop-legacy
       - gsettings
       - screen-inhibit-control
+
+slots:
+  # Store distribution requires approval of this exact name via snap-declaration.
+  # Host Shell calls us; no plug granting outgoing access to GNOME Shell.
+  gnome-status:
+    interface: dbus
+    bus: session
+    name: io.github.fabxdev.Apricus.GnomeBridge
 
 parts:
   deno:
