@@ -725,3 +725,64 @@ untouched, PoC x1 intact, extensions ACTIVE, 3 GNOME URIs byte-identical to
 baseline, no `~/snap/apricus`. LXD stays installed (no build/remove this
 phase). GUI matrix helper `tests/manual/m1_native/compare_select.py`
 committed; per-arm evidence retained under `build/snap-compare/`.
+
+## 19. STOP/RESUME GUI accessibility audit (code-only, no changes)
+
+The user never saw Stop/Resume in any UI used during testing. Verified
+against M1 sources (identical in the installed Snap payload) and the
+shipped Italian catalog — no GUI run, install or screenshot was possible
+in this environment (no desktop-control tools, no authorized runs), so the
+interface below is a code-verified widget inventory, not a screenshot.
+
+### Where the controls actually are
+
+1. GTK4 Control Center (`src/apricus/gui/gtk4app.py`), page
+   "Now Playing" (`_now_playing_page`), transport row (L1332–1362):
+   circular Play/Pause button + `np_stop_btn`
+   (`Gtk.Button(label=_("Stop wallpaper"))`, L1340) + mute toggle +
+   volume scale. Handler `on_stop_resume` (L4311): disables the button,
+   calls `stop_playback()`/`resume_playback()` on a worker thread based on
+   live `playback_state`, then re-enables + `_refresh_all`. The Play
+   button also routes to resume when stopped (L4300–4302).
+2. GTK3 player context menu (`src/apricus/menu.py::build_menu`, used on
+   wallpaper right-click by `video_player.py:514` and `web_player.py:228`,
+   and for the (X11-only effective) systray): ALWAYS appends both
+   "Stop wallpaper" and "Resume wallpaper" (L127–133) with no
+   state-based hiding or disabling.
+
+### Visibility, state feedback, translations
+
+- The Now Playing button is never hidden; it is sensitive whenever the
+  server object exists, its label toggles Stop↔Resume (L1496–1501), the
+  badge shows Playing/Paused/Stopped ("Fermato" in Italian), the
+  equalizer hides when not playing, and Play shows the start icon.
+- BUT the Control Center opens on the "Library" page by default (L225);
+  the user must open the sidebar section "Now Playing" first. Nothing on
+  Library/Playlist/Streaming/Web/Settings mentions STOP.
+- Italian catalog verified in `po/it.po` AND inside the Snap payload
+  (`.mo` unpacked from the M1 artifact): "Ferma wallpaper",
+  "Riprendi wallpaper", "Fermato", "Impossibile modificare la
+  riproduzione del wallpaper." The Snap ships the M1 GUI code (7
+  `np_stop_btn`/`on_stop_resume` references in the packed `gtk4app.py`).
+
+### Why the user never saw it
+
+All validation was IPC-driven (`gdbus`/socket calls). The Control Center
+was opened only ~3 times, briefly, for bridge checks — never navigated to
+Now Playing on record. The systray path is effectively absent on Wayland
+GNOME (no AppIndicator host), leaving only the undiscovered video
+right-click menu. Net effect: a working, translated, state-reflecting
+control existed two clicks away (open panel → Now Playing) but nothing
+surfaced it in the flows the user actually used.
+
+### Minimal UX proposal (NOT implemented — awaiting approval)
+
+Single header-bar STOP/RESUME toggle, visible on every Control Center
+page, wired to the existing `on_stop_resume` and reusing the existing
+translated strings (no new msgids, no `.po` churn): add the button next to
+the window controls/header in the panel chrome and sync its label in
+`_refresh_all` next to `np_stop_btn`. Optional second step: make the
+GTK3 context menu show only the applicable action (Stop XOR Resume) from
+live `playback_state` instead of both unconditionally. Files to touch:
+only `src/apricus/gui/gtk4app.py` (+ `src/apricus/menu.py` for step two).
+No bridge/extension/IPC/renderer changes.
