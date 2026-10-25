@@ -1,5 +1,9 @@
 # M3 local closure and reduced validation
 
+Historical implementation/measurement plan. The reduced campaign was subsequently
+completed: see [final validation status](m3-validation-status.md) for the live
+results, NOT MEASURED latency verdict and exact restoration reservation.
+
 Local-only follow-up to the third campaign (`6fc5f3f`), GNOME 50.1 / native
 Wayland. No installed extension, session settings, manifest or permissions
 are changed by this work. No live latency PASS is claimed.
@@ -111,7 +115,7 @@ Never subtract 1.5 s and call the remainder an exact measured latency. Compare
 the full T0→T5 against 500 ms explicitly: it may exceed it by design with fade.
 Also report T0→T3 separately. Do not silently redefine the target.
 
-## Reduced final live proposal — not executed or authorized here
+## Historical reduced final live proposal (subsequently executed)
 
 Reuse the verified extension backup/rollback, but take a **complete** fresh
 config/cache/static-image inventory before touching anything. Keep the prior

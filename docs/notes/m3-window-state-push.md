@@ -1,5 +1,9 @@
 # M3 — Wayland window-state push (design record, implemented)
 
+Current live verdict and packaging/latency/restoration limits:
+[M3 final validation status](m3-validation-status.md). Historical plans below
+must not be interpreted as additional live PASS results.
+
 Compositor truth flows extension → server over a dedicated versioned bus
 name. The server remains the only playback decider; the extension carries
 no policy, no window identities, and no playback verbs.
