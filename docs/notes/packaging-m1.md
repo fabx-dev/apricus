@@ -786,3 +786,64 @@ GTK3 context menu show only the applicable action (Stop XOR Resume) from
 live `playback_state` instead of both unconditionally. Files to touch:
 only `src/apricus/gui/gtk4app.py` (+ `src/apricus/menu.py` for step two).
 No bridge/extension/IPC/renderer changes.
+
+## 20. M1 + GNOME reload-fix combination check ([validation date omitted], temp worktree only)
+
+Scope: Fase 1 translations completed (Play→Riproduci/Pausa, Abspielen/Pause,
+Reproducir/Pausar, Lire/Pause，再生/一時停止； all catalogs compile; other
+strings untouched). This section records the isolated combination test.
+
+Worktrees (read-only listing): M1 `<private-path>`
+(`8a6d194`→`a21d0f8` after the i18n commit), Agent A
+`<private-path>` (untouched), roadmap worktree untouched.
+Merge-base M1↔integration: `9cb6ea5`. Integration adds exactly one commit
+on top: `31f0c36` (extension enable()-scan fix + rescan GJS harness +
+CI step). M1 adds 27 commits on top of the same base (implementation,
+tests/tooling/docs, two-button UX + i18n).
+
+Production-code overlap: NONE except `tests/test_gnome_integration.py`
+(M1 added a FakeConfigUtil.load helper; the fix added an independent
+rescan test in a different hunk). `gnome-extension/`, manifests,
+workflows (except the fix's own CI step for its harness), permissions and
+protocols are untouched by M1; the fix does not touch `src/`.
+
+Combination: temp worktree `<private-path>`,
+temp branch `tmp/m1-gnome-fix-check`, local merge commit `bb3113d`
+(M1 `a21d0f8` + `31f0c36`), automatic ort merge, ZERO conflicts. Existing
+branches, PR #1, master and Agent A's worktree untouched; nothing pushed.
+
+Test on the combination (M1 venv reused read-only, no installs, no live):
+- Full pytest suite: 393 passed, 5 skipped (display-dependent).
+- STOP/RESUME + bridge + integration files explicitly: 82 passed.
+- Rescan/stacking regression tests: pass.
+- Ruff lint + format: clean. GJS status-bridge harness: PASS. GJS
+  extension-rescan harness: PASS (re-adoption, no double adoption,
+  disable releases, overrides restored).
+- gettext: all 6 catalogs compile (including completed Play/Pause).
+- Worktree clean after tests (no test pollution).
+
+Excluded from any integration: `build/`, `dist/`, `.venv/` (all git-ignored
+artifacts, logs and evidence roots), `tests/manual/` (preflight/live
+harnesses and session supervisors), `tests/test_m1_isolation.py`,
+`tests/test_m1_native_session.py`, `tests/perf_m1.py`, docs and notes.
+Proposed integration payload = exactly the merge-base diff file list for
+`src/`, `po/`, `gnome-extension/` (fix side), `tests/test_*.py`
+(43 files, no packaging/manifest/permission/workflow changes).
+
+Residual risks:
+1. UX two-button change (6c171f0) validated only headless + one graphical
+   smoke of the *previous* layout; the new STOPPED-disabled/refresh logic
+   has no live-session confirmation yet (explicitly out of scope here).
+2. Anomaly A verdict (NOT REPRODUCED) is unchanged by this combination;
+   no comparative live runs were performed in this phase.
+3. The temp merge commit is verification-only and must not be pushed or
+   merged into existing branches.
+
+Recommended strategy: when authorized, fast-forward or PR the integration
+branch with the M1 file set (production: 11 `src/` files + 7 `po/` files;
+tests: 4 `tests/test_*.py` files; docs as decided), keeping the fix commit
+as-is; PR #1 needs an update ONLY if it is the vehicle chosen for that
+integration (no change made here, no assessment of PR #1 contents made).
+Alternative: keep M1 separate until a live session confirms the new
+transport buttons. Either way, delete the temp worktree only after the
+decision (it is the only place holding the verified combination).
