@@ -193,14 +193,16 @@ collect ≥5 STOP samples per backend before any comparison with native
 - Byte-reproducibility of a rebuild is NOT claimed (build-ids/timestamps);
   the exact rebuild command is recorded in §3.
 - Flatpak test status: matrix complete, restore verified, package
-  uninstalled. Snap build/install: NOT STARTED, still gated.
+  uninstalled. Snap build: DONE (§13); Snap install: NOT PERFORMED, still
+  gated.
 
 ## 10. Current status (Flatpak done, Snap gated)
 
 - Tests: PASS (392). Packaging diff: none. Flatpak matrix complete with one
   documented integration finding; restore verified (data 51/51, URIs exact,
-  no processes, Snap absent).
-- Snap build/install: NOT STARTED — verified plan in §11 below.
+  no processes, Snap absent at test time).
+- Snap build: DONE (see §13); Snap install NOT performed, still gated. LXD
+  stays installed pending the package-validation decision (see §13).
 - No merge/push/PR/tag/release/publication. No production/sandbox/permission
   changes.
 
@@ -355,3 +357,48 @@ proves nothing pre-existed — `lxc network delete lxdbr0`,
 `ip link`/iptables/socket are clean. Build artifacts live in ignored
 `build/` and `dist/` (see `.gitignore`), never in the repo. Snapd snapshot 9
 and the PoC snap are untouched by all of this.
+
+## 13. Snap core24 build results ([validation date omitted], LXD backend, no install)
+
+Built from worktree HEAD `90fd876` (only docs/test-tooling after the M1 code
+commit; `src/` identical to the validated Flatpak build input). Preseed
+`build/lxd-preseed.yaml` applied as authorized: standalone, local socket only,
+`lxdbr0` <private-address>/24 (host route is <private-address>/24 — no overlap), NAT on for
+dependency downloads, dir pool. Observed host changes: `lxdbr0` bridge,
+`ip_forward` 0→1, LXD socket service. No user/group changes; `lxd` group was
+already effective.
+
+Limits: default-project profile limits do NOT propagate into snapcraft's own
+`snapcraft` project (separate profile namespace — documented pitfall). Applied
+directly to the live build instance before compilation started and verified
+by re-read: `limits.cpu=4`, `limits.memory=3GiB`
+(`<test-build-container>`, project `snapcraft`). Build log retained:
+`build/snapcraft-m1.log`. No `--destructive-mode`, no host APT changes, no
+manifest/permission/code changes. Memory stayed healthy (≥2.9 GB available
+throughout per samples); disk went 34G→41G used (+~7 GB: LXD snap, base
+image, build data).
+
+Artifact: `dist/apricus_2.0.7_amd64.snap` (123,392,000 bytes) +
+`dist/apricus_2.0.7_amd64.snap.sha256`:
+`<artifact-sha256>`
+Verification (same checks as the artifact-only workflow, plus M1/payload
+proof): python3 entrypoint, `install-host.sh`, extension `metadata.json`
+present; `meta/snap.yaml` = name apricus, version 2.0.7, base core24,
+confinement strict, grade stable; built `server.py` carries the M1
+`manual_stop` marker (5 hits); payload diff vs the validated pre-M1 x3 snap
+(`b94fac7c…`) is exactly the 11 M1 source files
+(child_jobs, commons, gtk4app, mediacache, menu, video/web_player, server,
+snap_ipc, stop_support, utils) — no other delta.
+
+LXD state at end: instances `base-instance-…` + `snapcraft-apricus-…`
+STOPPED, network `lxdbr0` + storage `default` CREATED/used, no build
+processes left. LXD intentionally left installed (decision deferred per
+authorization: remove only after package validation). Removal prep (NOT
+executed): `lxc delete --force` the two snapcraft instances (keep the cached
+base image only if a rebuild is wanted, else delete it too), then the §12e
+sequence.
+
+STOPPED before installing the package. No sudo beyond the authorized LXD
+install; no snap install/remove; no push/PR/tag/release/publication; no
+workflow, secret, ruleset, extension, sandbox, renderer or SSRF-guard
+changes.
