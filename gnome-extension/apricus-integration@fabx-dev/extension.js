@@ -33,10 +33,12 @@ import Meta from 'gi://Meta';
 import Shell from 'gi://Shell';
 
 import {Extension, InjectionManager} from 'resource:///org/gnome/shell/extensions/extension.js';
+import Config from 'resource:///org/gnome/shell/misc/config.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import {Workspace} from 'resource:///org/gnome/shell/ui/workspace.js';
 import {WorkspaceThumbnail} from 'resource:///org/gnome/shell/ui/workspaceThumbnail.js';
 import {StatusBridge} from './statusBridge.js';
+import {DesktopStateTracker, StatePublisher} from './state.js';
 
 // Must match WALLPAPER_WINDOW_ROLE in src/apricus/gnome_shell.py and the
 // role set by the player before mapping (Gtk.Window.set_role).
@@ -44,7 +46,7 @@ const WALLPAPER_ROLE = 'apricus-wallpaper';
 
 // Bumped on every code change; logged from enable() so the journal shows
 // which revision the running shell actually loaded.
-const CODE_REVISION = 4;
+const CODE_REVISION = 5;
 
 const WINDOW_MATCH_RETRIES = 10;
 const WINDOW_MATCH_INTERVAL_MS = 100;
@@ -106,6 +108,41 @@ export default class ApricusIntegrationExtension extends Extension {
         this._injectionManager = new InjectionManager();
         this._installOverviewHiding();
 
+        // Compositor truth sensor (M3): tracks fullscreen/maximized per
+        // window and publishes it on D-Bus. No playback logic here; the
+        // server decides. Best effort: a failed sensor must never break
+        // adoption or stacking.
+        try {
+            const shellVersion = (typeof Config !== 'undefined' && Config.PACKAGE_VERSION) || '?';
+            const extensionVersion = Number(this.metadata?.version ?? 1) || 1;
+            this._stateTracker = new DesktopStateTracker(
+                () => this._readDesktopState(),
+                {
+                    codeRevision: CODE_REVISION,
+                    shellVersion,
+                    extensionVersion,
+                    subscribeDisplay: (name, callback) => global.display.connect(name, callback),
+                    unsubscribeDisplay: id => global.display.disconnect(id),
+                    subscribeWorkspace: (name, callback) => global.workspace_manager.connect(name, callback),
+                    unsubscribeWorkspace: id => global.workspace_manager.disconnect(id),
+                    subscribeLayout: (name, callback) => Main.layoutManager.connect(name, callback),
+                    unsubscribeLayout: id => Main.layoutManager.disconnect(id),
+                    subscribeWindow: (ref, name, callback) => ref.connect(name, callback),
+                    unsubscribeWindow: (ref, _name, id) => ref.disconnect(id),
+                });
+            this._statePublisher = new StatePublisher(this._stateTracker, {
+                codeRevision: CODE_REVISION,
+                shellVersion,
+                extensionVersion,
+            });
+            this._stateTracker.watchBus();
+            this._statePublisher.start();
+        } catch (error) {
+            console.warn(`[ApricusPush] unavailable: ${error.message}`);
+            this._stateTracker = null;
+            this._statePublisher = null;
+        }
+
         // The player may already run (started before the extension was
         // enabled, or re-enabled after unlock): adopt matching windows now.
         let seen = 0, matched = 0;
@@ -124,6 +161,10 @@ export default class ApricusIntegrationExtension extends Extension {
     }
 
     disable() {
+        this._stateTracker?.stop();
+        this._stateTracker = null;
+        this._statePublisher?.stop();
+        this._statePublisher = null;
         this._statusBridge?.stop();
         this._statusBridge = null;
         this._operational = false;
@@ -371,6 +412,68 @@ export default class ApricusIntegrationExtension extends Extension {
         } catch (_e) {
             // Shell is shutting down; the actor dies with it.
         }
+    }
+
+    // ------------------------------------------------- window-state sensor
+
+    _readDesktopState() {
+        // Plain-data snapshot for the push sensor: counts and indices only,
+        // never window identities. Wallpaper windows are excluded (they are
+        // also hidden from get_window_actors() by the Overview overrides).
+        // Windows the compositor cannot describe are skipped, never fatal.
+        const windows = [];
+        let activeWorkspace = 0;
+        try {
+            activeWorkspace = global.workspace_manager.get_active_workspace_index();
+        } catch (_e) {
+            // Stay at workspace 0 rather than breaking the Shell.
+        }
+        let activeWs = null;
+        try {
+            activeWs = global.workspace_manager.get_active_workspace();
+        } catch (_e) {
+            activeWs = null;
+        }
+        for (const actor of global.get_window_actors()) {
+            const window = actor ? actor.get_meta_window() : null;
+            if (!window || this._isWallpaperWindow(window))
+                continue;
+            try {
+                windows.push({
+                    ref: window,
+                    fullscreen: !!window.fullscreen,
+                    maximizedHorizontally: !!window.maximized_horizontally,
+                    maximizedVertically: !!window.maximized_vertically,
+                    monitor: window.get_monitor(),
+                    minimized: !!window.minimized,
+                    onActiveWorkspace: activeWs ? !!window.located_on_workspace(activeWs) : true,
+                    wallpaper: false,
+                });
+            } catch (_e) {
+                // Skip windows the compositor cannot describe right now.
+            }
+        }
+        let monitors = [];
+        try {
+            const primary = Main.layoutManager.primaryIndex;
+            monitors = Main.layoutManager.monitors.map((monitor, index) => ({
+                index,
+                primary: index === primary,
+                x: monitor.x,
+                y: monitor.y,
+                width: monitor.width,
+                height: monitor.height,
+            }));
+        } catch (_e) {
+            // Monitors stay empty rather than breaking the Shell.
+        }
+        let nWorkspaces = 1;
+        try {
+            nWorkspaces = global.workspace_manager.get_n_workspaces();
+        } catch (_e) {
+            // Stay at a single workspace.
+        }
+        return {windows, activeWorkspace, nWorkspaces, monitors};
     }
 
     // ---------------------------------------------------- overview hiding
