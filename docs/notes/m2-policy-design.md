@@ -94,11 +94,13 @@ pause/stop/mute; config reload while stopped never autoplays.
   `_apply_policy_output` actuates EXISTING paths only (fades, M1
   destroy/recreate, stopped-background fallback) with per-(desired,
   wanted_mute) idempotency (mute-only changes never re-trigger fades);
-  `_sync_player_to_policy` aligns fresh players without restarting
-  playback; `_feed_auto` + generation-guarded `_apply_policy_pending`
-  feed X11 lock/maximize sensors moved here from the player; additive
-  read-only `engine_snapshot` (+ introspection XML). `is_paused_by_user`
-  is now an engine-latch mirror (always a bool — this also fixes the old
+  fresh players created by `_setup_player` are aligned via the
+  `fresh=True` path (no re-issued start — they auto-started on creation;
+  only the mirror, an optional pause, and the mute switch apply);
+  `_feed_auto` + generation-guarded `_apply_policy_pending` feed X11
+  lock/maximize sensors moved here from the player; additive read-only
+  `engine_snapshot` (+ introspection XML). `is_paused_by_user` is now an
+  engine-latch mirror (always a bool — this also fixes the old
   `None`-over-D-Bus wart); `is_mute` setter routes through the engine.
   `PolicyChanged` signal deferred: emissions are already single per
   transition via server-side dedup; a new bus signal is left to M6

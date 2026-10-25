@@ -211,10 +211,13 @@ class ApricusServer:
             self.config[CONFIG_KEY_STOPPED] = bool(stop_to)
             self._save_config(manual_stop=bool(stop_to), manual_pause=pause)
 
-    def _apply_policy_output(self, output):
+    def _apply_policy_output(self, output, *, fresh=False):
         """Actuate an engine output. Idempotent: re-applying the same
         (desired, wanted_mute) pair is a no-op (no double fades). A mute-only
-        change never restarts playback, it only flips the mute switch."""
+        change never restarts playback, it only flips the mute switch.
+        With fresh=True the player was created seconds ago and already
+        auto-started, so PLAY never re-issues start: only the mirror, an
+        optional pause, and the mute switch are applied."""
         if self._last_applied is None:
             last_desired, last_mute = None, None
         else:
@@ -237,12 +240,17 @@ class ApricusServer:
                     except (GLib.Error, AttributeError):
                         pass
                     player.pause_playback()
-                else:
+                elif not fresh:
                     try:
                         player.is_paused_by_user = False
                     except (GLib.Error, AttributeError):
                         pass
                     player.start_playback()
+                else:
+                    try:
+                        player.is_paused_by_user = False
+                    except (GLib.Error, AttributeError):
+                        pass
             if output.wanted_mute != last_mute:
                 if hasattr(player, "is_mute"):
                     player.is_mute = output.wanted_mute
@@ -432,30 +440,11 @@ class ApricusServer:
         # Refresh systray icon if the mode changed
         self._refresh_systray(mode)
 
-        # Align a (possibly new) player with the engine without restarting
-        # playback: a latched pause or an active automatic reason must
-        # survive respawns and mode switches. Explicit transitions go
-        # through _apply_policy_output instead.
-        self._sync_player_to_policy()
-
-    def _sync_player_to_policy(self):
-        """One-way sync for (re)created players: mirror the latch, enforce a
-        paused output, apply the wanted mute. Never starts playback (the
-        player already auto-started); start remains an explicit transition."""
-        out = self.policy.compute()
-        player = get_instance(DBUS_NAME_PLAYER)
-        if player is not None:
-            try:
-                player.is_paused_by_user = out.desired == PAUSED
-                if out.desired == PAUSED:
-                    player.pause_playback()
-                if hasattr(player, "is_mute"):
-                    player.is_mute = out.wanted_mute
-                elif hasattr(player, "set_is_mute"):
-                    player.set_is_mute(out.wanted_mute)
-            except (GLib.Error, AttributeError):
-                logger.debug("[Policy] player sync skipped (player gone?)")
-        self._last_applied = (out.desired, out.wanted_mute)
+        # Align a fresh player without restarting playback (it auto-started
+        # on creation): only the mirror, an optional pause, and the mute
+        # switch are applied. Explicit transitions go through the
+        # non-fresh path of _apply_policy_output instead.
+        self._apply_policy_output(self.policy.compute(), fresh=True)
 
     def _refresh_systray(self, mode):
         if self.config[CONFIG_KEY_SYSTRAY]:

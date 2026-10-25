@@ -35,7 +35,7 @@ class _FakePlayer:
 class _FakeProcess:
     pid = 999999  # nonexistent: os.getpgid raises ProcessLookupError
 
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
         self.started = False
 
     def is_alive(self):
@@ -250,16 +250,64 @@ def test_stop_then_resume_full_cycle(monkeypatch):
     assert obj.engine_snapshot["active_reasons"] == []
 
 
+def test_pause_then_change_wallpaper_stays_paused(monkeypatch, tmp_path):
+    """Paused + new selection: selection updates, nothing auto-plays, the
+    latch survives; only an explicit Play resumes (auto reason permitting)."""
+    clip = tmp_path / "new.mp4"
+    clip.write_bytes(b"fake")
+    obj, disk, saved = _server(monkeypatch, player=_FakePlayer())
+    monkeypatch.setattr(srv, "Process", _FakeProcess)
+    obj._apply_policy_output(obj.policy.compute())
+    assert obj._player.calls == ["start"]
+    obj.pause_playback()
+    assert obj._player.calls == ["start", "pause"]
+    obj.video(str(clip), "")
+    assert disk["data_source"]["Default"] == str(clip)
+    assert disk["policy_manual_pause"] is True
+    assert obj.engine_snapshot["desired"] == "paused"
+    assert "start" not in obj._player.calls[2:], obj._player.calls
+    obj.start_playback()
+    assert obj._player.calls[-1] == "start"
+    assert obj.engine_snapshot["desired"] == "playing"
+    assert disk["policy_manual_pause"] is False
+
+
+def test_pause_then_change_webpage_stays_paused(monkeypatch):
+    """Same contract for MODE_WEBPAGE (no WebKit involved: the server
+    decision is mode-agnostic; the freeze itself is covered below)."""
+    obj, disk, saved = _server(monkeypatch, player=_FakePlayer())
+    monkeypatch.setattr(srv, "Process", _FakeProcess)
+    obj._apply_policy_output(obj.policy.compute())
+    obj.pause_playback()
+    obj.webpage("file:///w.html", "")
+    assert disk["data_source"]["Default"] == "file:///w.html"
+    assert disk["policy_manual_pause"] is True
+    assert obj.engine_snapshot["desired"] == "paused"
+    assert obj._player.calls == ["start", "pause"], obj._player.calls
+
+
 def test_setup_hook_syncs_fresh_player_without_restarting_playback(monkeypatch):
-    """A respawned/reloaded player inherits the latch without a re-fade."""
+    """A respawned/reloaded player inherits the latch without a re-fade.
+    Exercises the same fresh-player path _setup_player uses."""
     obj, disk, saved = _server(monkeypatch, player=_FakePlayer())
     obj.policy.request_manual_pause()
     obj._sync_policy_persist()
     obj._player.calls.clear()
-    obj._sync_player_to_policy()
+    obj._apply_policy_output(obj.policy.compute(), fresh=True)
     assert obj._player.calls == ["pause"], obj._player.calls
     assert obj._player.is_paused_by_user is True
     assert obj.engine_snapshot["desired"] == "paused"
+
+
+def test_fresh_playing_player_gets_no_restart(monkeypatch):
+    """A freshly spawned player already auto-started: syncing must not
+    re-issue play (no restart fades); the mirror is still aligned."""
+    obj, disk, saved = _server(monkeypatch, player=_FakePlayer())
+    obj._player.calls.clear()
+    obj._apply_policy_output(obj.policy.compute(), fresh=True)
+    assert obj._player.calls == [], obj._player.calls
+    assert obj._player.is_paused_by_user is False
+    assert obj.engine_snapshot["desired"] == "playing"
 
 
 def test_web_pause_freezes_and_reports_paused(monkeypatch):

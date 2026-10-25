@@ -387,6 +387,58 @@ def test_snap_ipc_roundtrip_methods_and_properties(tmp_path, monkeypatch):
     assert obj.seen == [("/a.mp4", "HDMI-1")]
 
 
+def test_snap_ipc_roundtrip_dict_property(tmp_path, monkeypatch):
+    """Dict-valued properties (like engine_snapshot) must survive the Unix
+    socket JSON round trip unchanged."""
+    from gi.repository import GLib
+
+    from apricus import snap_ipc
+
+    monkeypatch.setenv("XDG_RUNTIME_DIR", str(tmp_path))
+
+    class _FakeServer:
+        mode = "MODE_VIDEO"
+        snapshot = {
+            "desired": "paused",
+            "wanted_mute": True,
+            "manual_stop": False,
+            "manual_pause": True,
+            "manual_mute": False,
+            "active_reasons": ["fullscreen"],
+            "push_alive": True,
+            "generation": 7,
+            "policy_version": 1,
+            "debounced": False,
+        }
+
+        @property
+        def engine_snapshot(self):
+            return dict(self.snapshot)
+
+    obj = _FakeServer()
+    sock = snap_ipc.publish_service("io.github.fabx_dev.Apricus.testdict", obj)
+    ctx = GLib.MainContext.default()
+    results = {}
+
+    def _client():
+        proxy = snap_ipc.get_service("io.github.fabx_dev.Apricus.testdict")
+        assert proxy is not None
+        results["snapshot"] = proxy.engine_snapshot
+
+    import threading
+    import time
+
+    t = threading.Thread(target=_client)
+    t.start()
+    deadline = time.monotonic() + 5
+    while t.is_alive() and time.monotonic() < deadline:
+        ctx.iteration(False)
+        time.sleep(0.01)
+    t.join(timeout=1)
+    sock.close()
+    assert results["snapshot"] == obj.snapshot
+
+
 def _attach_policy(obj, disk=None):
     """Give a bare `__new__` server a real engine synced from `disk`/config."""
     from apricus.policy import PlaybackPolicyEngine
