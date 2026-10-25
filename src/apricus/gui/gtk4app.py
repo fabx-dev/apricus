@@ -90,6 +90,9 @@ logger = logging.getLogger(LOGGER_NAME)
 
 APP_ID = f"{PROJECT}.gui4"
 _UNSET = object()
+# Transport auto-refresh cadence: lightweight signature check only, full
+# refresh solely on actual change. Never aggressive polling.
+_NP_POLL_SECONDS = 2
 
 
 def _capped_get(url, timeout, max_bytes):
@@ -173,6 +176,13 @@ class ControlPanel(Adw.Application):
         timer = getattr(self, "_integration_timer", None)
         if timer:
             GLib.source_remove(timer)
+        poll = getattr(self, "_np_poll_id", None)
+        if poll:
+            try:
+                GLib.source_remove(poll)
+            except Exception:  # noqa: BLE001 - shutdown never fails
+                pass
+            self._np_poll_id = None
         Gio.Application.do_shutdown(self)
 
     def do_activate(self):
@@ -223,6 +233,7 @@ class ControlPanel(Adw.Application):
         # Dev/test aid: preselect a section (e.g. screenshots).
         initial_tab = os.environ.get("APRICUS_GTK4_TAB")
         self._select_section(initial_tab or "library")
+        self._start_np_poll()
         self.window.present()
 
     def _build_sidebar(self):
@@ -535,6 +546,13 @@ class ControlPanel(Adw.Application):
                 self._reload_stream_lists()
             elif row.get_name() == "webpage":
                 self._reload_web_lists()
+            elif row.get_name() == "now-playing":
+                # Coherent view after page change: reuse the full refresh so
+                # externally changed transport/title state is shown at once.
+                try:
+                    self._refresh_all()
+                except Exception:  # noqa: BLE001 - page change never breaks
+                    pass
 
     def _select_section(self, name):
         names = [section for section, _, _ in self.SECTIONS]
@@ -1450,6 +1468,34 @@ class ControlPanel(Adw.Application):
             return _("Paused") if paused else _("Playing")
         return _("Static")
 
+    @staticmethod
+    def _playlist_current_path(queue, positions):
+        """Effective playlist item: saved position clamped into the queue.
+
+        Distinguishes the persisted selection/position from the UI editing
+        queue and from the previously playing single video. Empty queue
+        returns "" so callers fall back to data_source Default.
+        """
+        if not queue:
+            return ""
+        index = 0
+        if isinstance(positions, dict):
+            value = positions.get("Default")
+            if not (isinstance(value, int) and not isinstance(value, bool) and value >= 0):
+                for key in sorted(positions.keys()):
+                    candidate = positions[key]
+                    if (
+                        isinstance(candidate, int)
+                        and not isinstance(candidate, bool)
+                        and candidate >= 0
+                    ):
+                        value = candidate
+                        break
+                else:
+                    value = 0
+            index = value % len(queue)
+        return queue[index]
+
     def _refresh_now_playing(self, server=_UNSET, mode=None, paused=None):
         if server is _UNSET:
             server = self._server()
@@ -1459,10 +1505,13 @@ class ControlPanel(Adw.Application):
         if mode == MODE_PLAYLIST:
             # A playlist never rewrites data_source.Default, so the hero
             # would keep showing the previous single video (or nothing).
-            # Follow the queue head instead (loop restarts there).
-            queue = list(getattr(self, "playlist_paths", None) or [])
+            # Show the effective item: persisted queue at its saved
+            # position, not always the queue head nor unsaved UI edits.
+            persisted = (self.config.get("playlist") or {}).get("Default", [])
+            queue = list(persisted or getattr(self, "playlist_paths", None) or [])
             if queue:
-                current = queue[0]
+                positions = self.config.get("playlist_position")
+                current = self._playlist_current_path(queue, positions)
         if paused is None:
             paused = True
             if server is not None and mode in (MODE_VIDEO, MODE_STREAM, MODE_PLAYLIST):
@@ -4229,6 +4278,13 @@ class ControlPanel(Adw.Application):
     # -- refresh + handlers ---------------------------------------------
 
     def _refresh_all(self):
+        # Reload persisted selection/position so externally changed queues
+        # (IPC playlist apply, player position writes, server restart) are
+        # shown. playlist_paths (unsaved UI edits) is intentionally kept.
+        try:
+            self.config = ConfigUtil().load()
+        except Exception:  # noqa: BLE001 - keep last known config
+            pass
         server = self._server()
         mode = server.mode if server is not None else self.config.get(CONFIG_KEY_MODE)
         paused = True
@@ -4261,6 +4317,85 @@ class ControlPanel(Adw.Application):
                 p_banner.set_title(_(p_err))
             p_banner.set_revealed(bool(p_err and server is not None))
         self._refresh_sidebar_status(server, mode, paused=paused)
+        try:
+            self._last_poll_sig = self._transport_signature(server, mode, paused)
+        except Exception:  # noqa: BLE001 - signature cache never breaks refresh
+            pass
+
+    def _transport_signature(self, server=_UNSET, mode=None, paused=None):
+        """Lightweight actual-state signature for external-change detection.
+
+        Single read per property, no full refresh. Includes the effective
+        playlist item so queue advancement also triggers an update.
+        """
+        if server is _UNSET:
+            server = self._server()
+        if mode is None:
+            mode = server.mode if server is not None else self.config.get(CONFIG_KEY_MODE)
+        if paused is None:
+            paused = True
+            if server is not None and mode in (MODE_VIDEO, MODE_STREAM, MODE_PLAYLIST):
+                try:
+                    paused = bool(server.is_paused_by_user)
+                except Exception:  # noqa: BLE001
+                    paused = True
+        try:
+            state = server.playback_state if server is not None else None
+        except Exception:  # noqa: BLE001
+            state = None
+        if mode == MODE_PLAYLIST:
+            persisted = (self.config.get("playlist") or {}).get("Default", [])
+            queue = list(persisted or getattr(self, "playlist_paths", None) or [])
+            current = self._playlist_current_path(queue, self.config.get("playlist_position"))
+        else:
+            current = (self.config.get(CONFIG_KEY_DATA_SOURCE) or {}).get("Default", "")
+        return (mode, bool(paused), state, current)
+
+    def _start_np_poll(self):
+        if getattr(self, "_np_poll_id", None):
+            return
+        try:
+            self._last_poll_sig = self._transport_signature()
+        except Exception:  # noqa: BLE001
+            self._last_poll_sig = None
+        try:
+            self._np_poll_id = GLib.timeout_add_seconds(_NP_POLL_SECONDS, self._poll_now_playing)
+        except Exception:  # noqa: BLE001 - polling is best-effort
+            self._np_poll_id = None
+
+    def _poll_now_playing(self):
+        """Auto-refresh on external transport/selection changes only.
+
+        Runs every _NP_POLL_SECONDS while the panel is active; performs at
+        most three lightweight property reads plus a config file read, and
+        calls the existing full refresh solely when the actual state moved.
+        """
+        try:
+            window = getattr(self, "window", None)
+            if window is None:
+                return True
+            try:
+                if not window.is_active():
+                    return True
+            except Exception:  # noqa: BLE001 - headless/test safety
+                pass
+            try:
+                fresh_config = ConfigUtil().load()
+            except Exception:  # noqa: BLE001
+                fresh_config = None
+            if fresh_config is not None:
+                self.config = fresh_config
+            server = self._server()
+            sig = self._transport_signature(server)
+            if sig != getattr(self, "_last_poll_sig", None):
+                self._refresh_all()
+                try:
+                    self._last_poll_sig = self._transport_signature()
+                except Exception:  # noqa: BLE001
+                    self._last_poll_sig = sig
+        except Exception:  # noqa: BLE001 - polling never crashes the panel
+            pass
+        return True
 
     @staticmethod
     def _playback_error(server):

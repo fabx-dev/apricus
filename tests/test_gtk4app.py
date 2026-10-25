@@ -2921,6 +2921,197 @@ def stop_resume_single_flight_and_state_gating():
     assert getattr(obj2, "_transport_busy", False) is False
 
 
+@check
+def external_pause_shows_play():
+    obj, srv = _npanel("playing", False)
+    obj._refresh_now_playing()
+    assert obj.np_play_btn.icon == "media-playback-pause-symbolic"
+    srv.is_paused_by_user = True
+    srv.playback_state = "paused"
+    obj._refresh_now_playing()
+    assert obj.np_play_btn.icon == "media-playback-start-symbolic", obj.np_play_btn.icon
+    assert obj.np_play_btn.tooltip == "Play", obj.np_play_btn.tooltip
+    assert obj.np_stop_btn.sensitive is True
+
+
+@check
+def external_play_shows_pause():
+    obj, srv = _npanel("paused", True)
+    obj._refresh_now_playing()
+    assert obj.np_play_btn.icon == "media-playback-start-symbolic"
+    srv.is_paused_by_user = False
+    srv.playback_state = "playing"
+    obj._refresh_now_playing()
+    assert obj.np_play_btn.icon == "media-playback-pause-symbolic", obj.np_play_btn.icon
+    assert obj.np_play_btn.tooltip == "Pause", obj.np_play_btn.tooltip
+
+
+@check
+def external_stop_shows_play_and_disables_stop():
+    obj, srv = _npanel("playing", False)
+    obj._refresh_now_playing()
+    assert obj.np_stop_btn.sensitive is True
+    srv.playback_state = "stopped"
+    srv.is_paused_by_user = True
+    obj._refresh_now_playing()
+    assert obj.np_play_btn.icon == "media-playback-start-symbolic"
+    assert obj.np_play_btn.tooltip == "Play"
+    assert obj.np_stop_btn.sensitive is False, obj.np_stop_btn.sensitive
+
+
+@check
+def page_change_refreshes_now_playing():
+    obj, _ = _npanel("playing", False)
+    seen = []
+    obj._refresh_all = lambda: seen.append(1)
+    obj._reload_stream_lists = lambda: None
+    obj._reload_web_lists = lambda: None
+
+    class _Stack:
+        def __init__(self):
+            self.names = []
+
+        def set_visible_child_name(self, name):
+            self.names.append(name)
+
+    class _Row:
+        def __init__(self, name):
+            self._name = name
+
+        def get_name(self):
+            return self._name
+
+    obj.stack = _Stack()
+    obj._on_sidebar_selected(None, _Row("now-playing"))
+    assert obj.stack.names == ["now-playing"], obj.stack.names
+    assert seen == [1], seen
+
+
+@check
+def playlist_second_item_title():
+    obj, srv = _npanel("playing", False)
+    srv.mode = "MODE_PLAYLIST"
+    obj.config = {
+        "mode": "MODE_PLAYLIST",
+        "data_source": {"Default": "/v/old.mp4"},
+        "playlist": {"Default": ["/v/a.mp4", "/v/b.mp4"]},
+        "playlist_position": {"Default": 1},
+        "playlist_shuffle": False,
+        "video_dir": None,
+        "is_mute": False,
+        "audio_volume": 50,
+    }
+    obj.playlist_paths = ["/v/a.mp4", "/v/b.mp4"]
+    obj._refresh_now_playing()
+    assert obj.np_title.text == "b.mp4", obj.np_title.text
+
+
+@check
+def element_change_updates_title():
+    obj, srv = _npanel("playing", False)
+    srv.mode = "MODE_PLAYLIST"
+    obj.config = {
+        "mode": "MODE_PLAYLIST",
+        "data_source": {"Default": "/v/old.mp4"},
+        "playlist": {"Default": ["/v/a.mp4", "/v/b.mp4"]},
+        "playlist_position": {"Default": 0},
+        "playlist_shuffle": False,
+        "video_dir": None,
+        "is_mute": False,
+        "audio_volume": 50,
+    }
+    obj.playlist_paths = ["/v/a.mp4", "/v/b.mp4"]
+    loaded = []
+    obj._load_np_hero = lambda path, generation: loaded.append(path)
+    obj._refresh_now_playing()
+    assert obj.np_title.text == "a.mp4", obj.np_title.text
+    obj.config = dict(obj.config, playlist_position={"Default": 1})
+    obj._refresh_now_playing()
+    assert obj.np_title.text == "b.mp4", obj.np_title.text
+    assert loaded[-1] == "/v/b.mp4", loaded
+
+
+@check
+def paused_playlist_keeps_effective_title():
+    obj, srv = _npanel("paused", True)
+    srv.mode = "MODE_PLAYLIST"
+    srv.playback_state = "paused"
+    obj.config = {
+        "mode": "MODE_PLAYLIST",
+        "data_source": {"Default": "/v/old.mp4"},
+        "playlist": {"Default": ["/v/a.mp4", "/v/b.mp4"]},
+        "playlist_position": {"Default": 1},
+        "playlist_shuffle": False,
+        "video_dir": None,
+        "is_mute": False,
+        "audio_volume": 50,
+    }
+    obj.playlist_paths = ["/v/a.mp4", "/v/b.mp4"]
+    obj._refresh_now_playing()
+    assert obj.np_title.text == "b.mp4", obj.np_title.text
+    assert obj.np_play_btn.icon == "media-playback-start-symbolic"
+
+
+@check
+def poll_no_excess_no_duplicate():
+    import apricus.gui.gtk4app as app
+
+    assert app._NP_POLL_SECONDS >= 2, app._NP_POLL_SECONDS
+
+    class _Counting:
+        def __init__(self):
+            self.counts = {"mode": 0, "paused": 0, "state": 0}
+            self._mode = "MODE_VIDEO"
+            self._paused = False
+            self._state = "playing"
+
+        @property
+        def mode(self):
+            self.counts["mode"] += 1
+            return self._mode
+
+        @property
+        def is_paused_by_user(self):
+            self.counts["paused"] += 1
+            return self._paused
+
+        @property
+        def playback_state(self):
+            self.counts["state"] += 1
+            return self._state
+
+        @property
+        def volume(self):
+            return 50
+
+        @property
+        def is_mute(self):
+            return False
+
+    obj, _ = _npanel("playing", False)
+    counting = _Counting()
+    obj._server = lambda: counting
+    obj._refresh_now_playing()
+    assert counting.counts == {"mode": 1, "paused": 1, "state": 1}, counting.counts
+
+    refreshed = []
+    obj._refresh_all = lambda: refreshed.append(1)
+    obj.window = type("W", (), {"is_active": lambda self: True})()
+
+    class _FakeConfigUtil:
+        def load(self):
+            return dict(obj.config)
+
+    app.ConfigUtil = _FakeConfigUtil
+    obj._last_poll_sig = obj._transport_signature(counting)
+    assert obj._poll_now_playing() is True
+    assert refreshed == [], refreshed
+    counting._paused = True
+    counting._state = "paused"
+    assert obj._poll_now_playing() is True
+    assert refreshed == [1], refreshed
+
+
 def main():
     name = sys.argv[1]
     try:
@@ -3328,3 +3519,35 @@ def test_play_pause_when_stopped_delegates_to_resume_once():
 
 def test_stop_resume_single_flight_and_state_gating():
     _run("stop_resume_single_flight_and_state_gating")
+
+
+def test_external_pause_shows_play():
+    _run("external_pause_shows_play")
+
+
+def test_external_play_shows_pause():
+    _run("external_play_shows_pause")
+
+
+def test_external_stop_shows_play_and_disables_stop():
+    _run("external_stop_shows_play_and_disables_stop")
+
+
+def test_page_change_refreshes_now_playing():
+    _run("page_change_refreshes_now_playing")
+
+
+def test_playlist_second_item_title():
+    _run("playlist_second_item_title")
+
+
+def test_element_change_updates_title():
+    _run("element_change_updates_title")
+
+
+def test_paused_playlist_keeps_effective_title():
+    _run("paused_playlist_keeps_effective_title")
+
+
+def test_poll_no_excess_no_duplicate():
+    _run("poll_no_excess_no_duplicate")
