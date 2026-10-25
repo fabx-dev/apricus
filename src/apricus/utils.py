@@ -1002,12 +1002,14 @@ class ConfigUtil:
         config[CONFIG_KEY_FADE_DURATION_SEC] = min(5.0, max(0.0, duration))
         return config
 
-    def save(self, config, *, manual_stop=None):
-        """Serialize writers; only explicit server commands may change STOP.
+    def save(self, config, *, manual_stop=None, manual_pause=None):
+        """Serialize writers; only explicit server commands may change the
+        STOP/PAUSE latches.
 
-        A GUI/playlist save can race STOP even after reloading config. Preserve
-        the on-disk latch under the same lock as the atomic write, unless this
-        is an explicit stop/resume command. Existing callers remain compatible.
+        A GUI/playlist save can race STOP (or PAUSE) even after reloading
+        config. Preserve the on-disk latches under the same lock as the
+        atomic write, unless this is an explicit command carrying the new
+        latch state. Existing callers remain compatible.
         """
         import fcntl
 
@@ -1015,9 +1017,9 @@ class ConfigUtil:
         with open(CONFIG_PATH + ".lock", "a") as lock:
             os.chmod(CONFIG_PATH + ".lock", 0o600)
             fcntl.flock(lock, fcntl.LOCK_EX)
-            self._save_locked(config, manual_stop)
+            self._save_locked(config, manual_stop, manual_pause)
 
-    def _save_locked(self, config, manual_stop):
+    def _save_locked(self, config, manual_stop, manual_pause=None):
         old_config = None
         old_raw = None
         if os.path.isfile(CONFIG_PATH):
@@ -1028,6 +1030,11 @@ class ConfigUtil:
                     if isinstance(old_config, dict) and "is_stopped" in old_config:
                         if manual_stop is None:
                             config["is_stopped"] = old_config["is_stopped"] is True
+                    if isinstance(old_config, dict) and CONFIG_KEY_POLICY_PAUSE in old_config:
+                        if manual_pause is None:
+                            config[CONFIG_KEY_POLICY_PAUSE] = bool(
+                                old_config[CONFIG_KEY_POLICY_PAUSE]
+                            )
                     if not self._check(old_config):
                         # Valid JSON but outdated (e.g. pre-backfill): keep
                         # the raw text for backup, so the first save after a
@@ -1039,6 +1046,8 @@ class ConfigUtil:
                     old_config = None
         if manual_stop is not None:
             config["is_stopped"] = bool(manual_stop)
+        if manual_pause is not None:
+            config[CONFIG_KEY_POLICY_PAUSE] = bool(manual_pause)
         # Skip if the config is identical
         if old_config == config:
             return
