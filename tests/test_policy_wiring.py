@@ -344,7 +344,7 @@ def test_web_pause_freezes_and_reports_paused(monkeypatch):
     assert calls == [True, False]
 
 
-def test_playlist_advance_holds_while_manually_paused(monkeypatch):
+def test_playlist_source_loads_but_does_not_play_while_manually_paused(monkeypatch):
     from types import SimpleNamespace
 
     from apricus.player import video_player as vid
@@ -359,6 +359,7 @@ def test_playlist_advance_holds_while_manually_paused(monkeypatch):
         )
         player = vid.VideoPlayer.__new__(vid.VideoPlayer)
         player._closing = False
+        player.is_paused_by_user = paused
         player.config = {"is_stopped": False}
         player.windows = {}
         played = []
@@ -382,6 +383,6 @@ def test_playlist_advance_holds_while_manually_paused(monkeypatch):
         player._play_queue_item(window, None, None)
         return played
 
-    assert run(True) == []
+    assert run(True) == ["/a.mp4"]
     out = run(False)
     assert out[0] == "/a.mp4" and "play" in out

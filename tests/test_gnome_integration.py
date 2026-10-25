@@ -796,22 +796,19 @@ def test_save_queue_index_persists_and_sanitizes():
     saved = {}
 
     class FakeConfigUtil:
-        def load(self):
-            return dict(saved)
-
-        def save(self, config):
-            saved.update(config)
+        def save_playlist_position(self, key, index, expected_queue, *, model=None):
+            assert expected_queue == ["/a.mp4"]
+            positions = saved.setdefault("playlist_position", {})
+            positions[key] = index
+            return dict(positions)
 
     import apricus.player.video_player as player_mod
 
     real_configutil = player_mod.ConfigUtil
     player_mod.ConfigUtil = FakeConfigUtil
     try:
-
-        class P:
-            config = {}
-
-        p = P()
+        p = VideoPlayer.__new__(VideoPlayer)
+        p.config = {"playlist": {"Default": ["/a.mp4"]}}
         VideoPlayer._save_queue_index(p, "M#1", 4)
         assert saved.get("playlist_position") == {"M#1": 4}
         VideoPlayer._save_queue_index(p, "", 4)

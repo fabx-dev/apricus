@@ -109,9 +109,11 @@ pause/stop/mute; config reload while stopped never autoplays.
   diagnostics to avoid an unreviewed API.
 - `player/video_player.py`: subscriptions and `_on_active_changed` /
   `_on_window_state_changed` removed (single decider);
-  `_should_playback_start` kept as a local veto; `_play_queue_item`
-  honors the persisted manual-pause latch (same pattern as the M1
-  `is_stopped` check); `_save_locked` gains `manual_pause` preservation
+  `_should_playback_start` kept as a local veto; playlist selection is
+  prepared even while paused, but playback and EndReached advancement obey
+  that veto. Positions are owned by a locked per-monitor config writer, not
+  ordinary GUI/server saves (see `m2-playlist-policy-fixes.md`).
+  `_save_locked` gains `manual_pause` preservation
   mirroring M1's STOP latch (GUI direct saves can no longer clobber a
   pause). Removed dead `_setup_handlers_idle` plumbing and unused imports.
 - `player/web_player.py`: pause hides the webview (frozen-frame visual via

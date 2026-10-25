@@ -6,6 +6,7 @@ import os
 import shutil
 import subprocess
 import sys
+from contextlib import contextmanager
 from pprint import pformat
 
 import gi
@@ -57,6 +58,7 @@ from apricus.commons import (
     CONFIG_VERSION,
     LEGACY_CONFIG_PATH,
     LOGGER_NAME,
+    MODE_PLAYLIST,
     MODE_VIDEO,
     RENDERER_AUTO,
     TRANSLATION_DOMAIN,
@@ -1010,16 +1012,60 @@ class ConfigUtil:
         config. Preserve the on-disk latches under the same lock as the
         atomic write, unless this is an explicit command carrying the new
         latch state. Existing callers remain compatible.
+
+        Playlist positions are player-owned too: ordinary saves preserve
+        them. save_playlist_position updates only one monitor atomically.
         """
+        with self._write_lock():
+            self._save_locked(config, manual_stop, manual_pause)
+
+    @contextmanager
+    def _write_lock(self):
         import fcntl
 
         os.makedirs(CONFIG_DIR, mode=0o700, exist_ok=True)
         with open(CONFIG_PATH + ".lock", "a") as lock:
             os.chmod(CONFIG_PATH + ".lock", 0o600)
             fcntl.flock(lock, fcntl.LOCK_EX)
-            self._save_locked(config, manual_stop, manual_pause)
+            yield
 
-    def _save_locked(self, config, manual_stop, manual_pause=None):
+    def save_playlist_position(self, key, index, expected_queue, *, model=None):
+        """Update just one monitor under the config lock, never a stale snapshot.
+
+        Discard a late callback if STOP or a new selection superseded it.
+        Ordinary saves cannot change these player-owned positions.
+        """
+        if not isinstance(key, str) or not key:
+            return None
+        if not isinstance(index, int) or isinstance(index, bool) or index < 0:
+            return None
+        with self._write_lock():
+            try:
+                with open(CONFIG_PATH) as f:
+                    current = json.load(f)
+            except (OSError, ValueError):
+                return None
+            if not isinstance(current, dict) or current.get("mode") != MODE_PLAYLIST:
+                return None
+            if current.get("is_stopped", False):
+                return None
+            playlist = current.get(CONFIG_KEY_PLAYLIST) or {}
+            if not isinstance(playlist, dict):
+                return None
+            queue = next(
+                (
+                    playlist[k]
+                    for k in (key, model, "Default")
+                    if isinstance(playlist.get(k), list) and playlist[k]
+                ),
+                [],
+            )
+            if queue != expected_queue:
+                return None
+            self._save_locked(current, None, playlist_positions={key: index})
+            return dict(current[CONFIG_KEY_PLAYLIST_POS])
+
+    def _save_locked(self, config, manual_stop, manual_pause=None, *, playlist_positions=None):
         old_config = None
         old_raw = None
         if os.path.isfile(CONFIG_PATH):
@@ -1035,6 +1081,13 @@ class ConfigUtil:
                             config[CONFIG_KEY_POLICY_PAUSE] = bool(
                                 old_config[CONFIG_KEY_POLICY_PAUSE]
                             )
+                    if isinstance(old_config, dict) and CONFIG_KEY_PLAYLIST_POS in old_config:
+                        positions = old_config[CONFIG_KEY_PLAYLIST_POS]
+                        config[CONFIG_KEY_PLAYLIST_POS] = {
+                            k: v
+                            for k, v in (positions.items() if isinstance(positions, dict) else [])
+                            if isinstance(v, int) and not isinstance(v, bool) and v >= 0
+                        }
                     if not self._check(old_config):
                         # Valid JSON but outdated (e.g. pre-backfill): keep
                         # the raw text for backup, so the first save after a
@@ -1048,6 +1101,8 @@ class ConfigUtil:
             config["is_stopped"] = bool(manual_stop)
         if manual_pause is not None:
             config[CONFIG_KEY_POLICY_PAUSE] = bool(manual_pause)
+        if playlist_positions is not None:
+            config.setdefault(CONFIG_KEY_PLAYLIST_POS, {}).update(playlist_positions)
         # Skip if the config is identical
         if old_config == config:
             return

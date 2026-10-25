@@ -29,7 +29,6 @@ from apricus.commons import (
     CONFIG_KEY_MUTE,
     CONFIG_KEY_PLAYLIST,
     CONFIG_KEY_PLAYLIST_POS,
-    CONFIG_KEY_POLICY_PAUSE,
     CONFIG_KEY_RENDERER,
     CONFIG_KEY_SHUFFLE,
     CONFIG_KEY_STATIC_WALLPAPER,
@@ -650,10 +649,15 @@ class VideoPlayer(BasePlayer):
     def switch_media(self, mode, dbus_context=None):
         """Hot-switch source inside the live player (no respawn)."""
         _authorize("player.switch_media", dbus_context)
-        GLib.idle_add(self._switch_media_main, mode)
+        self._source_generation = getattr(self, "_source_generation", 0) + 1
+        self._source_switch_pending = True
+        GLib.idle_add(self._switch_media_main, mode, self._source_generation)
 
-    def _switch_media_main(self, mode):
+    def _switch_media_main(self, mode, generation=None):
+        if generation is not None and generation != self._source_generation:
+            return False
         self.reload_config()
+        self._source_switch_pending = False
         self._apply_source(self.config[CONFIG_KEY_DATA_SOURCE])
         perf.mark(f"player: switched [{mode}]")
         return False
@@ -768,6 +772,9 @@ class VideoPlayer(BasePlayer):
                     queue = random.sample(queue, len(queue))
                 if not queue:
                     logger.warning(f"[Playlist] No videos for {mkey}, monitor stays blank")
+                    window._queue = []
+                    window.stop()
+                    window.set_media(None)
                     continue
                 window._queue = queue
                 # Resume where the queue left off (persisted across player
@@ -783,7 +790,9 @@ class VideoPlayer(BasePlayer):
                 if not getattr(window, "_end_attached", False):
                     window.attach_end_reached(lambda w=window: self._on_media_end(w))
                     window._end_attached = True
-                self._play_queue_item(window, mkey, monitor.get_model())
+                # Prepare the selected media even while paused; only the
+                # explicit playback actuator below may start it.
+                self._play_queue_item(window, mkey, monitor.get_model(), start=False)
         else:
             raise ValueError("Invalid mode")
 
@@ -831,13 +840,13 @@ class VideoPlayer(BasePlayer):
                 return queue[0]
         return None
 
-    def _play_queue_item(self, window, mkey=None, model=None):
-        """Play window._queue[window._queue_index]. Main thread only."""
+    def _play_queue_item(self, window, mkey=None, model=None, *, start=True):
+        """Install the selected queue item; optional start obeys the local veto.
+
+        Selection/loading is independent of PAUSE. Source setup passes
+        start=False and uses start_playback once after all monitors are ready.
+        """
         if getattr(self, "_closing", False) or ConfigUtil().load().get("is_stopped", False):
-            return
-        if ConfigUtil().load().get(CONFIG_KEY_POLICY_PAUSE, False):
-            # A manual pause holds the queue: advancing would audibly restart
-            # playback behind the user's back. Resume replays the same item.
             return
         if getattr(window, "_transitioning", False):
             logger.debug("[Playlist] Transition already in progress, skipping")
@@ -854,16 +863,21 @@ class VideoPlayer(BasePlayer):
             media.add_option("no-audio")
             window.stop()
             window.set_media(media)
-            window.play()
             window.centercrop(width, height)
             self._media_started_at = time.monotonic()
-            self._save_queue_index(mkey or model, window._queue_index)
+            self._save_queue_index(mkey or model, window._queue_index, model)
+            if start and self._should_playback_start():
+                window.play()
         finally:
             window._transitioning = False
 
     def _on_media_end(self, window):
         """Advance the queue. Invoked on the GTK main thread via idle_add."""
         if getattr(self, "_closing", False) or ConfigUtil().load().get("is_stopped", False):
+            return False
+        if self.mode != MODE_PLAYLIST:
+            return False
+        if not self._should_playback_start() or getattr(self, "_source_switch_pending", False):
             return False
         queue = getattr(window, "_queue", [])
         if not queue:
@@ -919,22 +933,15 @@ class VideoPlayer(BasePlayer):
             except Exception:  # noqa: BLE001 - last resort
                 return "Default"
 
-    def _save_queue_index(self, key, index):
+    def _save_queue_index(self, key, index, model=None):
         """Persist the current playlist position (survives respawns)."""
         if not key:
             return
         try:
-            # Do not overwrite a concurrent server STOP/GUI preference with
-            # the player's older config snapshot.
-            latest = ConfigUtil().load()
-            if latest.get("is_stopped", False):
-                return
-            positions = latest.setdefault(CONFIG_KEY_PLAYLIST_POS, {})
-            if not isinstance(positions, dict):
-                positions = latest[CONFIG_KEY_PLAYLIST_POS] = {}
-            positions[key] = int(index)
-            ConfigUtil().save(latest)
-            self.config[CONFIG_KEY_PLAYLIST_POS] = positions
+            expected = self._queue_for(self.config.get(CONFIG_KEY_PLAYLIST) or {}, key, model)
+            positions = ConfigUtil().save_playlist_position(key, index, expected, model=model)
+            if positions is not None:
+                self.config[CONFIG_KEY_PLAYLIST_POS] = positions
         except Exception as e:  # noqa: BLE001 - static frame matters more
             logger.debug(f"[Playlist] position save skipped: {e}")
 
@@ -1026,8 +1033,12 @@ class VideoPlayer(BasePlayer):
         _authorize("player.start_playback", dbus_context)
         if getattr(self, "_closing", False) or ConfigUtil().load().get("is_stopped", False):
             return
+        if getattr(self, "_source_switch_pending", False):
+            return  # Deferred source setup will apply the latest local veto.
         if self._should_playback_start():
             for _monitor, window in self.windows.items():
+                if self.mode == MODE_PLAYLIST and not getattr(window, "_queue", []):
+                    continue  # No selected media on this monitor.
                 window.play_fade(
                     target=self.volume,
                     fade_duration_sec=self.config[CONFIG_KEY_FADE_DURATION_SEC],
