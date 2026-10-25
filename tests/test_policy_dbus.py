@@ -57,13 +57,20 @@ def read_snapshot(expected):
     if errors:
         raise errors[0]
 
-read_snapshot(server.policy.snapshot())  # Includes the empty string array.
+def expected_snapshot():
+    # The D-Bus wrapper adds the server-owned window-source diagnostic key;
+    # the stub server has no sensors, so it marshals to the "none" default.
+    snap = server.policy.snapshot()
+    snap["window_state_source"] = "none"
+    return snap
+
+read_snapshot(expected_snapshot())  # Includes the empty string array.
 server.policy.request_manual_pause()
 server.policy.reason_active_changed("fullscreen", True)
 server.policy.set_manual_mute(True)
-read_snapshot(server.policy.snapshot())
+read_snapshot(expected_snapshot())
 server.policy.request_manual_stop()
-read_snapshot(server.policy.snapshot())
+read_snapshot(expected_snapshot())
 view.transport_test_value = 7
 assert server.transport_test_value == 7
 assert view.pause_playback == server.pause_playback
