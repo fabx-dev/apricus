@@ -1042,3 +1042,18 @@ msgstr "Impossibile modificare la riproduzione del wallpaper."
 
 #~ msgid "Restart Apricus to apply a new renderer"
 #~ msgstr "Riavvia Apricus per applicare il nuovo renderer"
+#: src/apricus/gui/gtk4app.py
+msgid "Requires GNOME on Wayland"
+msgstr "Richiede GNOME su Wayland"
+
+#: src/apricus/gui/gtk4app.py
+msgid "Window policies are not available in Snap on Wayland"
+msgstr "Le regole di riproduzione basate sulle finestre non sono disponibili nella Snap su Wayland"
+
+#: src/apricus/gui/gtk4app.py
+msgid "Window-state access has not been verified in Flatpak"
+msgstr "L'accesso allo stato delle finestre non è stato verificato in Flatpak"
+
+#: src/apricus/gui/gtk4app.py
+msgid "Requires the Apricus GNOME extension on Wayland"
+msgstr "Richiede l'estensione GNOME di Apricus su Wayland"

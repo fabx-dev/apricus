@@ -1042,3 +1042,18 @@ msgstr "No se pudo cambiar la reproducción del fondo."
 
 #~ msgid "Restart Apricus to apply a new renderer"
 #~ msgstr "Reinicia Apricus para aplicar el nuevo renderizador"
+#: src/apricus/gui/gtk4app.py
+msgid "Requires GNOME on Wayland"
+msgstr "Requiere GNOME en Wayland"
+
+#: src/apricus/gui/gtk4app.py
+msgid "Window policies are not available in Snap on Wayland"
+msgstr "Las reglas de reproducción basadas en ventanas no están disponibles en Snap en Wayland"
+
+#: src/apricus/gui/gtk4app.py
+msgid "Window-state access has not been verified in Flatpak"
+msgstr "No se ha verificado el acceso al estado de las ventanas en Flatpak"
+
+#: src/apricus/gui/gtk4app.py
+msgid "Requires the Apricus GNOME extension on Wayland"
+msgstr "Requiere la extensión de GNOME de Apricus en Wayland"

@@ -1046,3 +1046,18 @@ msgstr "Die Hintergrundwiedergabe konnte nicht geändert werden."
 
 #~ msgid "Restart Apricus to apply a new renderer"
 #~ msgstr "Apricus neu starten, um den neuen Renderer zu übernehmen"
+#: src/apricus/gui/gtk4app.py
+msgid "Requires GNOME on Wayland"
+msgstr "Erfordert GNOME unter Wayland"
+
+#: src/apricus/gui/gtk4app.py
+msgid "Window policies are not available in Snap on Wayland"
+msgstr "Fensterabhängige Wiedergaberegeln sind in Snap unter Wayland nicht verfügbar"
+
+#: src/apricus/gui/gtk4app.py
+msgid "Window-state access has not been verified in Flatpak"
+msgstr "Der Zugriff auf den Fensterzustand wurde in Flatpak nicht überprüft"
+
+#: src/apricus/gui/gtk4app.py
+msgid "Requires the Apricus GNOME extension on Wayland"
+msgstr "Erfordert die GNOME-Erweiterung von Apricus unter Wayland"

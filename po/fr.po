@@ -1048,3 +1048,18 @@ msgstr "Impossible de modifier la lecture du fond d’écran."
 
 #~ msgid "Restart Apricus to apply a new renderer"
 #~ msgstr "Redémarrez Apricus pour appliquer le nouveau moteur de rendu"
+#: src/apricus/gui/gtk4app.py
+msgid "Requires GNOME on Wayland"
+msgstr "Nécessite GNOME sous Wayland"
+
+#: src/apricus/gui/gtk4app.py
+msgid "Window policies are not available in Snap on Wayland"
+msgstr "Les règles de lecture liées aux fenêtres ne sont pas disponibles dans Snap sous Wayland"
+
+#: src/apricus/gui/gtk4app.py
+msgid "Window-state access has not been verified in Flatpak"
+msgstr "L'accès à l'état des fenêtres n'a pas été vérifié dans Flatpak"
+
+#: src/apricus/gui/gtk4app.py
+msgid "Requires the Apricus GNOME extension on Wayland"
+msgstr "Nécessite l'extension GNOME d'Apricus sous Wayland"

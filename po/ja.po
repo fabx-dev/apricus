@@ -1047,3 +1047,18 @@ msgstr "壁紙の再生状態を変更できませんでした。"
 
 #~ msgid "Restart Apricus to apply a new renderer"
 #~ msgstr "新しいレンダラーを適用するには Apricus を再起動してください"
+#: src/apricus/gui/gtk4app.py
+msgid "Requires GNOME on Wayland"
+msgstr "Wayland では GNOME が必要です"
+
+#: src/apricus/gui/gtk4app.py
+msgid "Window policies are not available in Snap on Wayland"
+msgstr "Wayland 上の Snap ではウィンドウに応じた再生制御は利用できません"
+
+#: src/apricus/gui/gtk4app.py
+msgid "Window-state access has not been verified in Flatpak"
+msgstr "Flatpak ではウィンドウ状態へのアクセスが確認されていません"
+
+#: src/apricus/gui/gtk4app.py
+msgid "Requires the Apricus GNOME extension on Wayland"
+msgstr "Wayland では Apricus の GNOME 拡張機能が必要です"
