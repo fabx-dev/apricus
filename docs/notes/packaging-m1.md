@@ -847,3 +847,54 @@ integration (no change made here, no assessment of PR #1 contents made).
 Alternative: keep M1 separate until a live session confirms the new
 transport buttons. Either way, delete the temp worktree only after the
 decision (it is the only place holding the verified combination).
+
+## 21. UX live-test reconciliation + final local integration ([validation date omitted])
+
+### Reconciliation (CONTROLLO 1) — the 10/10 test DID cover the new GUI
+
+Commit timestamps prove the order: UX implementation `6c171f0` ([event time omitted]) →
+graphical source run → report `8a6d194` ([event time omitted]). The recorded 10/10
+questions explicitly exercise new-layout features: square Stop button,
+STOPPED Play-enabled/Stop-disabled state, Play-from-STOP producing a fresh
+player, and the `Pausa`/`Riproduci`/`Ferma wallpaper` tooltips (Italian
+strings live-confirmed, i.e. the gettext path was active in the source run).
+Conclusion: graphical live confirmation EXISTS for the exact two-button
+layout; no repeat run needed. This corrects §20's residual-risk note, which
+wrongly stated the opposite. Remaining nuance (unchanged): de/es/fr/ja
+tooltips were verified at catalog level only (`msgfmt` + gettext lookup
+for all five locales in this phase); rendering uses the identical code path
+as the live-confirmed Italian strings.
+Ref: test questions in `docs/notes/perf-m1.md` ("two-button UX graphical
+validation").
+
+### Completeness (CONTROLLO 2) — nothing missing
+
+`git diff --name-only a21d0f8 71e79b3` = only `docs/notes/packaging-m1.md`
+(docs). All production code, tests and translations in the final M1 HEAD
+were therefore already inside the checked combination; the temp worktree
+additionally merged `71e79b3` (docs sync) and re-ran verification.
+
+### Final local integration branch
+
+`tmp/m1-integration-final` = `820f761` (built in temp worktree
+`apricus-m1-integration-check`): branched directly from the Agent-A tip
+`31f0c36`, merged full M1 `71e79b3`, automatic ort merge, zero conflicts,
+tree byte-identical to the previously verified combination. Existing
+branches, PR #1, master and Agent A's worktree untouched; nothing pushed.
+Superseded check branch deleted after recording its SHAs
+(`bb3113d`, `f410aa3`).
+
+Verification on `820f761`: full pytest 393 passed + 5 display-skips;
+STOP/RESUME/bridge/integration files 82 passed; Ruff lint+format clean;
+GJS status-bridge and extension-rescan harnesses PASS; all six catalogs
+compile; per-locale tooltip lookup verified; worktree clean afterwards.
+
+### Exact transfer proposal (NOT executed)
+
+When authorized, from a clean checkout of `feat/gnome-wayland-integration`
+at `31f0c36`: `git merge --no-ff 71e79b3` (== recreating `820f761`; expected
+result: automatic, zero conflicts, same tree) — or open the integration PR
+from that merge. Never merge into `master`, never touch PR #1 unless it is
+explicitly chosen as the vehicle, never push without a separate approval.
+LXD stays installed; temp worktree kept until the decision (it is the only
+holder of the verified combination besides the recorded SHAs).
