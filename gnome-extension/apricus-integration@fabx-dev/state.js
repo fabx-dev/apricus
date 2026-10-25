@@ -91,8 +91,8 @@ function dictToVariant(payload) {
 }
 
 const defaultTimer = {
-    later: (seconds, callback) => GLib.timeout_add_seconds(
-        GLib.PRIORITY_DEFAULT, Math.max(1, Math.ceil(seconds)),
+    later: (seconds, callback) => GLib.timeout_add(
+        GLib.PRIORITY_DEFAULT, Math.max(1, Math.ceil(seconds * 1000)),
         () => { callback(); return GLib.SOURCE_REMOVE; }),
     remove: id => GLib.source_remove(id),
 };
@@ -169,8 +169,10 @@ export class DesktopStateTracker {
     }
 
     changed() {
-        if (this._stopped || this._timerId)
+        if (this._stopped)
             return;
+        if (this._timerId)
+            this._timer.remove(this._timerId);
         this._timerId = this._timer.later(DEBOUNCE_SECONDS, () => {
             this._timerId = 0;
             this._flush(false);
@@ -181,11 +183,12 @@ export class DesktopStateTracker {
         if (this._stopped)
             return;
         const snapshot = this._readState();
+        // Window lifecycle must be tracked even when aggregate truth is unchanged.
+        this._syncWatches(snapshot.windows);
         const summary = summarize(snapshot.windows, snapshot.activeWorkspace);
         const key = JSON.stringify([summary, snapshot.monitors]);
         if (!force && key === this._lastKey)
             return;
-        this._syncWatches(snapshot.windows);
         this._lastKey = key;
         this._seq += 1;
         this._current = {

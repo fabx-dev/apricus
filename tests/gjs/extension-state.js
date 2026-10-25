@@ -105,7 +105,9 @@ function makeEnv() {
         },
         fireWindow(ref, name) {
             for (const [key, cbs] of subs) {
-                const [id, event] = key.split(':', 2);
+                const colon = key.indexOf(':');
+                const id = key.slice(0, colon);
+                const event = key.slice(colon + 1);
                 if (Number(id) === ref.id && event === name) {
                     for (const cb of cbs)
                         cb();
@@ -225,6 +227,10 @@ function makeTracker(env, timer) {
     timer.fireAll();
     assert(emitted[1].maximized === true, 'fully maximized detected');
     assert(JSON.stringify(emitted[1].maxMonitors) === '[0]', 'max monitor reported');
+    half.maximizedHorizontally = false;
+    tracker.changed();
+    timer.fireAll();
+    assert(emitted[2].maximized === false, 'vertical-only is not maximized');
     const hidden = env.addWindow({fullscreen: true, minimized: true});
     const other = env.addWindow({fullscreen: true, onActiveWorkspace: false});
     void hidden;
@@ -232,9 +238,9 @@ function makeTracker(env, timer) {
     const visible = env.addWindow({fullscreen: true, monitor: 2});
     tracker.changed();
     timer.fireAll();
-    assert(emitted.length === 3, 'visible change still emitted');
-    assert(emitted[2].fullscreen === true, 'visible fs window reported');
-    assert(JSON.stringify(emitted[2].fsMonitors) === '[2]',
+    assert(emitted.length === 4, 'visible change still emitted');
+    assert(emitted[3].fullscreen === true, 'visible fs window reported');
+    assert(JSON.stringify(emitted[3].fsMonitors) === '[2]',
         'only the visible on-workspace window is counted');
 }
 
@@ -339,6 +345,78 @@ function makeTracker(env, timer) {
     assert(out.fullscreen === true && out.maximized === true, 'flags computed');
     assert(JSON.stringify(out.fsMonitors) === '[1]', 'fs monitor index');
     assert(JSON.stringify(out.maxMonitors) === '[2]', 'max monitor index');
+}
+
+// 9. A new ordinary window must be watched even when aggregate truth deduplicates.
+{
+    const env = makeEnv();
+    const timer = makeTimer();
+    const {tracker, emitted} = makeTracker(env, timer);
+    tracker.refresh();
+    const win = env.addWindow({fullscreen: false});
+    tracker.changed();
+    timer.fireAll();
+    assert(emitted.length === 1, 'unchanged aggregate not published');
+    win.fullscreen = true;
+    env.fireWindow(win.ref, 'notify::fullscreen');
+    timer.fireAll();
+    assert(emitted.length === 2 && emitted[1].fullscreen, 'new window notifications watched');
+    tracker.stop();
+}
+
+// 10. Real GLib millisecond timer, no compositor/bus/session mutation.
+// Several edges restart the trailing timer. Measure from the LAST edge,
+// not from when this process was launched. Upper limit detects the old
+// seconds timer; it is a regression bound, not a compositor latency claim.
+{
+    const env = makeEnv();
+    const win = env.addWindow({fullscreen: false});
+    const bus = makeBus();
+    const times = [];
+    let emissionsBeforeStop = 0;
+    const loop = new GLib.MainLoop(null, false);
+    let lastEdge = GLib.get_monotonic_time();
+    let publisher;
+    const tracker = new DesktopStateTracker(() => env.readState(), {
+        emit: payload => {
+            times.push(GLib.get_monotonic_time());
+            publisher.publish(payload);
+        },
+    });
+    publisher = new StatePublisher(tracker, {bus});
+    publisher.start();
+    win.fullscreen = true;
+    tracker.changed();
+    const edge = delay => GLib.timeout_add(GLib.PRIORITY_DEFAULT, delay, () => {
+        lastEdge = GLib.get_monotonic_time();
+        tracker.changed();
+        return GLib.SOURCE_REMOVE;
+    });
+    edge(80);
+    edge(160);
+    GLib.timeout_add(GLib.PRIORITY_DEFAULT, 700, () => {
+        emissionsBeforeStop = times.length;
+        win.fullscreen = false;
+        tracker.changed();
+        tracker.stop();
+        publisher.stop();
+        tracker.changed();
+        return GLib.SOURCE_REMOVE;
+    });
+    GLib.timeout_add(GLib.PRIORITY_DEFAULT, 1100, () => {
+        loop.quit();
+        return GLib.SOURCE_REMOVE;
+    });
+    loop.run();
+    // Assert outside GLib callbacks: exceptions inside a source callback alone
+    // can be logged by GJS without producing a nonzero process exit status.
+    assert(emissionsBeforeStop === 1, `real timer coalesced to one publish: ${emissionsBeforeStop}`);
+    const elapsed = (times[0] - lastEdge) / 1000;
+    assert(elapsed >= 240 && elapsed < 500, `trailing debounce ms=${elapsed}`);
+    assert(times.length === 1 && bus.emitted.length === 1, 'no callback/publication after stop');
+    const packet = bus.emitted[0].parameters.get_child_value(0);
+    assert(packet.lookup_value('fullscreen', null).deepUnpack(), 'published fullscreen');
+    print(`PASS: real GLib trailing timer ${elapsed.toFixed(1)} ms; one signal`);
 }
 
 print('PASS: push sensor reports compositor truth, debounces, cleans up, contracts hold');
