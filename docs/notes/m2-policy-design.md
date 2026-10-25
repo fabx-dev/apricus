@@ -81,32 +81,49 @@ ActiveChanged ⇒ reconcile on player reconnect/startup; extension absent ⇒
 freeze autos, no surprise resume, diagnostics flag; web parity for
 pause/stop/mute; config reload while stopped never autoplays.
 
-## 4. Minimal architectural changes (proposal, NOT implemented)
+## 4. Minimal architectural changes (IMPLEMENTED as below)
 
-- NEW `src/apricus/policy.py` (<600 lines per roadmap): `Reason` set,
-  `PlaybackPolicyEngine` (latches + auto dict + `compute()` +
-  `request_manual_*` + `reason_active_changed()` + `snapshot()` +
-  debounce + `extension_lost` freeze), pure logic with an injected
-  persist/apply/clock seam for headless tests.
-- `server.py`: own the engine; route `pause/start/stop/resume_playback`
-  through it; `_apply_policy_output` maps to EXISTING actuators only
-  (fade verbs, M1 destroy/recreate paths, static fallback); `is_paused_by_user`
-  becomes an engine-latch mirror (persisted); additive read-only
-  `engine_snapshot` (+ `PolicyChanged` signal as specified — additive,
-  v1 intact); `snap_ipc.py` mirrors new names only.
-- `player/*`: move `_on_active_changed`/`_on_window_state_changed`
-  subscriptions to the server (X11 Wnck backend unchanged, only re-owned);
-  player keeps fade application + `_is_actually_playing` reporting;
-  `_should_playback_start` becomes a thin `engine.compute_desired()`
-  query; wire web pause/start to freeze (no new WebKit APIs).
-- `gui/gtk4app.py` + `menu.py`: keep calling server verbs (no new logic);
-  read `engine_snapshot` for badge/disabled states instead of ad-hoc
-  `is_paused_by_user` probes (small, contained).
-- Persistence: keep M1 `is_stopped` as the manual-STOP latch (no
-  dual-source-of-truth, no migration risk — deliberate, documented deviation
-  from roadmap §6.4 naming); add `policy_manual_pause`,
-  `policy_manual_mute`, `policy_version=1` via existing atomic
-  `ConfigUtil` write + `.bak`.
+- NEW `src/apricus/policy.py` (stdlib only, pure logic + injected clock):
+  manual STOP/PAUSE/MUTE latches, auto reasons (`fullscreen`,
+  `maximized`, `maximized_mute`, `screen_locked`; unknown and reserved
+  auto-STOP names raise), `compute()` → `EngineOutput(desired,
+  wanted_mute, active_reasons, generation)`, immediate manual verbs,
+  debounced auto updates with `pop_due()`, push-channel freeze limited to
+  push-fed reasons, JSON-safe `snapshot()`, `load_latches()` for restarts.
+- `server.py`: owns the engine; all four verbs route through it;
+  `_apply_policy_output` actuates EXISTING paths only (fades, M1
+  destroy/recreate, stopped-background fallback) with per-(desired,
+  wanted_mute) idempotency (mute-only changes never re-trigger fades);
+  `_sync_player_to_policy` aligns fresh players without restarting
+  playback; `_feed_auto` + generation-guarded `_apply_policy_pending`
+  feed X11 lock/maximize sensors moved here from the player; additive
+  read-only `engine_snapshot` (+ introspection XML). `is_paused_by_user`
+  is now an engine-latch mirror (always a bool — this also fixes the old
+  `None`-over-D-Bus wart); `is_mute` setter routes through the engine.
+  `PolicyChanged` signal deferred: emissions are already single per
+  transition via server-side dedup; a new bus signal is left to M6
+  diagnostics to avoid an unreviewed API.
+- `player/video_player.py`: subscriptions and `_on_active_changed` /
+  `_on_window_state_changed` removed (single decider);
+  `_should_playback_start` kept as a local veto; `_play_queue_item`
+  honors the persisted manual-pause latch (same pattern as the M1
+  `is_stopped` check); `_save_locked` gains `manual_pause` preservation
+  mirroring M1's STOP latch (GUI direct saves can no longer clobber a
+  pause). Removed dead `_setup_handlers_idle` plumbing and unused imports.
+- `player/web_player.py`: pause hides the webview (frozen-frame visual via
+  the applied static frame underneath), start re-shows it; honest
+  `is_playing` flag; `set_is_mute` wired through the engine path. No new
+  WebKit APIs. Residual: page JS timers may continue while hidden (same
+  cost class as paused VLC allocations).
+- `gui/gtk4app.py` + `menu.py`: NO changes needed — both already call
+  server verbs (now engine-routed) and read `playback_state` /
+  `is_paused_by_user` (now engine-backed with identical visible
+  semantics). No new indicators (per UX constraints).
+- Persistence: M1 `is_stopped` stays the manual-STOP latch (no parallel
+  key — avoids dual sources of truth); added `policy_manual_pause` +
+  `policy_version=1` with no-bump backfill; `is_mute` remains the single
+  manual-mute key (no `policy_manual_mute` — the draft's extra key was
+  dropped to avoid a redundant latch).
 - Explicitly OUT: extension `state.js`/push subscription (M3), blank/sleep
   listeners (M4), per-monitor policy (M7), bridge/AppArmor/manifest/sandbox
   changes, v1 D-Bus breakage, renderer changes, SSRF-guard changes.
@@ -115,23 +132,32 @@ pause/stop/mute; config reload while stopped never autoplays.
 
 - X11 fade timing: decisions cross D-Bus instead of in-process idle
   callbacks (mitigation: application stays in-player; only the decision
-  moves; Wnck traces compared pre/post).
+  moves; a dedicated Wnck trace-identity test was considered but dropped as
+  brittle — backend selection is covered by existing
+  `test_backends.py`, and the moved subscriptions are byte-identical calls).
 - Single-latch migration: old volatile pause becomes persisted (intended
   behavior change per req 7; GUI copy must not fight it — same file-lock
-  discipline as M1).
+  discipline as M1, now also covering the pause latch).
 - Over-centralization temptation: engine decides, never animates/fades.
 - Scope creep into M3: the reason feed exists, but only X11/poll/lock
   producers are wired.
 
-## 6. Regression tests (to write on implementation)
+## 6. Regression tests (implemented)
 
-New `tests/test_policy_engine.py` (headless matrix): every §3 row;
-idempotency incl. single-emission asserts; manual-prevails-over-all-autos;
+New `tests/test_policy_engine.py` (18 headless matrix cases): every §3 row;
+idempotency incl. single-delivery asserts; manual-prevails-over-all-autos;
 auto-mute cycle with `is_mute` byte-identical; crash recovery (latches kept,
-autos dropped); missed-event reconcile; extension-lost freeze; web parity
-stub; debounce (flicker ⇒ one actuation). Updates: GUI headless tests for
-snapshot-driven buttons; server verb-routing tests; player
-compute-desired query tests; Wnck trace-identity test; existing
-`test_stop_resume.py` / `test_playlist.py` / `test_backends.py` suites keep
-passing unchanged (STOP/RESUME/playlist/static/volume/mute behavior is
-preserved by construction).
+autos dropped); missed-event reconcile; push-channel freeze limited to
+push-fed reasons; debounce (flicker never delivers PAUSE); JSON-safe
+snapshot. New `tests/test_policy_wiring.py` (11 cases): server verb routing,
+idempotent actuation, STOP-while-playing teardown, resume clearing both
+latches, mute orthogonality incl. maximized-mute with untouched manual key,
+debounced auto actuation + stale-generation drops, snapshot shape,
+web pause/freeze/unpause, playlist advance held while paused.
+Updated: `tests/test_server.py` (engine-backed `is_paused_by_user`, always
+bool), `tests/test_config.py` (no-bump backfill), `tests/test_stop_resume.py`
+(new `_last_applied` fixture field). Unchanged suites
+(`test_playlist.py`, `test_backends.py`, GUI headless tests) keep passing:
+STOP/RESUME/playlist/static/volume/mute behavior is preserved by
+construction. Deliberately NOT added: a `PolicyChanged` bus-signal test
+(signal deferred), live/Wayland/session tests (out of scope).
