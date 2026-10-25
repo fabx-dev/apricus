@@ -3112,6 +3112,369 @@ def poll_no_excess_no_duplicate():
     assert refreshed == [1], refreshed
 
 
+@check
+def poll_timer_registered_and_periodic():
+    import apricus.gui.gtk4app as app
+
+    assert app._NP_POLL_SECONDS >= 2
+    calls = []
+    real_add = app.GLib.timeout_add_seconds
+    app.GLib.timeout_add_seconds = lambda secs, cb, *a: calls.append((secs, cb)) or 999
+    try:
+        obj, _ = _npanel("playing", False)
+        obj.window = type("W", (), {"is_active": lambda self: True})()
+
+        class _FakeConfigUtil:
+            def load(self):
+                return dict(obj.config)
+
+        app.ConfigUtil = _FakeConfigUtil
+        obj._start_np_poll()
+        assert calls, "timer never registered"
+        secs, cb = calls[0]
+        assert secs >= 2, secs
+        assert getattr(cb, "__func__", cb) == obj._poll_now_playing.__func__
+        # Callback keeps the source alive and performs no refresh when idle.
+        refreshed = []
+        obj._refresh_all = lambda: refreshed.append(1)
+        assert cb() is True
+        assert refreshed == [], refreshed
+    finally:
+        app.GLib.timeout_add_seconds = real_add
+
+
+@check
+def poll_external_transport_via_poll():
+    import apricus.gui.gtk4app as app
+
+    class _Counting:
+        def __init__(self):
+            self._mode = "MODE_VIDEO"
+            self._paused = False
+            self._state = "playing"
+            self.actuations = []
+
+        @property
+        def mode(self):
+            return self._mode
+
+        @property
+        def is_paused_by_user(self):
+            return self._paused
+
+        @property
+        def playback_state(self):
+            return self._state
+
+        @property
+        def volume(self):
+            return 50
+
+        @property
+        def is_mute(self):
+            return False
+
+        def pause_playback(self):
+            self.actuations.append("pause")
+
+        def start_playback(self):
+            self.actuations.append("start")
+
+        def stop_playback(self):
+            self.actuations.append("stop")
+
+        def resume_playback(self):
+            self.actuations.append("resume")
+
+    obj, _ = _npanel("playing", False)
+    counting = _Counting()
+    obj._server = lambda: counting
+    refreshed = []
+    obj._refresh_all = lambda: (refreshed.append(1), obj._refresh_now_playing())
+    obj.window = type("W", (), {"is_active": lambda self: True})()
+
+    class _FakeConfigUtil:
+        def load(self):
+            return dict(obj.config)
+
+    app.ConfigUtil = _FakeConfigUtil
+    obj._last_poll_sig = obj._transport_signature(counting)
+    # External PAUSE → Play icon, Stop stays enabled.
+    counting._paused = True
+    counting._state = "paused"
+    assert obj._poll_now_playing() is True
+    assert refreshed == [1], refreshed
+    assert obj.np_play_btn.icon == "media-playback-start-symbolic"
+    assert obj.np_stop_btn.sensitive is True
+    # External PLAY → Pause icon.
+    counting._paused = False
+    counting._state = "playing"
+    assert obj._poll_now_playing() is True
+    assert obj.np_play_btn.icon == "media-playback-pause-symbolic"
+    # External STOP → Play icon, Stop disabled.
+    counting._state = "stopped"
+    counting._paused = True
+    assert obj._poll_now_playing() is True
+    assert obj.np_play_btn.icon == "media-playback-start-symbolic"
+    assert obj.np_stop_btn.sensitive is False
+    assert counting.actuations == [], counting.actuations
+
+
+@check
+def poll_inactive_does_no_ipc():
+    import apricus.gui.gtk4app as app
+
+    class _Counting:
+        def __init__(self):
+            self.calls = []
+
+        @property
+        def mode(self):
+            self.calls.append("mode")
+            return "MODE_VIDEO"
+
+        @property
+        def is_paused_by_user(self):
+            self.calls.append("paused")
+            return False
+
+        @property
+        def playback_state(self):
+            self.calls.append("state")
+            return "playing"
+
+    obj, _ = _npanel("playing", False)
+    counting = _Counting()
+    obj._server = lambda: counting
+    refreshed = []
+    obj._refresh_all = lambda: refreshed.append(1)
+    obj.window = type("W", (), {"is_active": lambda self: False})()
+    loaded = []
+    orig_load = app.ConfigUtil.load
+    app.ConfigUtil.load = lambda self: loaded.append(1) or {}
+    try:
+        assert obj._poll_now_playing() is True
+    finally:
+        app.ConfigUtil.load = orig_load
+    assert refreshed == [], refreshed
+    assert counting.calls == [], counting.calls
+    assert loaded == [], loaded
+
+
+@check
+def activation_immediate_refresh():
+    obj, _ = _npanel("playing", False)
+    refreshed = []
+    obj._refresh_all = lambda: refreshed.append(1)
+
+    class _W:
+        def __init__(self, active):
+            self._active = active
+
+        def is_active(self):
+            return self._active
+
+    obj._on_window_active_changed(_W(False))
+    assert refreshed == [], refreshed
+    obj._on_window_active_changed(_W(True))
+    assert refreshed == [1], refreshed
+    # A failing refresh never breaks the activation signal.
+    obj._refresh_all = lambda: (_ for _ in ()).throw(RuntimeError("boom"))
+    obj._on_window_active_changed(_W(True))
+
+
+@check
+def timer_survives_page_change():
+    import apricus.gui.gtk4app as app
+
+    obj, _ = _npanel("playing", False)
+    registrations = []
+    real_add = app.GLib.timeout_add_seconds
+    app.GLib.timeout_add_seconds = lambda secs, cb, *a: registrations.append(secs) or 777
+    try:
+        obj._start_np_poll()
+        obj._start_np_poll()
+        assert registrations == [app._NP_POLL_SECONDS], registrations
+        assert obj._np_poll_id == 777
+    finally:
+        app.GLib.timeout_add_seconds = real_add
+    seen = []
+    obj._refresh_all = lambda: seen.append(1)
+    obj._reload_stream_lists = lambda: None
+    obj._reload_web_lists = lambda: None
+
+    class _Stack:
+        def __init__(self):
+            self.names = []
+
+        def set_visible_child_name(self, name):
+            self.names.append(name)
+
+    class _Row:
+        def __init__(self, name):
+            self._name = name
+
+        def get_name(self):
+            return self._name
+
+    obj.stack = _Stack()
+    obj._on_sidebar_selected(None, _Row("playlist"))
+    obj._on_sidebar_selected(None, _Row("now-playing"))
+    assert obj.stack.names == ["playlist", "now-playing"]
+    assert seen == [1], seen
+    assert obj._np_poll_id == 777, "page change must not duplicate the timer"
+
+
+@check
+def signature_detects_item_change():
+    obj, srv = _npanel("playing", False)
+    srv.mode = "MODE_PLAYLIST"
+    base = {
+        "mode": "MODE_PLAYLIST",
+        "data_source": {"Default": "/v/old.mp4"},
+        "playlist": {"Default": ["/v/a.mp4", "/v/b.mp4"]},
+        "playlist_position": {"Default": 0},
+        "playlist_shuffle": False,
+        "video_dir": None,
+        "is_mute": False,
+        "audio_volume": 50,
+    }
+    obj.config = dict(base)
+    obj.playlist_paths = ["/v/a.mp4", "/v/b.mp4"]
+    before = obj._transport_signature(srv)
+    obj.config = dict(base, playlist_position={"Default": 1})
+    after = obj._transport_signature(srv)
+    assert before != after, (before, after)
+    assert after[-1] == "/v/b.mp4", after
+
+
+@check
+def poll_exception_survives():
+    import apricus.gui.gtk4app as app
+    from gi.repository import GLib as _GLib
+
+    obj, _ = _npanel("playing", False)
+    obj.window = type("W", (), {"is_active": lambda self: True})()
+
+    class _Boom:
+        @property
+        def mode(self):
+            raise _GLib.Error("down")
+
+    obj._server = lambda: _Boom()
+    refreshed = []
+    obj._refresh_all = lambda: refreshed.append(1)
+    assert obj._poll_now_playing() is True
+    assert refreshed == [], refreshed
+
+    class _Counting:
+        @property
+        def mode(self):
+            return "MODE_VIDEO"
+
+        @property
+        def is_paused_by_user(self):
+            return False
+
+        @property
+        def playback_state(self):
+            return "playing"
+
+        @property
+        def volume(self):
+            return 50
+
+        @property
+        def is_mute(self):
+            return False
+
+    counting = _Counting()
+    obj._server = lambda: counting
+
+    class _FakeConfigUtil:
+        def load(self):
+            return dict(obj.config)
+
+    app.ConfigUtil = _FakeConfigUtil
+    obj._last_poll_sig = ("MODE_VIDEO", True, "paused", "/v/a.mp4")
+    refreshed.clear()
+    obj._refresh_all = lambda: refreshed.append(1)
+    assert obj._poll_now_playing() is True
+    assert refreshed == [1], refreshed
+
+
+@check
+def poll_never_actuates():
+    import apricus.gui.gtk4app as app
+
+    class _Counting:
+        def __init__(self):
+            self._paused = False
+            self._state = "playing"
+            self.actuations = []
+            self.reads = 0
+
+        @property
+        def mode(self):
+            self.reads += 1
+            return "MODE_VIDEO"
+
+        @property
+        def is_paused_by_user(self):
+            self.reads += 1
+            return self._paused
+
+        @property
+        def playback_state(self):
+            self.reads += 1
+            return self._state
+
+        @property
+        def volume(self):
+            return 50
+
+        @property
+        def is_mute(self):
+            return False
+
+        def pause_playback(self):
+            self.actuations.append("pause")
+
+        def start_playback(self):
+            self.actuations.append("start")
+
+        def stop_playback(self):
+            self.actuations.append("stop")
+
+        def resume_playback(self):
+            self.actuations.append("resume")
+
+    obj, _ = _npanel("playing", False)
+    counting = _Counting()
+    obj._server = lambda: counting
+    refreshed = []
+    obj._refresh_all = lambda: refreshed.append(1)
+    obj.window = type("W", (), {"is_active": lambda self: True})()
+
+    class _FakeConfigUtil:
+        def load(self):
+            return dict(obj.config)
+
+    app.ConfigUtil = _FakeConfigUtil
+    obj._last_poll_sig = obj._transport_signature(counting)
+    reads_before = counting.reads
+    for paused, state in ((True, "paused"), (False, "playing"), (True, "stopped")):
+        counting._paused = paused
+        counting._state = state
+        assert obj._poll_now_playing() is True
+    assert counting.actuations == [], counting.actuations
+    # Bounded lightweight reads only: 3 for the check plus 3 for the
+    # post-refresh re-signature on each changed poll (stubbed _refresh_all
+    # performs no reads itself). No refresh storms, no actuations.
+    assert counting.reads - reads_before == 18, counting.reads
+    assert refreshed == [1, 1, 1], refreshed
+
+
 def main():
     name = sys.argv[1]
     try:
@@ -3551,3 +3914,35 @@ def test_paused_playlist_keeps_effective_title():
 
 def test_poll_no_excess_no_duplicate():
     _run("poll_no_excess_no_duplicate")
+
+
+def test_poll_timer_registered_and_periodic():
+    _run("poll_timer_registered_and_periodic")
+
+
+def test_poll_external_transport_via_poll():
+    _run("poll_external_transport_via_poll")
+
+
+def test_poll_inactive_does_no_ipc():
+    _run("poll_inactive_does_no_ipc")
+
+
+def test_activation_immediate_refresh():
+    _run("activation_immediate_refresh")
+
+
+def test_timer_survives_page_change():
+    _run("timer_survives_page_change")
+
+
+def test_signature_detects_item_change():
+    _run("signature_detects_item_change")
+
+
+def test_poll_exception_survives():
+    _run("poll_exception_survives")
+
+
+def test_poll_never_actuates():
+    _run("poll_never_actuates")

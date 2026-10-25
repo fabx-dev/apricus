@@ -229,6 +229,10 @@ class ControlPanel(Adw.Application):
             toolbar.set_content(self.toasts)
             self.window.set_content(toolbar)
             self._load_css()
+            try:
+                self.window.connect("notify::is-active", self._on_window_active_changed)
+            except Exception:  # noqa: BLE001 - activation refresh best-effort
+                pass
         self._refresh_all()
         # Dev/test aid: preselect a section (e.g. screenshots).
         initial_tab = os.environ.get("APRICUS_GTK4_TAB")
@@ -4350,6 +4354,21 @@ class ControlPanel(Adw.Application):
         else:
             current = (self.config.get(CONFIG_KEY_DATA_SOURCE) or {}).get("Default", "")
         return (mode, bool(paused), state, current)
+
+    def _on_window_active_changed(self, window, _pspec=None):
+        """Immediate refresh on return to foreground.
+
+        The periodic poll is intentionally gated on window.is_active() to
+        avoid background churn. Without this hook the user would see stale
+        transport/title for up to _NP_POLL_SECONDS after re-activating (or
+        be forced to change page). Activation therefore reconciles at once
+        with the existing full refresh; failures never break the window.
+        """
+        try:
+            if window is not None and window.is_active():
+                self._refresh_all()
+        except Exception:  # noqa: BLE001 - activation refresh never breaks
+            pass
 
     def _start_np_poll(self):
         if getattr(self, "_np_poll_id", None):
