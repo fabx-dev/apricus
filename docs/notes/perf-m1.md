@@ -1518,3 +1518,32 @@ languages fall back to English. Regression coverage: 5 new headless
 single-flight both paths, stopped→resume delegation); the existing
 `test_stop_resume.py` GUI wiring test gained the play-button stub it now
 needs. Full suite: 397 passed. No live runs, installs or releases.
+
+### Now Playing two-button UX — graphical validation ([validation date omitted], source run)
+
+M1 launched from sources with the real GNOME session (no Landlock, no
+packages). Control Center opened, Now Playing page inspected with the
+user. Result: 10/10 PASS.
+1. PLAYING shows circular Pause + square Stop side by side: PASS (legible,
+   well spaced). 2-4. Pause freezes video with player alive, button flips
+   to Play, Play resumes: PASS. 5. Stop kills the player, test-video static
+   remains: PASS (verified no player process). 6. STOPPED shows Play
+   enabled + Stop visible-but-disabled: PASS. 7. Play from STOPPED creates
+   a fresh player, Hawaii animates, no orphans: PASS. 8. Page switching
+   keeps controls consistent: PASS. 9. Tooltips readable
+   (Pausa/Riprendi/Ferma wallpaper), sizes adequate: PASS. 10. DING
+   click/drag + Overview while playing: PASS.
+No new buttons/indicators were added during the test; no `menu.py` change.
+No layout or comprehension issue found, hence no code change proposed.
+
+Restore note: the automated recovery restored a dirty backup (it had
+captured the Hawaii test selection), so the supervisor's claim alone was
+not accepted at face value. Cross-checked against three independent
+historical backups (identical hash `7e391dbdec8f`, MODE_NULL/empty Default)
+and restored the true original `config.json`/`config.json.bak` from the
+verified set, quarantining the test state under
+`<private-evidence-dir>`. The test-video static
+PNG was intentionally kept because the recorded pre-test URIs point to it;
+the regenerable `video-info.json` was removed. GNOME URIs byte-identical to
+the run manifest; cache matches verified user data; no Apricus processes;
+Snap absent; PoC intact; DING + integration extension ACTIVE.
