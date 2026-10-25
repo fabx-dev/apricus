@@ -402,3 +402,113 @@ STOPPED before installing the package. No sudo beyond the authorized LXD
 install; no snap install/remove; no push/PR/tag/release/publication; no
 workflow, secret, ruleset, extension, sandbox, renderer or SSRF-guard
 changes.
+
+## 14. Snap strict validation results ([validation date omitted], user-installed --dangerous)
+
+Artifact `dist/apricus_2.0.7_amd64.snap` (123,392,000 bytes),
+sha256 `<artifact-sha256>`
+(re-verified before install). Installed as revision x1, strict confinement
+verified at runtime (`snap.apricus.apricus (enforce)`). No concurrent Apricus,
+no Flatpak/native instances. GNOME URIs recorded; no pre-existing
+`~/snap/apricus` (fresh profile created by first run). Snapshot 9 intact
+before/after. PoC x1 untouched.
+
+### Smoke test — 10/10 PASS
+
+GUI+server start, strict enforcement, Hawaii first frame (user-confirmed),
+initial extension adoption, STOP (player gone, server alive, test-video static
+user-confirmed), RESUME (new player, new adoption, video user-confirmed),
+DING clicks/drags + Overview with video playing (user-confirmed).
+
+STOP sample 1: `T_reply` 179.5 ms = `T_death` 179.6 ms (termination completed
+inside the call); `T_uri` never fired in any sample — the static URI was
+already applied during playback, so there was nothing to flip. Same pattern
+on all samples: termination always lands inside the D-Bus round trip.
+
+### Bridge (separate section, no protocol/AppArmor changes)
+
+- Owned only while the GUI runs (`show_gui` → Register accepted, Update
+  flowing; sender uid/pid checks pass). Background-only server: name absent
+  (expected — bridge lives in the GUI process).
+- After STOP: still owned, Updates continue. After GUI close: cleanly
+  unowned. After GUI reopen: re-registered. After full server restart
+  without GUI: absent (expected).
+- Lease expiry: NOT TESTED (would require interfering with the live
+  extension session).
+- D-Bus introspection exposes `GnomeBridge1.Register/Update/Unregister`
+  (generation + lease + renew); no new permissions were added to make this
+  work under strict confinement.
+
+### Extended matrix
+
+| Check | Result |
+|---|---|
+| STOP persistence across reload + full server restart | PASS (0 players, stays stopped) |
+| Double STOP/RESUME | PASS (idempotent, 1 player) |
+| Playlist advance/freeze/resume (2s+3s clips) | PASS (5 advances, 0 while stopped, resumes) |
+| Public HTTP stream | PASS (playing + user-confirmed visual + cached thumbnail static) |
+| Local web page | PASS (user-confirmed render, WebKit procs, snapshot works) |
+| Loopback HTTP stream | NOT TESTED in snap (same SSRF guard as native — intentionally not bypassed) |
+| Static ON/OFF + missing-cache fallback | Mechanism observed working; see anomaly A — final verdict NOT VERIFIED for the OFF/ON pair |
+| 5x STOP/RESUME + orphan check | PASS (0 leftovers, adoptions logged) |
+| 10s-clip playlist red/blue cleanup | done, dir verified clean |
+| Extension reload with live window | EXCLUDED (pre-fix host extension, per authorization) |
+| DING/Overview after cycles | PASS (user-confirmed) |
+
+### STOP/RESUME latencies (socket RPC, per-sample unique files)
+
+13 STOP samples: `T_reply` min 2.6 / median 99.2 / max 393.7 ms;
+`T_death` == `T_reply` in every sample (player reaped inside the call).
+`T_uri` never fired (static pre-applied — method note, not a failure).
+9 RESUME samples: reply min 12.7 / median 13.8 / max 237.6 ms (max = first
+resume after server restart, includes player spawn); time-to-playing min 662
+/ median 726 / max 954 ms. No `Wallpaper player did not stop` timeout in any
+sample. Ranges reported, no regression claim (no pre-M1 snap baseline exists).
+
+### Benchmarks (15 CPUs, Hawaii 1080p, machine-normalized %)
+
+| State | CPU mean / max | RSS mean | PSS mean | Procs | Threads |
+|---|---|---|---|---|---|
+| PLAYING 60s | 2.27% / 2.76% | 408 MB | 370 MB | 4 | 28 |
+| STOPPED 60s | 0.00% / 0.00% | 80 MB | 64 MB | 3 | 8 |
+| RESUMED 60s | 2.58% / 2.85% | 426 MB | 380 MB | 4 | 28 |
+
+Same profile as native source and Flatpak (playing ≈2.3–2.9%, stopped 0%).
+No RESUME spike beyond playing level. Xvfb numbers not compared.
+
+### Anomaly A — intermittent selection revert (snap session only; NOT FIXED)
+
+Observed: `video()` via socket IPC intermittently did not persist — the file
+kept an older web-HTML source; 8 `_checkDefaultSource` warnings total; no
+`Rejected video path` lines; `snap run --shell` shows the files as visible;
+`ok:true` replies throughout; dispatch verified by code reading
+(`fn(*args)`, per-request event, no reuse).
+Ruled out: snap path visibility, RPC arg passing, GUI as sole cause (flips
+also occurred with GUI closed and bridge unowned), orphan players (zero
+leftovers at every check), lock contention (instant acquire), snapd
+background refresh (no tasks in the test window).
+Not isolated: the exact writer/trigger (candidates: GUI stale-snapshot
+saves — 12 call sites — and transient `isfile` failures inside the long
+running server; evidence supports neither conclusively, and the two
+hypotheses contradict on the GUI-closed flips).
+Impact: the Kelp-fallback, Hawaii-restore and static-OFF/ON observations
+from the affected window are re-labeled NOT VERIFIED (outcomes are
+indistinguishable between designed fallback and reverted selection), except
+the test-video static-apply itself (d47832 observed → source WAS Hawaii at apply
+time). Unaffected and standing: all STOP/RESUME mechanics, playlist
+advance/freeze/resume, stream/web visuals, orphan checks, bridge behavior,
+benchmarks (no selection changes involved).
+No production code changed for this; no renderer/SSRF/sandbox change made.
+
+### Restore — VERIFIED
+
+Server quit cleanly (0 processes, both bus names released), test media
+deleted, `sudo snap remove apricus` (user-run, no `--purge`), snap absent,
+snapshot 9 intact and untouched, PoC x1 intact, extensions ACTIVE, 3 GNOME
+URIs restored byte-identical (one self-caught screensaver typo corrected
+immediately and re-verified), LXD left installed per decision. New auto
+snapshot of the test profile retained by snapd (not restored, documented).
+
+LXD final state: instances STOPPED (base + builder retained for a possible
+rebuild — removal prep in §12e unchanged), network/storage present, no build
+processes left.
