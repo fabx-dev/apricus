@@ -303,3 +303,55 @@ extensions ACTIVE. Never auto-reinstall the old x3 payload.
 STOPPED before compiling or installing Snap. No sudo used in this phase; no
 push/PR/tag/release/publication; no workflow, secret, ruleset, extension,
 sandbox, renderer or SSRF-guard changes.
+
+## 12. LXD pre-install read-only check ([validation date omitted], NOTHING installed)
+
+All commands in this section were read-only (`id`, `groups`, `ip link`,
+directory listings, `df`, `free`, `.gitignore` inspection). No user added to
+any group, no LXD installed, no `init`, no build, no host/session/package
+change.
+
+### 12a. Group membership — already effective
+
+`id -Gn` and `groups <test-host>` (sorted diff) are identical and include
+`lxd`: the group is effective in the current session. No `usermod`, no
+re-login needed (re-login/logout is in any case out of scope).
+
+### 12b. No pre-existing LXD footprint
+
+Absent: `/var/snap/lxd`, `/var/lib/lxd`, `/var/lib/lxc`,
+`~/.local/share/lxc`, `~/.config/lxc`, `lxdbr0`/docker bridges, any LXD snap
+blob, any LXD/dnsmasq processes. Everything LXD-related observed after a
+future install is therefore test-created — verify with before/after
+`lxc list`, `lxc network list`, `lxc storage list`, `ip link`.
+
+### 12c. Persistent effects of the proposed one-time setup (to verify at install)
+
+`sudo snap install lxd` adds the LXD snap (mount + socket service, enabled
+persistently until purged). `lxd init --auto` (documented upstream
+behavior) creates: a `default` dir-backend storage pool under
+`/var/snap/lxd/common/lxd/storage-pools/default`, an `lxdbr0` bridge with
+dnsmasq DHCP/DNS + NAT/iptables rules, and a `default` profile attaching
+both to new instances. Alternative for tighter control: explicit `lxd init`
+(non-auto) with a size-limited loop volume — dir backend has no quotas, so
+either monitor `df` and time-box the build, or pick a quota-capable pool at
+init (preallocates disk). Decision deferred to install approval.
+
+### 12d. Resources and limits
+
+Disk 61 GB free (LXD image + core24 base + build need roughly 5–10 GB);
+RAM 4.7 GB total / 2.4 GB available + 3.7 GB swap free — tight for a
+parallel desktop + build container. Mitigation (commands documented, NOT
+executed): `lxc config set <snapcraft-apricus-*> limits.cpu=4
+limits.memory=3GiB` (or set on the `default` profile before the build so it
+applies to the fresh snapcraft instance). Snapcraft names its instances
+`snapcraft-<project>-…`; target them by prefix, never by guessing.
+
+### 12e. Rollback (test resources only)
+
+Delete snapcraft instances (`lxc delete --force`), then — only because §12b
+proves nothing pre-existed — `lxc network delete lxdbr0`,
+`lxc storage delete default`, `sudo snap remove --purge lxd`, and verify
+`ip link`/iptables/socket are clean. Build artifacts live in ignored
+`build/` and `dist/` (see `.gitignore`), never in the repo. Snapd snapshot 9
+and the PoC snap are untouched by all of this.
