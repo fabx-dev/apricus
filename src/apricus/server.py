@@ -18,6 +18,8 @@ from apricus.commons import (
     CONFIG_KEY_MUTE_WHEN_MAXIMIZED,
     CONFIG_KEY_PAUSE_WHEN_MAXIMIZED,
     CONFIG_KEY_PLAYLIST,
+    CONFIG_KEY_POLICY_PAUSE,
+    CONFIG_KEY_POLICY_VERSION,
     CONFIG_KEY_STATIC_WALLPAPER,
     CONFIG_KEY_STOPPED,
     CONFIG_KEY_SYSTRAY,
@@ -33,6 +35,7 @@ from apricus.commons import (
     resolve_video_dir,
 )
 from apricus.monitor import Monitors
+from apricus.policy import PAUSED, POLICY_VERSION, STOPPED, PlaybackPolicyEngine
 from apricus.stop_support import finish_process, stopped_background
 from apricus.utils import ConfigUtil, EndSessionHandler, _authorize, get_video_paths, is_snap
 
@@ -109,6 +112,7 @@ class ApricusServer:
         <property name="is_mute" type="b" access="readwrite"/>
         <property name="is_playing" type="b" access="read"/>
         <property name="playback_state" type="s" access="read"/>
+        <property name="engine_snapshot" type="a{sv}" access="read"/>
         <property name="is_paused_by_user" type="b" access="readwrite"/>
         <property name="is_static_wallpaper" type="b" access="readwrite"/>
         <property name="is_pause_when_maximized" type="b" access="readwrite"/>
@@ -153,9 +157,25 @@ class ApricusServer:
         self._load_config()
         perf.mark("server: config loaded")
 
+        # Central playback policy (M2). The engine owns manual latches and
+        # automatic reasons; every verb below routes through it. Latches are
+        # restored from the persisted config so STOP/PAUSE survive restarts.
+        self.policy = PlaybackPolicyEngine()
+        self.policy.load_latches(
+            manual_stop=bool(self.config.get(CONFIG_KEY_STOPPED, False)),
+            manual_pause=bool(self.config.get(CONFIG_KEY_POLICY_PAUSE, False)),
+            manual_mute=bool(self.config.get(CONFIG_KEY_MUTE, False)),
+        )
+        self._last_applied = None
+        self._auto_fed = {}
+
         # Player process
         self.reload()
         perf.mark("server: player spawn requested")
+
+        # Environment sensors (moved here from the player so there is a
+        # single decider; best-effort in headless/test contexts).
+        self._start_environment_sensors()
 
         # Show main GUI
         if not args.background:
@@ -166,11 +186,157 @@ class ApricusServer:
     def _load_config(self):
         self.config = ConfigUtil().load()
 
-    def _save_config(self, *, manual_stop=None):
-        if manual_stop is None:
+    def _save_config(self, *, manual_stop=None, manual_pause=None):
+        if manual_stop is None and manual_pause is None:
             ConfigUtil().save(self.config)
         else:
-            ConfigUtil().save(self.config, manual_stop=manual_stop)
+            ConfigUtil().save(self.config, manual_stop=manual_stop, manual_pause=manual_pause)
+
+    # -- central policy plumbing (M2) -------------------------------------
+    def _sync_policy_persist(self, *, stop_to=None, pause_to="keep"):
+        """Write the engine latch state into the config and persist it.
+
+        ``stop_to``/``pause_to`` carry explicit tri-state intent from the
+        calling verb (True/False) or preserve the on-disk latch (None, the
+        M1 rule for concurrent non-owner writers).
+        """
+        latches = self.policy.latches()
+        pause = latches["manual_pause"] if pause_to == "keep" else bool(pause_to)
+        self.config[CONFIG_KEY_POLICY_PAUSE] = pause
+        self.config[CONFIG_KEY_POLICY_VERSION] = POLICY_VERSION
+        self.config[CONFIG_KEY_MUTE] = latches["manual_mute"]
+        if stop_to is None:
+            self._save_config(manual_pause=pause if pause_to != "keep" else None)
+        else:
+            self.config[CONFIG_KEY_STOPPED] = bool(stop_to)
+            self._save_config(manual_stop=bool(stop_to), manual_pause=pause)
+
+    def _apply_policy_output(self, output):
+        """Actuate an engine output. Idempotent: re-applying the same
+        (desired, wanted_mute) pair is a no-op (no double fades). A mute-only
+        change never restarts playback, it only flips the mute switch."""
+        if self._last_applied is None:
+            last_desired, last_mute = None, None
+        else:
+            last_desired, last_mute = self._last_applied
+        if (output.desired, output.wanted_mute) == (last_desired, last_mute):
+            return False
+        self._last_applied = (output.desired, output.wanted_mute)
+        if output.desired == STOPPED:
+            self._terminate_player()
+            self._apply_stopped_background()
+            return True
+        player = get_instance(DBUS_NAME_PLAYER)
+        if player is None:
+            return False
+        try:
+            if output.desired != last_desired:
+                if output.desired == PAUSED:
+                    try:
+                        player.is_paused_by_user = True
+                    except (GLib.Error, AttributeError):
+                        pass
+                    player.pause_playback()
+                else:
+                    try:
+                        player.is_paused_by_user = False
+                    except (GLib.Error, AttributeError):
+                        pass
+                    player.start_playback()
+            if output.wanted_mute != last_mute:
+                if hasattr(player, "is_mute"):
+                    player.is_mute = output.wanted_mute
+                elif hasattr(player, "set_is_mute"):
+                    player.set_is_mute(output.wanted_mute)
+        except (GLib.Error, AttributeError):
+            logger.debug("[Policy] player actuation skipped (player gone?)")
+            return False
+        return True
+
+    def _terminate_player(self):
+        """Bounded teardown of the player process/session (M1 semantics)."""
+        proc = getattr(self, "player_process", None)
+        if proc is None:
+            return
+        group = None
+        try:
+            if os.getpgid(proc.pid) == proc.pid:
+                group = proc.pid
+        except ProcessLookupError:
+            pass
+        if proc.is_alive():
+            proc.terminate()
+        proc.join(timeout=0.75)
+        finish_process(proc, group)
+        self.player_process = None
+
+    def reason_active_changed(self, reason, active):
+        """Feed an automatic reason (internal; M3 will also call this for
+        push reasons). Debounced: only settled outputs actuate."""
+        output, act_now = self.policy.reason_active_changed(reason, active)
+        if act_now:
+            self._apply_policy_output(output)
+            return
+        generation = self.policy.snapshot()["generation"]
+        GLib.timeout_add(
+            int(self.policy._debounce_s * 1000),
+            self._apply_policy_pending,
+            generation,
+        )
+
+    def _apply_policy_pending(self, generation):
+        if generation != self.policy.snapshot()["generation"]:
+            return False
+        output = self.policy.pop_due()
+        if output is not None:
+            self._apply_policy_output(output)
+        return False
+
+    @property
+    def engine_snapshot(self):
+        """Read-only policy state for GUI diagnostics and tests."""
+        return self.policy.snapshot()
+
+    def _start_environment_sensors(self):
+        """Own the lock/maximized sensors (moved from the player). Best
+        effort: without a session bus or window backend there are simply
+        no automatic reasons, and manual control is unaffected."""
+        self._active_handler = None
+        self._window_state = None
+        try:
+            from apricus.utils import ActiveHandler
+
+            self._active_handler = ActiveHandler(self._on_lock_changed)
+        except Exception as e:  # noqa: BLE001 - headless/test safe
+            logger.debug(f"[Policy] lock sensor unavailable: {e}")
+        try:
+            from apricus.backends import create_window_state_backend
+
+            backend = create_window_state_backend(self._on_window_state_changed)
+            if backend is not None:
+                self._window_state = backend
+                self._window_state.start()
+        except Exception as e:  # noqa: BLE001 - headless/test safe
+            logger.debug(f"[Policy] window-state sensor unavailable: {e}")
+
+    def _on_lock_changed(self, active):
+        self.reason_active_changed("screen_locked", bool(active))
+
+    def _on_window_state_changed(self, state):
+        is_max = bool(state.get("is_any_maximized", False))
+        is_full = bool(state.get("is_any_fullscreen", False))
+        if self.config.get(CONFIG_KEY_PAUSE_WHEN_MAXIMIZED, True):
+            self._feed_auto("fullscreen", is_full)
+            self._feed_auto("maximized", is_max)
+        elif self.config.get(CONFIG_KEY_MUTE_WHEN_MAXIMIZED, False):
+            self._feed_auto("maximized_mute", is_max or is_full)
+        # With neither flag set, the backend runs but feeds nothing.
+
+    def _feed_auto(self, reason, active):
+        if self._auto_fed.get(reason) == bool(active):
+            return
+        self._auto_fed[reason] = bool(active)
+        self.reason_active_changed(reason, bool(active))
 
     def _setup_player(self, mode, data_source=None, monitor=None, force_respawn=False):
         """Setup and run player"""
@@ -211,6 +377,7 @@ class ApricusServer:
             # Changes/reload/respawn while stopped update selection, never play.
             self._apply_stopped_background()
             self._refresh_systray(mode)
+            self._last_applied = (STOPPED, self.policy.compute().wanted_mute)
             return
 
         # Pre-apply the new video's cached static frame so the switch shows
@@ -264,6 +431,31 @@ class ApricusServer:
 
         # Refresh systray icon if the mode changed
         self._refresh_systray(mode)
+
+        # Align a (possibly new) player with the engine without restarting
+        # playback: a latched pause or an active automatic reason must
+        # survive respawns and mode switches. Explicit transitions go
+        # through _apply_policy_output instead.
+        self._sync_player_to_policy()
+
+    def _sync_player_to_policy(self):
+        """One-way sync for (re)created players: mirror the latch, enforce a
+        paused output, apply the wanted mute. Never starts playback (the
+        player already auto-started); start remains an explicit transition."""
+        out = self.policy.compute()
+        player = get_instance(DBUS_NAME_PLAYER)
+        if player is not None:
+            try:
+                player.is_paused_by_user = out.desired == PAUSED
+                if out.desired == PAUSED:
+                    player.pause_playback()
+                if hasattr(player, "is_mute"):
+                    player.is_mute = out.wanted_mute
+                elif hasattr(player, "set_is_mute"):
+                    player.set_is_mute(out.wanted_mute)
+            except (GLib.Error, AttributeError):
+                logger.debug("[Policy] player sync skipped (player gone?)")
+        self._last_applied = (out.desired, out.wanted_mute)
 
     def _refresh_systray(self, mode):
         if self.config[CONFIG_KEY_SYSTRAY]:
@@ -324,37 +516,24 @@ class ApricusServer:
         """
         _authorize("stop_playback", dbus_context)
         self._load_config()
-        self.config[CONFIG_KEY_STOPPED] = True
-        # Persist before shutdown so crash/reload cannot accidentally autoplay.
-        self._save_config(manual_stop=True)
-        proc = getattr(self, "player_process", None)
-        if proc is not None:
-            group = None
-            try:
-                if os.getpgid(proc.pid) == proc.pid:
-                    group = proc.pid
-            except ProcessLookupError:
-                pass
-            # A blocked stream resolver must not hold the server on a D-Bus
-            # call timeout. Players handle SIGTERM on their GLib main loop;
-            # the bounded process-group fallback handles an unresponsive one.
-            if proc.is_alive():
-                proc.terminate()
-            proc.join(timeout=0.75)
-            finish_process(proc, group)
-            self.player_process = None
+        self.policy.request_manual_stop()
+        self._sync_policy_persist(stop_to=True)
+        self._terminate_player()
         # Old process/async callbacks are gone before changing the background.
         self._load_config()
-        self._apply_stopped_background()
+        self._last_applied = None
+        self._apply_policy_output(self.policy.compute())
 
     def resume_playback(self, dbus_context=None):
-        """Only this explicit operation clears manual STOP; repeat is a no-op."""
+        """Only this explicit operation clears manual STOP (and any stale
+        manual pause, so a fresh start never resumes paused). Repeat is a
+        no-op."""
         _authorize("resume_playback", dbus_context)
         self._load_config()
         if not self.config.get(CONFIG_KEY_STOPPED, False):
             return
-        self.config[CONFIG_KEY_STOPPED] = False
-        self._save_config(manual_stop=False)
+        self.policy.request_manual_start()
+        self._sync_policy_persist(stop_to=False)
         self.reload()
 
     @staticmethod
@@ -429,20 +608,21 @@ class ApricusServer:
         self._save_config()
         self._setup_player(MODE_PLAYLIST)
 
-    @staticmethod
-    def pause_playback(dbus_context=None):
+    def pause_playback(self, dbus_context=None):
         _authorize("pause_playback", dbus_context)
-        player = get_instance(DBUS_NAME_PLAYER)
-        if player:
-            player.pause_playback()
+        if self.policy.latches()["manual_stop"]:
+            return  # M1 semantics: no player exists while stopped.
+        out, _ = self.policy.request_manual_pause()
+        self._sync_policy_persist(pause_to=True)
+        self._apply_policy_output(out)
 
     def start_playback(self, dbus_context=None):
         _authorize("start_playback", dbus_context)
-        if self.config.get(CONFIG_KEY_STOPPED, False):
-            return
-        player = get_instance(DBUS_NAME_PLAYER)
-        if player:
-            player.start_playback()
+        if self.policy.latches()["manual_stop"]:
+            return  # M1 semantics: explicit resume_playback required.
+        out, _ = self.policy.request_manual_resume()
+        self._sync_policy_persist()
+        self._apply_policy_output(out)
 
     def reload(self, dbus_context=None):
         _authorize("reload", dbus_context)
@@ -566,11 +746,9 @@ class ApricusServer:
 
     @is_mute.setter
     def is_mute(self, is_mute):
-        self.config[CONFIG_KEY_MUTE] = is_mute
-        self._save_config()
-        player = get_instance(DBUS_NAME_PLAYER)
-        if player is not None:
-            player.is_mute = is_mute
+        out, _ = self.policy.set_manual_mute(bool(is_mute))
+        self._sync_policy_persist()
+        self._apply_policy_output(out)
 
     @property
     def is_playing(self):
@@ -595,22 +773,16 @@ class ApricusServer:
 
     @property
     def is_paused_by_user(self):
-        player = get_instance(DBUS_NAME_PLAYER)
-        if player is not None and player.mode in [MODE_VIDEO, MODE_STREAM, MODE_PLAYLIST]:
-            try:
-                return player.is_paused_by_user
-            except (GLib.Error, AttributeError):
-                return None
-        return None
+        return self.policy.latches()["manual_pause"]
 
     @is_paused_by_user.setter
     def is_paused_by_user(self, is_paused_by_user):
-        player = get_instance(DBUS_NAME_PLAYER)
-        if player is not None and player.mode in [MODE_VIDEO, MODE_STREAM, MODE_PLAYLIST]:
-            try:
-                player.is_paused_by_user = bool(is_paused_by_user)
-            except (GLib.Error, AttributeError):
-                pass
+        if bool(is_paused_by_user):
+            out, _ = self.policy.request_manual_pause()
+        else:
+            out, _ = self.policy.request_manual_resume()
+        self._sync_policy_persist()
+        self._apply_policy_output(out)
 
     @property
     def is_static_wallpaper(self):

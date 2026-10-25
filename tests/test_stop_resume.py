@@ -19,6 +19,8 @@ from apricus.commons import CONFIG_TEMPLATE, MODE_PLAYLIST, MODE_STREAM, MODE_VI
 
 @pytest.fixture
 def stopped_server(monkeypatch):
+    from apricus.policy import PlaybackPolicyEngine
+
     obj = server.ApricusServer.__new__(server.ApricusServer)
     disk = copy.deepcopy(CONFIG_TEMPLATE)
     disk.update(
@@ -34,6 +36,14 @@ def stopped_server(monkeypatch):
     obj._refresh_systray = Mock()
     obj._apply_stopped_background = Mock()
     obj.player_process = None
+    obj.policy = PlaybackPolicyEngine()
+    obj.policy.load_latches(
+        manual_stop=bool(disk.get("is_stopped", False)),
+        manual_pause=bool(disk.get("policy_manual_pause", False)),
+        manual_mute=bool(disk.get("is_mute", False)),
+    )
+    obj._last_applied = None
+    obj._auto_fed = {}
     obj._player_count = 0
     obj._try_switch_media = Mock(return_value=False)
     monkeypatch.setattr(server, "get_instance", lambda _: None)

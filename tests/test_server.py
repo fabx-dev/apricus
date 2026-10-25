@@ -331,11 +331,12 @@ def test_web_player_proxy_without_vlc_methods_never_breaks_server_transitions(mo
 
     monkeypatch.setattr(srv, "get_instance", lambda _name: _WebPlayerProxy())
     s = srv.ApricusServer.__new__(srv.ApricusServer)
+    _attach_policy(s, {})
     s.player_process = type("P", (), {"is_alive": lambda self: True})()
     srv.ApricusServer._preview_static(srv.MODE_VIDEO, "/tmp/v.mp4")
     srv.ApricusServer._preview_static(srv.MODE_STREAM, "https://example.com/v")
     assert s._try_switch_media(srv.MODE_VIDEO) is False
-    assert s.is_paused_by_user is None
+    assert s.is_paused_by_user is False
     assert s.playback_error == ""
 
 
@@ -386,6 +387,21 @@ def test_snap_ipc_roundtrip_methods_and_properties(tmp_path, monkeypatch):
     assert obj.seen == [("/a.mp4", "HDMI-1")]
 
 
+def _attach_policy(obj, disk=None):
+    """Give a bare `__new__` server a real engine synced from `disk`/config."""
+    from apricus.policy import PlaybackPolicyEngine
+
+    cfg = disk if isinstance(disk, dict) else (getattr(obj, "config", None) or {})
+    obj.policy = PlaybackPolicyEngine()
+    obj.policy.load_latches(
+        manual_stop=bool(cfg.get("is_stopped", False)),
+        manual_pause=bool(cfg.get("policy_manual_pause", False)),
+        manual_mute=bool(cfg.get("is_mute", False)),
+    )
+    obj._last_applied = None
+    obj._auto_fed = {}
+
+
 def test_pause_flag_roundtrips_in_playlist_mode():
     """In MODE_PLAYLIST the pause flag must round-trip like other modes.
 
@@ -397,6 +413,9 @@ def test_pause_flag_roundtrips_in_playlist_mode():
     from unittest.mock import patch
 
     s = srv.ApricusServer.__new__(srv.ApricusServer)
+    s.config = {"policy_manual_pause": False, "is_mute": False}
+    s._save_config = lambda **_: None
+    _attach_policy(s, s.config)
 
     class _Player:
         mode = "MODE_PLAYLIST"
@@ -412,13 +431,17 @@ def test_pause_flag_roundtrips_in_playlist_mode():
         assert player.is_paused_by_user is False
 
 
-def test_pause_flag_still_none_without_player():
+def test_pause_flag_defaults_false_without_player():
     from unittest.mock import patch
 
     s = srv.ApricusServer.__new__(srv.ApricusServer)
+    s.config = {}
+    s._save_config = lambda **_: None
+    _attach_policy(s, {})
     with patch.object(srv, "get_instance", return_value=None):
-        assert s.is_paused_by_user is None
-        s.is_paused_by_user = True  # must not raise
+        assert s.is_paused_by_user is False
+        s.is_paused_by_user = True  # must not raise; latches engine-side
+        assert s.is_paused_by_user is True
 
 
 def test_server_property_setters_persist_to_disk(monkeypatch):
@@ -434,7 +457,8 @@ def test_server_property_setters_persist_to_disk(monkeypatch):
         srv.CONFIG_KEY_PAUSE_WHEN_MAXIMIZED: True,
         srv.CONFIG_KEY_MUTE_WHEN_MAXIMIZED: False,
     }
-    s._save_config = lambda: saved.append(dict(s.config))
+    _attach_policy(s, s.config)
+    s._save_config = lambda **_: saved.append(dict(s.config))
 
     s.is_mute = True
     s.volume = 75

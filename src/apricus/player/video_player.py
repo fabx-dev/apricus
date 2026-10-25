@@ -19,7 +19,7 @@ from gi.repository import Gdk, GdkPixbuf, GLib, Gtk
 from pydbus import SessionBus
 
 from apricus import mediacache, perf
-from apricus.backends import create_wallpaper_backend, create_window_state_backend
+from apricus.backends import create_wallpaper_backend
 from apricus.commons import (
     CONFIG_DIR,
     CONFIG_KEY_DATA_SOURCE,
@@ -27,10 +27,9 @@ from apricus.commons import (
     CONFIG_KEY_FADE_INTERVAL,
     CONFIG_KEY_MODE,
     CONFIG_KEY_MUTE,
-    CONFIG_KEY_MUTE_WHEN_MAXIMIZED,
-    CONFIG_KEY_PAUSE_WHEN_MAXIMIZED,
     CONFIG_KEY_PLAYLIST,
     CONFIG_KEY_PLAYLIST_POS,
+    CONFIG_KEY_POLICY_PAUSE,
     CONFIG_KEY_RENDERER,
     CONFIG_KEY_SHUFFLE,
     CONFIG_KEY_STATIC_WALLPAPER,
@@ -47,7 +46,6 @@ from apricus.gnome_shell import integration_active
 from apricus.menu import build_menu
 from apricus.player.base_player import BasePlayer
 from apricus.utils import (
-    ActiveHandler,
     ConfigUtil,
     _authorize,
     is_gnome,
@@ -577,9 +575,8 @@ class VideoPlayer(BasePlayer):
         # DE-specific behavior (wallpaper + window state) lives in backends.
         self.wallpaper = create_wallpaper_backend()
 
-        # Handler should be created after everything initialized
-        self.active_handler, self.window_state = None, None
-        self.is_any_maximized, self.is_any_fullscreen = False, False
+        # DE-specific wallpaper behavior lives in backends; window-state
+        # sensing moved to the server (single policy decider).
         self.is_paused_by_user = False
         # Last stream-resolution failure (yt-dlp/format selection), surfaced
         # via playback_error()/last_error so the GUI banner fires instead of
@@ -615,54 +612,11 @@ class VideoPlayer(BasePlayer):
         super()._on_monitor_added(_, gdk_monitor, *args)
         self.monitor_sync()
 
-    def _on_active_changed(self, active):
-        if active:
-            self.pause_playback()
-        else:
-            if self._should_playback_start():
-                self.start_playback()
-            else:
-                self.pause_playback()
-
-    def _on_window_state_changed(self, state):
-        self.is_any_maximized, self.is_any_fullscreen = (
-            state["is_any_maximized"],
-            state["is_any_fullscreen"],
-        )
-        logger.info(
-            f"is_any_maximized: {self.is_any_maximized}, is_any_fullscreen: {self.is_any_fullscreen}"
-        )
-
-        if self.config[CONFIG_KEY_PAUSE_WHEN_MAXIMIZED]:
-            if self._should_playback_start():
-                self.start_playback()
-            else:
-                self.pause_playback()
-        elif self.config[CONFIG_KEY_MUTE_WHEN_MAXIMIZED]:
-            for monitor, window in self.windows.items():
-                if not monitor.is_primary():
-                    continue
-                if self.is_any_fullscreen or self.is_any_maximized:
-                    window.volume_fade(
-                        target=0,
-                        fade_duration_sec=self.config[CONFIG_KEY_FADE_DURATION_SEC],
-                        fade_interval=self.config[CONFIG_KEY_FADE_INTERVAL],
-                    )
-                else:
-                    window.volume_fade(
-                        target=self.volume,
-                        fade_duration_sec=self.config[CONFIG_KEY_FADE_DURATION_SEC],
-                        fade_interval=self.config[CONFIG_KEY_FADE_INTERVAL],
-                    )
-
     def _should_playback_start(self):
-        if self.config[CONFIG_KEY_PAUSE_WHEN_MAXIMIZED] and (
-            self.is_any_maximized or self.is_any_fullscreen
-        ):
-            return False
-        if self.is_paused_by_user:
-            return False
-        return True
+        # Local veto only. Pause/maximize/fullscreen policy is decided by the
+        # server's PlaybackPolicyEngine (which mirrors the manual latch into
+        # is_paused_by_user); the player never auto-starts on its own.
+        return not self.is_paused_by_user
 
     @property
     def mode(self):
@@ -687,7 +641,7 @@ class VideoPlayer(BasePlayer):
     @data_source.setter
     def data_source(self, data_source):
         self.config[CONFIG_KEY_DATA_SOURCE] = data_source
-        self._apply_source(data_source, setup_handlers=True)
+        self._apply_source(data_source)
 
     def switch_media(self, mode, dbus_context=None):
         """Hot-switch source inside the live player (no respawn)."""
@@ -696,7 +650,7 @@ class VideoPlayer(BasePlayer):
 
     def _switch_media_main(self, mode):
         self.reload_config()
-        self._apply_source(self.config[CONFIG_KEY_DATA_SOURCE], setup_handlers=False)
+        self._apply_source(self.config[CONFIG_KEY_DATA_SOURCE])
         perf.mark(f"player: switched [{mode}]")
         return False
 
@@ -705,7 +659,7 @@ class VideoPlayer(BasePlayer):
     # legitimately take a while; this guards mode transitions.
     FIRST_FRAME_TIMEOUT_SEC = 20
 
-    def _apply_source(self, data_source, setup_handlers):
+    def _apply_source(self, data_source):
         self._static_token = getattr(self, "_static_token", 0) + 1
         self._static_in_flight = None
         # New media, new verdict: drop the previous resolution failure so a
@@ -833,11 +787,6 @@ class VideoPlayer(BasePlayer):
         self.is_mute = self.config[CONFIG_KEY_MUTE]
         self.start_playback()
 
-        # Everything is initialized. Create handlers on idle so the first video
-        # frame renders without waiting on screensaver D-Bus or Wnck sync.
-        if setup_handlers:
-            GLib.idle_add(self._setup_handlers_idle)
-
         if self.config[CONFIG_KEY_STATIC_WALLPAPER] and self.mode == MODE_VIDEO:
             self.set_static_wallpaper()
         elif self.config[CONFIG_KEY_STATIC_WALLPAPER] and self.mode == MODE_STREAM:
@@ -861,14 +810,6 @@ class VideoPlayer(BasePlayer):
         else:
             self.wallpaper.prune_cache(self._live_cache_paths())
 
-    def _setup_handlers_idle(self):
-        if not self.active_handler:
-            self.active_handler = ActiveHandler(self._on_active_changed)
-        if not self.window_state:
-            self.window_state = create_window_state_backend(self._on_window_state_changed)
-            self.window_state.start()
-        return False
-
     @staticmethod
     def _queue_for(playlist, key, model):
         """Resolve the play queue for a monitor: stable key, legacy model,
@@ -889,6 +830,10 @@ class VideoPlayer(BasePlayer):
     def _play_queue_item(self, window, mkey=None, model=None):
         """Play window._queue[window._queue_index]. Main thread only."""
         if getattr(self, "_closing", False) or ConfigUtil().load().get("is_stopped", False):
+            return
+        if ConfigUtil().load().get(CONFIG_KEY_POLICY_PAUSE, False):
+            # A manual pause holds the queue: advancing would audibly restart
+            # playback behind the user's back. Resume replays the same item.
             return
         if getattr(window, "_transitioning", False):
             logger.debug("[Playlist] Transition already in progress, skipping")
@@ -1464,15 +1409,6 @@ class VideoPlayer(BasePlayer):
         # logins, so re-entering the session never shows a bare default.
         if not ConfigUtil().load().get("is_stopped", False):
             self.wallpaper.prune_cache(self._live_cache_paths())
-
-        # Cleanup handlers
-        if self.active_handler:
-            self.active_handler.cleanup()
-            self.active_handler = None
-
-        if self.window_state:
-            self.window_state.stop()
-            self.window_state = None
 
         # Cleanup all windows
         for _monitor, window in self.windows.items():

@@ -18,9 +18,11 @@ Mute is orthogonal: wanted_mute = manual_mute OR any(auto_mute_active).
 import time
 from dataclasses import dataclass
 
-PLAY = "play"
-PAUSED = "pause"
-STOPPED = "stop"
+# Desired states mirror the D-Bus playback_state vocabulary so snapshots
+# and diagnostics compare directly with reported player state.
+PLAY = "playing"
+PAUSED = "paused"
+STOPPED = "stopped"
 
 # Automatic reasons wired in M2. Future producers (M3 extension push, M4
 # power listeners) reuse the same entry point with explicitly registered

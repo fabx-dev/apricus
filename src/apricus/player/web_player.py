@@ -222,6 +222,20 @@ class WebWindow(Gtk.ApplicationWindow):
     def reload(self):
         self.__webview.reload()
 
+    def set_frozen(self, frozen):
+        """Visually freeze the page without touching the web process.
+
+        A hidden widget stops compositing new frames (rAF-driven animation
+        halts on hide); the transparent window then reveals the applied
+        static frame underneath — the same visual language as STOPPED,
+        without tearing the renderer down. JS timers may continue, same
+        cost class as paused VLC allocations.
+        """
+        if frozen:
+            self.__webview.hide()
+        else:
+            self.__webview.show()
+
     def _on_button_press_event(self, widget, event):
         if event.type == Gdk.EventType.BUTTON_PRESS and event.button == 3:
             if not self.menu:
@@ -253,6 +267,7 @@ class WebPlayer(BasePlayer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.config = None
+        self._paused = False
         self.wallpaper = create_wallpaper_backend()
         self.reload_config()
 
@@ -400,13 +415,23 @@ class WebPlayer(BasePlayer):
 
     @property
     def is_playing(self):
-        return True
+        return not self._paused
 
     def pause_playback(self, dbus_context=None):
         _authorize("player.pause_playback", dbus_context)
+        self._paused = True
+        for window in self.windows.values():
+            if window is not None:
+                window.set_frozen(True)
 
     def start_playback(self, dbus_context=None):
         _authorize("player.start_playback", dbus_context)
+        if getattr(self, "_closing", False) or ConfigUtil().load().get("is_stopped", False):
+            return
+        self._paused = False
+        for window in self.windows.values():
+            if window is not None:
+                window.set_frozen(False)
 
     def reload_config(self, dbus_context=None):
         _authorize("player.reload_config", dbus_context)
