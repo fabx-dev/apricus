@@ -53,18 +53,18 @@ def _gui_gtk4_target(version, pkgdatadir, localedir):
     gui_target(version, pkgdatadir, localedir)
 
 
-def _video_player_target():
+def _video_player_target(ready=None, initially_paused=False):
     os.setsid()
     from apricus.player.video_player import main as video_player_main
 
-    video_player_main()
+    video_player_main(ready=ready, initially_paused=initially_paused)
 
 
-def _web_player_target():
+def _web_player_target(ready=None, initially_paused=False):
     os.setsid()
     from apricus.player.web_player import main as web_player_main
 
-    web_player_main()
+    web_player_main(ready=ready, initially_paused=initially_paused)
 
 
 def _systray_target(mode, localedir):
@@ -224,11 +224,14 @@ class ApricusServer:
             last_desired, last_mute = self._last_applied
         if (output.desired, output.wanted_mute) == (last_desired, last_mute):
             return False
-        self._last_applied = (output.desired, output.wanted_mute)
         if output.desired == STOPPED:
             self._terminate_player()
             self._apply_stopped_background()
+            self._last_applied = (output.desired, output.wanted_mute)
             return True
+        ready = getattr(self, "_player_ready_event", None)
+        if ready is not None and not ready.is_set():
+            return False
         player = get_instance(DBUS_NAME_PLAYER)
         if player is None:
             return False
@@ -251,6 +254,9 @@ class ApricusServer:
                         player.is_paused_by_user = False
                     except (GLib.Error, AttributeError):
                         pass
+            # Keep a successful playback actuation if only the mute step
+            # fails; readiness reconciliation must not restart its fade.
+            self._last_applied = (output.desired, last_mute)
             if output.wanted_mute != last_mute:
                 if hasattr(player, "is_mute"):
                     player.is_mute = output.wanted_mute
@@ -258,6 +264,25 @@ class ApricusServer:
                     player.set_is_mute(output.wanted_mute)
         except (GLib.Error, AttributeError):
             logger.debug("[Policy] player actuation skipped (player gone?)")
+            return False
+        self._last_applied = (output.desired, output.wanted_mute)
+        return True
+
+    def _reconcile_new_player(self, proc, ready, initially_paused, deadline):
+        """Wait for activation, not just process creation or name publication.
+
+        This bounded readiness check never sleeps or caches an unexecuted
+        decision. A replaced/stopped/dead process invalidates its callback.
+        """
+        if self.player_process is not proc or not proc.is_alive():
+            return False
+        if ready.is_set():
+            output = self.policy.compute()  # Intent may have changed meanwhile.
+            self._apply_policy_output(output, fresh=not initially_paused)
+            if self._last_applied == (output.desired, output.wanted_mute):
+                return False
+        if time.monotonic() >= deadline:
+            logger.warning("[Policy] player readiness/actuation timed out: pid=%s", proc.pid)
             return False
         return True
 
@@ -419,19 +444,28 @@ class ApricusServer:
                 self.player_process.join(timeout=2)
             self.player_process = None
 
+        ready = mp.Event()
+        initially_paused = self.policy.compute().desired == PAUSED
         if mode in [MODE_VIDEO, MODE_STREAM, MODE_PLAYLIST]:
             self.player_process = Process(
-                name=f"apricus-player-{self._player_count}", target=_video_player_target
+                name=f"apricus-player-{self._player_count}",
+                target=_video_player_target,
+                args=(ready, initially_paused),
             )
         elif mode == MODE_WEBPAGE:
             self.player_process = Process(
-                name=f"apricus-player-{self._player_count}", target=_web_player_target
+                name=f"apricus-player-{self._player_count}",
+                target=_web_player_target,
+                args=(ready, initially_paused),
             )
         elif mode == MODE_NULL:
             pass
         else:
             raise ValueError("[Server] Unknown mode")
         if self.player_process is not None:
+            # Deduplication belongs to this process instance, not its predecessor.
+            self._last_applied = None
+            self._player_ready_event = ready
             self.player_process.start()
             self._player_count += 1
             perf.mark(f"server: player process started [{mode}]")
@@ -440,11 +474,10 @@ class ApricusServer:
         # Refresh systray icon if the mode changed
         self._refresh_systray(mode)
 
-        # Align a fresh player without restarting playback (it auto-started
-        # on creation): only the mirror, an optional pause, and the mute
-        # switch are applied. Explicit transitions go through the
-        # non-fresh path of _apply_policy_output instead.
-        self._apply_policy_output(self.policy.compute(), fresh=True)
+        if self.player_process is not None:
+            args = (self.player_process, ready, initially_paused, time.monotonic() + 30)
+            if self._reconcile_new_player(*args):
+                GLib.timeout_add(50, self._reconcile_new_player, *args)
 
     def _refresh_systray(self, mode):
         if self.config[CONFIG_KEY_SYSTRAY]:

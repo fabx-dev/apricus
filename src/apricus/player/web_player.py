@@ -303,6 +303,12 @@ class WebPlayer(BasePlayer):
         self._preapply_cached_static()
         super().do_activate()
         self.data_source = self.config[CONFIG_KEY_DATA_SOURCE]["Default"]
+        if self._paused:
+            self.pause_playback()
+        ready = getattr(self, "_policy_ready", None)
+        if ready is not None:
+            ready.set()
+            self._policy_ready = None
 
     def _preapply_cached_static(self):
         """Paint the cached frame before windows map.
@@ -438,10 +444,12 @@ class WebPlayer(BasePlayer):
         self.config = ConfigUtil().load()
 
 
-def main():
+def main(ready=None, initially_paused=False):
     setup_logging()
     setup_render_device()
     app = WebPlayer()
+    app._paused = initially_paused
+    app._policy_ready = ready
     import signal
 
     GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGTERM, lambda: app.quit_player(False))

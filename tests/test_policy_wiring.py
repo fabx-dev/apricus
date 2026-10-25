@@ -266,6 +266,12 @@ def test_pause_then_change_wallpaper_stays_paused(monkeypatch, tmp_path):
     assert disk["policy_manual_pause"] is True
     assert obj.engine_snapshot["desired"] == "paused"
     assert "start" not in obj._player.calls[2:], obj._player.calls
+    # The replacement has a separate actuator and becomes ready later.
+    obj._player = _FakePlayer()
+    obj.player_process.is_alive = lambda: True
+    obj._player_ready_event.set()
+    obj._reconcile_new_player(obj.player_process, obj._player_ready_event, True, float("inf"))
+    assert obj._player.calls == ["pause"]
     obj.start_playback()
     assert obj._player.calls[-1] == "start"
     assert obj.engine_snapshot["desired"] == "playing"
@@ -284,6 +290,11 @@ def test_pause_then_change_webpage_stays_paused(monkeypatch):
     assert disk["policy_manual_pause"] is True
     assert obj.engine_snapshot["desired"] == "paused"
     assert obj._player.calls == ["start", "pause"], obj._player.calls
+    obj._player = _FakePlayer()
+    obj.player_process.is_alive = lambda: True
+    obj._player_ready_event.set()
+    obj._reconcile_new_player(obj.player_process, obj._player_ready_event, True, float("inf"))
+    assert obj._player.calls == ["pause"]
 
 
 def test_setup_hook_syncs_fresh_player_without_restarting_playback(monkeypatch):

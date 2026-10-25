@@ -607,6 +607,10 @@ class VideoPlayer(BasePlayer):
     def do_activate(self):
         super().do_activate()
         self.data_source = self.config[CONFIG_KEY_DATA_SOURCE]
+        ready = getattr(self, "_policy_ready", None)
+        if ready is not None:
+            ready.set()
+            self._policy_ready = None
 
     def _on_monitor_added(self, _, gdk_monitor, *args):
         super()._on_monitor_added(_, gdk_monitor, *args)
@@ -1418,7 +1422,7 @@ class VideoPlayer(BasePlayer):
         super().quit_player()
 
 
-def main():
+def main(ready=None, initially_paused=False):
     # Dump Python tracebacks on C-level crashes (segfaults in VLC/Gtk).
     # Invaluable for diagnosing silent player deaths; always on, negligible cost.
     import faulthandler
@@ -1428,6 +1432,10 @@ def main():
     setup_logging()
     logger.info(f"[Player] pid={os.getpid()}")
     app = VideoPlayer()
+    # Bootstrap actuator command from the server, not a second policy decision.
+    # Set before activation/source setup so its autoplay path respects PAUSE.
+    app.is_paused_by_user = initially_paused
+    app._policy_ready = ready
     import signal
 
     GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGTERM, lambda: app.quit_player(False))

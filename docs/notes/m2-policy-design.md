@@ -94,9 +94,11 @@ pause/stop/mute; config reload while stopped never autoplays.
   `_apply_policy_output` actuates EXISTING paths only (fades, M1
   destroy/recreate, stopped-background fallback) with per-(desired,
   wanted_mute) idempotency (mute-only changes never re-trigger fades);
-  fresh players created by `_setup_player` are aligned via the
-  `fresh=True` path (no re-issued start — they auto-started on creation;
-  only the mirror, an optional pause, and the mute switch apply);
+  new players receive a server-computed pause bootstrap and are aligned
+  after activation readiness (bounded, process-scoped reconciliation).
+  The `fresh=True` path avoids re-issued start for auto-started players;
+  a bootstrap-held player receives start only if current policy permits it.
+  See `m2-player-readiness.md` for the startup/dedup correction;
   `_feed_auto` + generation-guarded `_apply_policy_pending` feed X11
   lock/maximize sensors moved here from the player; additive read-only
   `engine_snapshot` (+ introspection XML). `is_paused_by_user` is now an
