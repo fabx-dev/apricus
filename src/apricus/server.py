@@ -336,6 +336,8 @@ class ApricusServer:
         no automatic reasons, and manual control is unaffected."""
         self._active_handler = None
         self._window_state = None
+        self._window_source = "none"
+        self._push_watcher = None
         try:
             from apricus.utils import ActiveHandler
 
@@ -343,14 +345,126 @@ class ApricusServer:
         except Exception as e:  # noqa: BLE001 - headless/test safe
             logger.debug(f"[Policy] lock sensor unavailable: {e}")
         try:
-            from apricus.backends import create_window_state_backend
+            from apricus.utils import is_gnome, is_wayland
 
-            backend = create_window_state_backend(self._on_window_state_changed)
-            if backend is not None:
-                self._window_state = backend
-                self._window_state.start()
+            pushable = bool(is_wayland() and is_gnome())
+        except Exception:  # noqa: BLE001 - headless/test safe
+            pushable = False
+        if pushable:
+            self._watch_push_owner()
+        if not (pushable and self._start_push_backend()):
+            self._start_fallback_backend()
+
+    def _start_push_backend(self):
+        """Prefer the extension push channel (no polling while healthy)."""
+        from apricus.backends import ExtensionPushWindowStateBackend
+
+        try:
+            backend = ExtensionPushWindowStateBackend.try_probe(self._on_window_state_changed)
+        except Exception as e:  # noqa: BLE001 - probe must never raise
+            logger.debug(f"[Policy] push probe failed: {e}")
+            return False
+        if backend is None:
+            return False
+        try:
+            if not backend.start():
+                backend.stop()
+                return False
         except Exception as e:  # noqa: BLE001 - headless/test safe
-            logger.debug(f"[Policy] window-state sensor unavailable: {e}")
+            logger.debug(f"[Policy] push start failed: {e}")
+            return False
+        self._window_state = backend
+        self._window_source = backend.name
+        self.policy.note_push_alive(True)
+        logger.info("[Policy] window-state source: extension push")
+        return True
+
+    def _start_fallback_backend(self):
+        """Poll/Wnck/Null ladder when push is unavailable. Never raises."""
+        from apricus.backends import create_window_state_backend
+
+        try:
+            backend = create_window_state_backend(self._on_window_state_changed)
+        except Exception as e:  # noqa: BLE001 - headless/test safe
+            logger.debug(f"[Policy] fallback backend unavailable: {e}")
+            return False
+        if backend is None:
+            self.policy.note_push_alive(False)
+            return False
+        try:
+            backend.start()
+        except Exception as e:  # noqa: BLE001 - headless/test safe
+            logger.debug(f"[Policy] fallback backend failed to start: {e}")
+            self.policy.note_push_alive(False)
+            return False
+        self._window_state = backend
+        self._window_source = getattr(backend, "name", "unknown")
+        self.policy.note_push_alive(False)
+        logger.info("[Policy] window-state source: %s", self._window_source)
+        return True
+
+    def _stop_window_state(self):
+        backend, self._window_state = self._window_state, None
+        if backend is not None:
+            try:
+                backend.stop()
+            except Exception:  # noqa: BLE001 - best effort
+                logger.debug("[Policy] window-state backend stop failed")
+        self._window_source = "none"
+
+    def _watch_push_owner(self):
+        """Reconcile when the extension name appears or disappears.
+
+        Event-driven only: no polling is introduced here. Appearing owners
+        trigger a GetState reconcile; vanishing owners freeze the last
+        known state and fall back (never auto-resume from comms loss).
+        """
+        from apricus.backends import ExtensionPushWindowStateBackend
+
+        try:
+            bus = SessionBus()
+            bus.get("org.freedesktop.DBus", "/org/freedesktop/DBus")
+
+            def _changed(_sender, _object, _iface, _signal, params):
+                try:
+                    name, _old, new = params[0], params[1], params[2]
+                except (TypeError, IndexError, KeyError):
+                    return
+                if name != ExtensionPushWindowStateBackend.BUS_NAME:
+                    return
+                if new:
+                    self._on_push_appeared()
+                else:
+                    self._on_push_vanished()
+
+            self._push_watcher = bus.subscribe(
+                sender="org.freedesktop.DBus",
+                iface="org.freedesktop.DBus",
+                member="NameOwnerChanged",
+                object="/org/freedesktop/DBus",
+                signal_fired=_changed,
+            )
+        except Exception as e:  # noqa: BLE001 - headless/test safe
+            logger.debug(f"[Policy] push owner watch unavailable: {e}")
+            self._push_watcher = None
+
+    def _on_push_appeared(self):
+        from apricus.utils import is_gnome, is_wayland
+
+        if not (is_wayland() and is_gnome()):
+            return
+        if self._window_source == "extension-push":
+            return
+        self._stop_window_state()
+        if not self._start_push_backend():
+            self._start_fallback_backend()
+
+    def _on_push_vanished(self):
+        if self._window_source != "extension-push":
+            return
+        self._stop_window_state()
+        self.policy.note_push_alive(False)
+        self._start_fallback_backend()
 
     def _on_lock_changed(self, active):
         self.reason_active_changed("screen_locked", bool(active))
@@ -914,11 +1028,11 @@ class _DBusServer:
             "generation": "t",
             "policy_version": "u",
             "debounced": "b",
+            "window_state_source": "s",
         }
-        return {
-            key: GLib.Variant(signatures[key], value)
-            for key, value in self._server.engine_snapshot.items()
-        }
+        snapshot = dict(self._server.engine_snapshot)
+        snapshot["window_state_source"] = getattr(self._server, "_window_source", "none")
+        return {key: GLib.Variant(signatures[key], value) for key, value in snapshot.items()}
 
 
 def main(version, pkgdatadir, localedir, args):

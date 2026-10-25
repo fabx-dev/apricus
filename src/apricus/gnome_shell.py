@@ -160,8 +160,10 @@ def _write_extension_zip(source_dir, zip_path):
     import zipfile
 
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
-        for name in ("metadata.json", "extension.js", "statusBridge.js"):
-            if name == "statusBridge.js" and not os.path.isfile(os.path.join(source_dir, name)):
+        for name in ("metadata.json", "extension.js", "statusBridge.js", "state.js"):
+            if name in ("statusBridge.js", "state.js") and not os.path.isfile(
+                os.path.join(source_dir, name)
+            ):
                 continue  # Old extension bundles remain exportable.
             with open(os.path.join(source_dir, name), "rb") as f:
                 zf.writestr(f"{EXTENSION_UUID}/{name}", f.read())

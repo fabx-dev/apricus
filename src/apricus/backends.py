@@ -319,6 +319,155 @@ class GnomeShellWindowStateBackend(WindowStateBackend):
         self._name_owner = None
 
 
+class ExtensionPushWindowStateBackend(WindowStateBackend):
+    """Wayland window-state via the Apricus Shell extension push channel.
+
+    The extension owns a dedicated session-bus name and emits
+    ``DesktopStateChanged`` on fullscreen/maximized changes. This backend
+    subscribes, validates the sender against the current bus owner, drops
+    stale/duplicate sequence numbers, and feeds the same
+    ``{is_any_maximized, is_any_fullscreen}`` dict as the other backends.
+
+    Reconnect and fallback selection live in ApricusServer (ladder
+    supervisor); this object only ever talks to one verified owner.
+    """
+
+    name = "extension-push"
+    BUS_NAME = "org.gnome.Shell.Extensions.ApricusIntegration"
+    OBJECT_PATH = "/org/gnome/Shell/Extensions/ApricusIntegration"
+    INTERFACE = "org.gnome.Shell.Extensions.ApricusIntegration"
+    EXPECTED_VERSION = 1
+
+    def __init__(self, on_window_state_changed, bus=None, daemon=None):
+        super().__init__(on_window_state_changed)
+        self._bus = bus
+        self._daemon = daemon
+        self._proxy = None
+        self._owner = None
+        self._seq = 0
+        self._started = False
+        self._signal_sub = None
+
+    @classmethod
+    def try_probe(cls, on_window_state_changed, bus=None, daemon=None):
+        """Return a working backend, or None when the push channel is
+        unavailable (extension missing/disabled, wrong version)."""
+        try:
+            bus = bus or SessionBus()
+            daemon = daemon or bus.get("org.freedesktop.DBus", "/org/freedesktop/DBus")
+            owner = daemon.GetNameOwner(cls.BUS_NAME)
+        except Exception as e:
+            logger.debug("[Backend] No Apricus extension push channel (%s)", e)
+            return None
+        backend = cls(on_window_state_changed, bus=bus, daemon=daemon)
+        if not backend._reconcile(owner):
+            return None
+        return backend
+
+    @staticmethod
+    def _validate(state):
+        """Narrow the extension payload to plain bools/ints/lists.
+
+        Raises on missing keys or wrong shapes: a malformed payload is
+        dropped, never trusted.
+        """
+        seq = int(state["seq"])
+        fullscreen = bool(state["fullscreen"])
+        maximized = bool(state["maximized"])
+        fs_monitors = [int(m) for m in state.get("fs_monitors", [])]
+        max_monitors = [int(m) for m in state.get("max_monitors", [])]
+        workspace = int(state.get("workspace", 0))
+        n_workspaces = int(state.get("n_workspaces", 1))
+        monitors = list(state.get("monitors", []))
+        return {
+            "seq": seq,
+            "fullscreen": fullscreen,
+            "maximized": maximized,
+            "fs_monitors": fs_monitors,
+            "max_monitors": max_monitors,
+            "workspace": workspace,
+            "n_workspaces": n_workspaces,
+            "monitors": monitors,
+        }
+
+    def _reconcile(self, owner):
+        """Pull full state from the current owner. True when usable."""
+        try:
+            proxy = self._bus.get(self.BUS_NAME, self.OBJECT_PATH)
+            if int(proxy.Version) != self.EXPECTED_VERSION:
+                logger.warning("[Backend] Apricus extension push version mismatch; ignoring")
+                return False
+            state = self._validate(proxy.GetState())
+        except Exception as e:
+            logger.debug("[Backend] push GetState failed (%s)", e)
+            return False
+        self._proxy = proxy
+        self._owner = owner
+        self._seq = state["seq"]
+        self.on_window_state_changed(
+            {
+                "is_any_maximized": state["maximized"],
+                "is_any_fullscreen": state["fullscreen"],
+            }
+        )
+        return True
+
+    def start(self):
+        if self._started:
+            return True
+        self._started = True
+        try:
+            self._signal_sub = self._bus.subscribe(
+                sender=self._owner,
+                iface=self.INTERFACE,
+                member="DesktopStateChanged",
+                object=self.OBJECT_PATH,
+                signal_fired=self._on_signal,
+            )
+        except Exception as e:
+            logger.debug("[Backend] push subscribe failed (%s)", e)
+            return False
+        return True
+
+    def _on_signal(self, sender, _object, _iface, _signal, params):
+        if not self._started:
+            return
+        if sender != self._owner:
+            # Never accept window state from anyone but the verified owner.
+            logger.debug("[Backend] push signal from non-owner dropped")
+            return
+        if isinstance(params, (tuple, list)):
+            if len(params) != 1:
+                return
+            params = params[0]
+        if not isinstance(params, dict):
+            return
+        try:
+            state = self._validate(params)
+        except Exception:
+            return
+        if state["seq"] <= self._seq:
+            return
+        self._seq = state["seq"]
+        self.on_window_state_changed(
+            {
+                "is_any_maximized": state["maximized"],
+                "is_any_fullscreen": state["fullscreen"],
+            }
+        )
+
+    def stop(self):
+        self._started = False
+        sub, self._signal_sub = self._signal_sub, None
+        if sub is not None:
+            try:
+                sub.unsubscribe()
+            except Exception:
+                pass
+        self._proxy = None
+        self._owner = None
+
+
 def create_window_state_backend(on_window_state_changed: callable):
     if not is_wayland():
         return WnckWindowStateBackend(on_window_state_changed)
