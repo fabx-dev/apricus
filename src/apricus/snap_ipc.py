@@ -138,6 +138,8 @@ class ServiceProxy:
         "playlist",
         "pause_playback",
         "start_playback",
+        "stop_playback",
+        "resume_playback",
         "reload",
         "feeling_lucky",
         "show_gui",

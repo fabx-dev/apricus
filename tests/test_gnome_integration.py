@@ -796,6 +796,9 @@ def test_save_queue_index_persists_and_sanitizes():
     saved = {}
 
     class FakeConfigUtil:
+        def load(self):
+            return dict(saved)
+
         def save(self, config):
             saved.update(config)
 

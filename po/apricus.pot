@@ -305,6 +305,14 @@ msgstr ""
 msgid "{n} videos in queue (paused)"
 msgstr ""
 
+#: src/apricus/gui/gtk4app.py:1517
+msgid "Pause"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:1517
+msgid "Play"
+msgstr ""
+
 #: src/apricus/gui/gtk4app.py:1315
 msgid "Play / Pause"
 msgstr ""
@@ -934,4 +942,19 @@ msgstr ""
 #.
 #: src/apricus/menu.py:105
 msgid "Quit Apricus"
+msgstr ""
+
+msgid "Stop wallpaper"
+msgstr ""
+
+msgid "Resume wallpaper"
+msgstr ""
+
+msgid "Stopped"
+msgstr ""
+
+msgid "Playback unavailable"
+msgstr ""
+
+msgid "Could not change wallpaper playback."
 msgstr ""

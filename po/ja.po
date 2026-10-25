@@ -314,6 +314,14 @@ msgstr "キューに {n} 件の動画（仕様によりミュート）"
 msgid "{n} videos in queue (paused)"
 msgstr "キューに {n} 件の動画（一時停止中）"
 
+#: src/apricus/gui/gtk4app.py:1517
+msgid "Pause"
+msgstr "一時停止"
+
+#: src/apricus/gui/gtk4app.py:1517
+msgid "Play"
+msgstr "再生"
+
 #: src/apricus/gui/gtk4app.py:1315
 msgid "Play / Pause"
 msgstr "再生 / 一時停止"
@@ -971,6 +979,21 @@ msgstr "再読み込み"
 #: src/apricus/menu.py:105
 msgid "Quit Apricus"
 msgstr "Apricus を終了"
+
+msgid "Stop wallpaper"
+msgstr "壁紙を停止"
+
+msgid "Resume wallpaper"
+msgstr "壁紙を再開"
+
+msgid "Stopped"
+msgstr "停止中"
+
+msgid "Playback unavailable"
+msgstr "再生できません"
+
+msgid "Could not change wallpaper playback."
+msgstr "壁紙の再生状態を変更できませんでした。"
 
 #~ msgid "No video frames received yet"
 #~ msgstr "まだビデオフレームを受信していません"

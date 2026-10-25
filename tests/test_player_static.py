@@ -145,14 +145,14 @@ def test_extract_remote_frame_uses_forced_8bit_cmd(monkeypatch, tmp_path):
             f.write(_blank_png_bytes())
         return _Result()
 
-    monkeypatch.setattr(player_mod.subprocess, "run", fake_run)
+    monkeypatch.setattr(VideoPlayer, "_static_run", lambda self, *a, **k: fake_run(*a, **k))
     monkeypatch.setattr("apricus.utils.public_http_url", lambda url: url)
     real_mkstemp = player_mod.tempfile.mkstemp
     monkeypatch.setattr(
         player_mod.tempfile, "mkstemp", lambda **k: (os.open(out, os.O_CREAT | os.O_WRONLY), out)
     )
     try:
-        data = VideoPlayer._extract_remote_frame("https://cdn.example/v.mp4")
+        data = _player()._extract_remote_frame("https://cdn.example/v.mp4")
     finally:
         monkeypatch.setattr(player_mod.tempfile, "mkstemp", real_mkstemp)
     assert data and data.startswith(b"\x89PNG")
@@ -165,8 +165,8 @@ def test_extract_remote_frame_uses_forced_8bit_cmd(monkeypatch, tmp_path):
         calls.append(cmd)
         return _Fail()
 
-    monkeypatch.setattr(player_mod.subprocess, "run", _fail_run)
-    assert VideoPlayer._extract_remote_frame("https://example.com/page") is None
+    monkeypatch.setattr(VideoPlayer, "_static_run", lambda self, *a, **k: _fail_run(*a, **k))
+    assert _player()._extract_remote_frame("https://example.com/page") is None
 
 
 def _window_stub(**attrs):
@@ -346,7 +346,7 @@ def test_refresh_static_applies_cached_frame_without_touching_media(monkeypatch,
 
 def test_refresh_static_generates_missing_frame_in_background(monkeypatch, tmp_path):
     monkeypatch.setattr(player_mod, "CONFIG_DIR", str(tmp_path))
-    monkeypatch.setattr(player_mod.mediacache, "probe_video", lambda _video: (640, 360, 30.0))
+    monkeypatch.setattr(player_mod.mediacache, "probe_video", lambda _video, **k: (640, 360, 30.0))
 
     class _Result:
         returncode = 0
@@ -357,7 +357,7 @@ def test_refresh_static_generates_missing_frame_in_background(monkeypatch, tmp_p
             f.write(_blank_png_bytes())
         return _Result()
 
-    monkeypatch.setattr(player_mod.subprocess, "run", fake_run)
+    monkeypatch.setattr(VideoPlayer, "_static_run", lambda self, *a, **k: fake_run(*a, **k))
     from gi.repository import GLib
 
     monkeypatch.setattr(GLib, "idle_add", lambda func, *args: func(*args))

@@ -906,6 +906,7 @@ class ConfigUtil:
                     # video_dir was added after v4 without a version bump:
                     # default it instead of wiping the whole config.
                     config.setdefault(CONFIG_KEY_VIDEO_DIR, None)
+                    config["is_stopped"] = config.get("is_stopped") is True
                     # Stored renderer id (same no-bump policy): no UI
                     # exposes it anymore, but old configs may carry it —
                     # sanitize to a known id, defaulting to automatic.
@@ -995,7 +996,22 @@ class ConfigUtil:
         config[CONFIG_KEY_FADE_DURATION_SEC] = min(5.0, max(0.0, duration))
         return config
 
-    def save(self, config):
+    def save(self, config, *, manual_stop=None):
+        """Serialize writers; only explicit server commands may change STOP.
+
+        A GUI/playlist save can race STOP even after reloading config. Preserve
+        the on-disk latch under the same lock as the atomic write, unless this
+        is an explicit stop/resume command. Existing callers remain compatible.
+        """
+        import fcntl
+
+        os.makedirs(CONFIG_DIR, mode=0o700, exist_ok=True)
+        with open(CONFIG_PATH + ".lock", "a") as lock:
+            os.chmod(CONFIG_PATH + ".lock", 0o600)
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            self._save_locked(config, manual_stop)
+
+    def _save_locked(self, config, manual_stop):
         old_config = None
         old_raw = None
         if os.path.isfile(CONFIG_PATH):
@@ -1003,6 +1019,9 @@ class ConfigUtil:
                 json_str = f.read()
                 try:
                     old_config = json.loads(json_str)
+                    if isinstance(old_config, dict) and "is_stopped" in old_config:
+                        if manual_stop is None:
+                            config["is_stopped"] = old_config["is_stopped"] is True
                     if not self._check(old_config):
                         # Valid JSON but outdated (e.g. pre-backfill): keep
                         # the raw text for backup, so the first save after a
@@ -1012,6 +1031,8 @@ class ConfigUtil:
                         old_config = None
                 except json.decoder.JSONDecodeError:
                     old_config = None
+        if manual_stop is not None:
+            config["is_stopped"] = bool(manual_stop)
         # Skip if the config is identical
         if old_config == config:
             return

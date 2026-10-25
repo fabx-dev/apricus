@@ -317,6 +317,14 @@ msgstr "{n} vidéos en file (muet par conception)"
 msgid "{n} videos in queue (paused)"
 msgstr "{n} vidéos en file (en pause)"
 
+#: src/apricus/gui/gtk4app.py:1517
+msgid "Pause"
+msgstr "Pause"
+
+#: src/apricus/gui/gtk4app.py:1517
+msgid "Play"
+msgstr "Lire"
+
 #: src/apricus/gui/gtk4app.py:1315
 msgid "Play / Pause"
 msgstr "Lecture / Pause"
@@ -858,7 +866,8 @@ msgid "Preparing static wallpaper…"
 msgstr "Préparation du fond d’écran statique…"
 
 msgid "No video playing — static wallpaper will apply to the next video"
-msgstr "Aucune vidéo en cours — le fond statique sera appliqué à la prochaine vidéo"
+msgstr ""
+"Aucune vidéo en cours — le fond statique sera appliqué à la prochaine vidéo"
 
 #: src/apricus/gui/gtk4app.py:3913
 #, python-brace-format
@@ -971,6 +980,21 @@ msgstr "Recharger"
 #: src/apricus/menu.py:105
 msgid "Quit Apricus"
 msgstr "Quitter Apricus"
+
+msgid "Stop wallpaper"
+msgstr "Arrêter le fond d’écran"
+
+msgid "Resume wallpaper"
+msgstr "Reprendre le fond d’écran"
+
+msgid "Stopped"
+msgstr "Arrêté"
+
+msgid "Playback unavailable"
+msgstr "Lecture indisponible"
+
+msgid "Could not change wallpaper playback."
+msgstr "Impossible de modifier la lecture du fond d’écran."
 
 #~ msgid "No video frames received yet"
 #~ msgstr "Aucune image vidéo reçue pour le moment"

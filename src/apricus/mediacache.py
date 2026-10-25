@@ -65,7 +65,7 @@ def _save(cache):
         logger.warning(f"[MediaCache] save failed: {e}")
 
 
-def probe_video(video_path):
+def probe_video(video_path, *, check_output=None):
     """Return (width, height, duration) for a video file.
 
     Width/height are ints or None, duration is float seconds or None.
@@ -90,7 +90,7 @@ def probe_video(video_path):
 
     width, height, duration = None, None, None
     try:
-        out = subprocess.check_output(
+        out = (check_output or subprocess.check_output)(
             [
                 "ffprobe",
                 "-v",
@@ -113,7 +113,7 @@ def probe_video(video_path):
         height = streams[0].get("height")
         duration = info.get("format", {}).get("duration")
         duration = float(duration) if duration is not None else None
-    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, ValueError) as e:
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError, ValueError) as e:
         logger.warning(f"[MediaCache] ffprobe failed for {abspath}: {e}")
 
     cache[abspath] = {

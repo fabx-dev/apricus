@@ -69,6 +69,18 @@ def on_item_pause():
             server.start_playback()
 
 
+def on_item_stop():
+    server = connect()
+    if server:
+        server.stop_playback()
+
+
+def on_item_resume():
+    server = connect()
+    if server:
+        server.resume_playback()
+
+
 def on_item_reload():
     server = connect()
     if server:
@@ -111,6 +123,13 @@ def build_menu(mode):
     else:
         item_list = [item_show, item_mute, item_pause, item_reload, item_quit]
     for item in item_list:
+        menu.append(item)
+    for label, action in (
+        (_("Stop wallpaper"), on_item_stop),
+        (_("Resume wallpaper"), on_item_resume),
+    ):
+        item = Gtk.MenuItem(label=label)
+        item.connect("activate", lambda *_, action=action: start_action(action))
         menu.append(item)
     menu.show_all()
     return menu
