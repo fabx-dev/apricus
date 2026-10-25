@@ -72,6 +72,43 @@ class StatusBridge {
     }
 }
 
+const Config = {PACKAGE_VERSION: '50.1'};
+
+class DesktopStateTracker {
+    constructor(_readState, _options) {
+        this.stops = 0;
+        this.watches = 0;
+        this.changes = 0;
+    }
+
+    watchBus() {
+        this.watches++;
+    }
+
+    changed() {
+        this.changes++;
+    }
+
+    stop() {
+        this.stops++;
+    }
+}
+
+class StatePublisher {
+    constructor(_tracker, _options) {
+        this.stops = 0;
+        this.starts = 0;
+    }
+
+    start() {
+        this.starts++;
+    }
+
+    stop() {
+        this.stops++;
+    }
+}
+
 function makeGroup(name) {
     const handlers = {};
     return {
@@ -229,10 +266,12 @@ function loadExtensionClass() {
         "import Meta from 'gi://Meta';",
         "import Shell from 'gi://Shell';",
         "import {Extension, InjectionManager} from 'resource:///org/gnome/shell/extensions/extension.js';",
+        "import Config from 'resource:///org/gnome/shell/misc/config.js';",
         "import * as Main from 'resource:///org/gnome/shell/ui/main.js';",
         "import {Workspace} from 'resource:///org/gnome/shell/ui/workspace.js';",
         "import {WorkspaceThumbnail} from 'resource:///org/gnome/shell/ui/workspaceThumbnail.js';",
         "import {StatusBridge} from './statusBridge.js';",
+        "import {DesktopStateTracker, StatePublisher} from './state.js';",
     ]) {
         if (!src.includes(line))
             throw new Error(`expected import line missing (harness out of date): ${line}`);

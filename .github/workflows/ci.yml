@@ -62,6 +62,9 @@ jobs:
       - name: GJS extension rescan harness (no display)
         run: gjs -m tests/gjs/extension-rescan.js
 
+      - name: GJS window-state push harness (no display)
+        run: gjs -m tests/gjs/extension-state.js
+
       - name: Build and verify .deb and .rpm packages
         run: |
           ./pkgs/deb/build-deb.sh

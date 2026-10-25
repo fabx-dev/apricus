@@ -90,11 +90,15 @@ def test_enable_scan_uses_precaptured_unfiltered_actors():
     assert capture, "startup scan must capture the actor list explicitly"
     captured = capture.group(1)
     install = js.index("this._installOverviewHiding();")
-    assert js.index(capture.group(0)) < install, (
+    assert install > js.index(capture.group(0)), (
         "actor list must be captured before the Overview-hiding overrides"
     )
-    assert f"for (const actor of {captured})" in js
-    assert "for (const actor of global.get_window_actors())" not in js
+    scan_log = js.index("startup scan:")
+    scan_loop = js.rindex("for (const actor of", 0, scan_log)
+    loop_line = js[scan_loop : js.index("\n", scan_loop)]
+    assert captured in loop_line, (
+        f"startup scan must iterate the pre-captured list, found: {loop_line.strip()}"
+    )
 
 
 def test_vlc_options_pin_exact_flags_per_renderer():
@@ -600,6 +604,7 @@ def test_host_zip_and_installer_roundtrip(tmp_path):
         "apricus-integration@fabx-dev/",
         "apricus-integration@fabx-dev/extension.js",
         "apricus-integration@fabx-dev/metadata.json",
+        "apricus-integration@fabx-dev/state.js",
         "apricus-integration@fabx-dev/statusBridge.js",
     ], names
     with zipfile.ZipFile(out_zip) as zf:
@@ -607,7 +612,7 @@ def test_host_zip_and_installer_roundtrip(tmp_path):
     assert meta["uuid"] == EXTENSION_UUID
     assert set(meta["shell-version"]) == {"49", "50", "51"}
     with zipfile.ZipFile(out_zip) as zf:
-        for name in ("metadata.json", "extension.js", "statusBridge.js"):
+        for name in ("metadata.json", "extension.js", "statusBridge.js", "state.js"):
             zipped = zf.read(f"apricus-integration@fabx-dev/{name}")
             source = (repo / "gnome-extension" / EXTENSION_UUID / name).read_bytes()
             assert zipped == source, name
@@ -624,7 +629,7 @@ def test_host_zip_and_installer_roundtrip(tmp_path):
     )
     assert proc.returncode == 0, proc.stderr
     installed = fake_home / ".local/share/gnome-shell/extensions" / EXTENSION_UUID
-    for name in ("metadata.json", "extension.js", "statusBridge.js"):
+    for name in ("metadata.json", "extension.js", "statusBridge.js", "state.js"):
         src = (repo / "gnome-extension" / EXTENSION_UUID / name).read_bytes()
         assert (installed / name).read_bytes() == src
     # The host run also leaves a machine-readable status receipt next to
@@ -644,12 +649,13 @@ def test_host_zip_and_installer_roundtrip(tmp_path):
         env=env,
     )
     assert proc.returncode == 0, proc.stderr
-    for name in ("metadata.json", "extension.js", "statusBridge.js"):
+    for name in ("metadata.json", "extension.js", "statusBridge.js", "state.js"):
         src = (repo / "gnome-extension" / EXTENSION_UUID / name).read_bytes()
         assert (installed / name).read_bytes() == src
     assert sorted(p.name for p in installed.iterdir()) == [
         "extension.js",
         "metadata.json",
+        "state.js",
         "statusBridge.js",
     ]
     proc = subprocess.run(
@@ -866,3 +872,74 @@ def test_host_check_only_never_installs_or_enables(tmp_path, monkeypatch, raw, e
     monkeypatch.setattr(gnome_shell, "host_export_dir", lambda: str(export))
     monkeypatch.setattr(gnome_shell, "extension_raw_state", lambda: gnome_shell._UNREACHABLE)
     assert gnome_shell.integration_status()[0] == expected
+
+
+def test_push_sensor_wired_without_playback_logic():
+    """M3 sensor contract (static): the push channel reports compositor
+    truth only. No playback decisions, verbs, spawning or window
+    identification may live in the sensor path. The rescan fix
+    (pre-captured actor list) must stay intact."""
+    with open(EXT_JS, encoding="utf-8") as f:
+        js = f.read()
+    assert "from './state.js'" in js
+    assert "new DesktopStateTracker(" in js
+    assert "new StatePublisher(" in js
+    # Negative check scoped to the sensor wiring block: the rest of
+    # extension.js legitimately mentions playback/VLC in comments.
+    block = js[js.index("new DesktopStateTracker(") : js.index("this._statePublisher.start();")]
+    for token in (
+        "request_manual",
+        "compute_desired",
+        "pause_playback",
+        "start_playback",
+        "stop_playback",
+        "set_is_mute",
+        "VLC",
+        "Eval(",
+        "Subprocess",
+        ".spawn(",
+    ):
+        assert token not in block, f"playback/control logic leaked into sensor path: {token}"
+    with open(os.path.join(EXT_DIR, "state.js"), encoding="utf-8") as f:
+        sensor = f.read()
+    for token in (
+        "request_manual",
+        "compute_desired",
+        "_apply_policy",
+        "pause_playback",
+        "start_playback",
+        "VLC",
+        "eval(",
+        "Subprocess",
+        "get_title",
+        "get_app_info",
+        "get_pid",
+        "get_wm_class",
+        "get_role",
+    ):
+        assert token not in sensor, f"sensor must stay dumb: {token}"
+    for name in (
+        "subscribeDisplay",
+        "subscribeWorkspace",
+        "subscribeLayout",
+        "subscribeWindow",
+        "unsubscribeWindow",
+        "preexistingActors",
+        "watchBus",
+    ):
+        assert name in js, f"sensor wiring must include {name}"
+    for name in (
+        "notify::fullscreen",
+        "notify::maximized-horizontally",
+        "notify::maximized-vertically",
+        "window-entered-monitor",
+        "window-left-monitor",
+        "active-workspace-changed",
+        "workspace-added",
+        "workspace-removed",
+        "monitors-changed",
+    ):
+        assert name in sensor, f"sensor must observe {name}"
+    assert "org.gnome.Shell.Extensions.ApricusIntegration" in sensor
+    assert "DesktopStateChanged" in sensor
+    assert "GetState" in sensor and "Ping" in sensor
