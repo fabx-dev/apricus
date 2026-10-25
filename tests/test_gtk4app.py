@@ -1847,15 +1847,58 @@ def settings_flag_persists_and_calls_server():
         obj, _ = _panel(_base_config(), [])
         server = _Server()
         obj._server = lambda: server
-        obj._on_settings_flag(_Switch(True), None, "is_static_wallpaper")
+        obj._on_settings_flag(_Switch(False), True, "is_static_wallpaper")
         assert server.is_static_wallpaper is True
         assert store.config["is_static_wallpaper"] is True
         # Server absent: still persists locally.
         obj._server = lambda: None
-        obj._on_settings_flag(_Switch(False), None, "is_pause_when_maximized")
+        obj._on_settings_flag(_Switch(True), False, "is_pause_when_maximized")
         assert store.config["is_pause_when_maximized"] is False
     finally:
         appmod.ConfigUtil = old
+
+
+@check
+def window_policy_capability_survives_disconnect():
+    from types import SimpleNamespace
+
+    app.is_wayland = lambda: True
+    app.is_gnome = lambda: True
+    app.is_snap = lambda: False
+    app.is_flatpak = lambda: False
+    obj, _ = _panel(_base_config(), [])
+    for name in ('pause_max', 'mute_max'):
+        switch = SimpleNamespace(active=True, sensitive=None)
+        switch.set_sensitive = lambda value, target=switch: setattr(target, 'sensitive', value)
+        setattr(obj, name + '_switch', switch)
+    def check_sensitivity(enabled):
+        obj._refresh_window_policy_support()
+        assert obj.pause_max_switch.sensitive is enabled
+        assert obj.mute_max_switch.sensitive is enabled
+        assert obj.pause_max_switch.active and obj.mute_max_switch.active
+
+    obj._server = lambda: None
+    assert obj._window_policy_support()[0]  # native capability, extension may be absent
+    check_sensitivity(True)
+    app.is_flatpak = lambda: True
+    assert not obj._window_policy_support()[0]  # no assumed sandbox permission
+    check_sensitivity(False)
+    class Server:
+        engine_snapshot = {"window_state_source": "extension-push", "push_alive": True}
+    server = Server()
+    obj._server = lambda: server
+    assert obj._window_policy_support()[0]
+    check_sensitivity(True)
+    server.engine_snapshot = {"window_state_source": "null", "push_alive": False}
+    assert obj._window_policy_support()[0]  # temporary loss preserves capability
+    check_sensitivity(True)
+    obj._server = lambda: None
+    assert obj._window_policy_support()[0]
+    app.is_snap = lambda: True
+    assert not obj._window_policy_support()[0]  # never promise strict Snap M3
+    check_sensitivity(False)
+    app.is_wayland = lambda: False
+    assert obj._window_policy_support()[0]  # unchanged X11
 
 
 @check
@@ -3722,6 +3765,10 @@ def test_autostart_toggle_roundtrip_and_rollback():
 
 def test_settings_flag_persists_and_calls_server():
     _run("settings_flag_persists_and_calls_server")
+
+
+def test_window_policy_capability_survives_disconnect():
+    _run("window_policy_capability_survives_disconnect")
 
 
 def test_settings_has_no_mute_volume_or_lucky():

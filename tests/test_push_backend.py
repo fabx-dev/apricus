@@ -233,6 +233,49 @@ def test_subscribe_kwarg_matches_installed_pydbus():
     assert "member" not in params, sorted(params)
 
 
+def test_repeated_reconnect_keeps_one_active_signal_subscription(monkeypatch):
+    import apricus.backends as backends
+    import apricus.utils as utils
+
+    monkeypatch.setattr(utils, "is_wayland", lambda: True)
+    monkeypatch.setattr(utils, "is_gnome", lambda: True)
+    daemon = _FakeDaemon(owner=":1.40")
+    proxy = _FakeProxy(state=_state(seq=1, fullscreen=True))
+    bus = _FakeBus(daemon, {(Push.BUS_NAME, Push.OBJECT_PATH): proxy})
+    monkeypatch.setattr(backends, "SessionBus", lambda: bus)
+
+    class Null:
+        name = "null"
+
+        def start(self):
+            pass
+
+        def stop(self):
+            pass
+
+    monkeypatch.setattr(backends, "create_window_state_backend", lambda cb: Null())
+    obj = _stub_server(monkeypatch)
+    outputs = []
+    obj._apply_policy_output = outputs.append
+    for _ in range(3):
+        obj._on_push_appeared()
+        assert obj._window_source == "extension-push"
+        obj._on_push_appeared()  # duplicate owner notification
+        active = [
+            sub
+            for kwargs, sub in bus.subs
+            if kwargs["signal"] == "DesktopStateChanged" and not sub.unsubscribed
+        ]
+        assert len(active) == 1
+        assert obj.policy.compute().desired == "paused"
+        obj._on_push_vanished()
+        assert not [sub for _, sub in bus.subs if not sub.unsubscribed]
+        assert obj.policy.compute().desired == "paused"
+        # Same Shell owner, a new extension epoch with a lower sequence.
+        proxy._state = _state(seq=0, fullscreen=True)
+    obj._stop_window_state()
+
+
 def _stub_server(monkeypatch):
     from apricus import server as srv_mod
 
@@ -243,6 +286,8 @@ def _stub_server(monkeypatch):
     obj._window_state = None
     obj._window_source = "none"
     obj._push_watcher = None
+    obj.applied = []
+    obj._apply_policy_output = obj.applied.append
     return obj
 
 
@@ -252,7 +297,6 @@ def test_ladder_prefers_push_and_reports_source(monkeypatch):
 
     monkeypatch.setattr(utils, "is_wayland", lambda: True)
     monkeypatch.setattr(utils, "is_gnome", lambda: True)
-    fed = []
     daemon = _FakeDaemon(owner=":1.40")
     proxy = _FakeProxy(state=_state())
     bus = _FakeBus(daemon, {(Push.BUS_NAME, Push.OBJECT_PATH): proxy})
@@ -261,7 +305,7 @@ def test_ladder_prefers_push_and_reports_source(monkeypatch):
     obj._start_environment_sensors()
     assert obj._window_source == "extension-push"
     assert obj.policy.snapshot()["push_alive"] is True
-    assert fed or True  # initial feed covered by backend unit tests
+    assert obj.applied[-1].desired == "playing"
     obj._stop_window_state()
     assert obj._window_state is None and obj._window_source == "none"
 

@@ -3821,16 +3821,16 @@ class ControlPanel(Adw.Application):
         if not is_gnome():
             self.static_row.set_subtitle(_("Only on GNOME"))
         self.static_switch.connect("state-set", self._on_settings_flag, CONFIG_KEY_STATIC_WALLPAPER)
-        wayland = is_wayland()
+        policy_sensitive, policy_subtitle = self._window_policy_support()
         self.pause_max_row, self.pause_max_switch = self._settings_switch_row(
             behaviour,
             _("Pause when maximized"),
             _("Pause playback when a window is maximized"),
             bool(config.get(CONFIG_KEY_PAUSE_WHEN_MAXIMIZED, True)),
-            sensitive=not wayland,
+            sensitive=policy_sensitive,
         )
-        if wayland:
-            self.pause_max_row.set_subtitle(_("Requires X11"))
+        if policy_subtitle:
+            self.pause_max_row.set_subtitle(_(policy_subtitle))
         self.pause_max_switch.connect(
             "state-set", self._on_settings_flag, CONFIG_KEY_PAUSE_WHEN_MAXIMIZED
         )
@@ -3839,10 +3839,10 @@ class ControlPanel(Adw.Application):
             _("Mute when maximized"),
             _("Mute audio when a window is maximized"),
             bool(config.get(CONFIG_KEY_MUTE_WHEN_MAXIMIZED, False)),
-            sensitive=not wayland,
+            sensitive=policy_sensitive,
         )
-        if wayland:
-            self.mute_max_row.set_subtitle(_("Requires X11"))
+        if policy_subtitle:
+            self.mute_max_row.set_subtitle(_(policy_subtitle))
         self.mute_max_switch.connect(
             "state-set", self._on_settings_flag, CONFIG_KEY_MUTE_WHEN_MAXIMIZED
         )
@@ -4234,10 +4234,53 @@ class ControlPanel(Adw.Application):
         CONFIG_KEY_MUTE_WHEN_MAXIMIZED: "is_mute_when_maximized",
     }
 
+    def _window_policy_support(self):
+        from .policy_support import window_policy_support
+
+        try:
+            server = self._server()
+            snapshot = server.engine_snapshot if server is not None else {}
+            if snapshot.get("window_state_source") == "extension-push" and snapshot.get(
+                "push_alive"
+            ):
+                self._window_policy_verified = True
+        except Exception:  # noqa: BLE001 - temporary service absence is not incapability
+            pass
+        enabled, message = window_policy_support(
+            wayland=is_wayland(),
+            gnome=is_gnome(),
+            snap=is_snap(),
+            flatpak=is_flatpak(),
+            verified=getattr(self, "_window_policy_verified", False),
+        )
+        messages = {
+            "Requires GNOME on Wayland": _("Requires GNOME on Wayland"),
+            "Window policies are not available in Snap on Wayland": _(
+                "Window policies are not available in Snap on Wayland"
+            ),
+            "Window-state access has not been verified in Flatpak": _(
+                "Window-state access has not been verified in Flatpak"
+            ),
+            "Requires the Apricus GNOME extension on Wayland": _(
+                "Requires the Apricus GNOME extension on Wayland"
+            ),
+        }
+        return enabled, messages.get(message, message)
+
+    def _refresh_window_policy_support(self):
+        sensitive, subtitle = self._window_policy_support()
+        for name in ("pause_max", "mute_max"):
+            switch = getattr(self, f"{name}_switch", None)
+            row = getattr(self, f"{name}_row", None)
+            if switch is not None:
+                switch.set_sensitive(sensitive)
+            if row is not None and subtitle:
+                row.set_subtitle(_(subtitle))
+
     def _on_settings_flag(self, switch, _state, key):
         if getattr(self, "_syncing_flags", False):
             return False
-        want = bool(switch.get_active())
+        want = bool(_state)
         server = self._server()
         if server is not None:
             try:
@@ -4282,6 +4325,7 @@ class ControlPanel(Adw.Application):
     # -- refresh + handlers ---------------------------------------------
 
     def _refresh_all(self):
+        self._refresh_window_policy_support()
         # Reload persisted selection/position so externally changed queues
         # (IPC playlist apply, player position writes, server restart) are
         # shown. playlist_paths (unsaved UI edits) is intentionally kept.

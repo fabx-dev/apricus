@@ -359,8 +359,9 @@ class ApricusServer:
         """Prefer the extension push channel (no polling while healthy)."""
         from apricus.backends import ExtensionPushWindowStateBackend
 
+        initial = []
         try:
-            backend = ExtensionPushWindowStateBackend.try_probe(self._on_window_state_changed)
+            backend = ExtensionPushWindowStateBackend.try_probe(initial.append)
         except Exception as e:  # noqa: BLE001 - probe must never raise
             logger.debug(f"[Policy] push probe failed: {e}")
             return False
@@ -376,6 +377,9 @@ class ApricusServer:
         self._window_state = backend
         self._window_source = backend.name
         self.policy.note_push_alive(True)
+        backend.on_window_state_changed = self._on_window_state_changed
+        if initial:
+            self._on_window_state_changed(initial[-1])
         logger.info("[Policy] window-state source: extension push")
         return True
 
@@ -470,14 +474,38 @@ class ApricusServer:
         self.reason_active_changed("screen_locked", bool(active))
 
     def _on_window_state_changed(self, state):
+        self._last_window_state = dict(state)
         is_max = bool(state.get("is_any_maximized", False))
         is_full = bool(state.get("is_any_fullscreen", False))
-        if self.config.get(CONFIG_KEY_PAUSE_WHEN_MAXIMIZED, True):
-            self._feed_auto("fullscreen", is_full)
-            self._feed_auto("maximized", is_max)
-        elif self.config.get(CONFIG_KEY_MUTE_WHEN_MAXIMIZED, False):
-            self._feed_auto("maximized_mute", is_max or is_full)
-        # With neither flag set, the backend runs but feeds nothing.
+        pause = self.config.get(CONFIG_KEY_PAUSE_WHEN_MAXIMIZED, True)
+        mute = self.config.get(CONFIG_KEY_MUTE_WHEN_MAXIMIZED, False)
+        updates = {
+            "fullscreen": pause and is_full,
+            "maximized": pause and is_max,
+            "maximized_mute": not pause and mute and (is_max or is_full),
+        }
+        if getattr(self, "_window_source", None) == "extension-push":
+            # The Shell already coalesced this snapshot. Do not add another
+            # 250 ms; update all reasons atomically to avoid transient resumes.
+            if all(self._auto_fed.get(k) == v for k, v in updates.items()):
+                return
+            self._auto_fed.update(updates)
+            output, act_now = self.policy.reasons_active_changed(updates, settled=True)
+            if act_now:
+                self._apply_policy_output(output)
+        else:
+            for reason, active in updates.items():
+                self._feed_auto(reason, active)
+
+    def _refresh_window_preferences(self):
+        state = getattr(self, "_last_window_state", None)
+        # Do not interpret stale cached state as a fresh sample on source loss.
+        if state is not None and getattr(self, "_window_source", None) not in (
+            None,
+            "none",
+            "null",
+        ):
+            self._on_window_state_changed(state)
 
     def _feed_auto(self, reason, active):
         if self._auto_fed.get(reason) == bool(active):
@@ -954,9 +982,9 @@ class ApricusServer:
     def is_pause_when_maximized(self, is_pause_when_maximized):
         self.config[CONFIG_KEY_PAUSE_WHEN_MAXIMIZED] = is_pause_when_maximized
         self._save_config()
-        player = get_instance(DBUS_NAME_PLAYER)
-        if player is not None:
-            player.reload_config()
+        # Window policy is server-owned. Reloading player config here would
+        # overwrite its effective automatic mute with the persisted manual mute.
+        self._refresh_window_preferences()
 
     @property
     def is_mute_when_maximized(self):
@@ -966,9 +994,7 @@ class ApricusServer:
     def is_mute_when_maximized(self, is_mute_when_maximized):
         self.config[CONFIG_KEY_MUTE_WHEN_MAXIMIZED] = is_mute_when_maximized
         self._save_config()
-        player = get_instance(DBUS_NAME_PLAYER)
-        if player is not None:
-            player.reload_config()
+        self._refresh_window_preferences()
 
     @property
     def playback_error(self):

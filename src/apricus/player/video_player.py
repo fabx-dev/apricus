@@ -528,7 +528,7 @@ class VideoPlayer(BasePlayer):
     <node>
     <interface name='io.github.fabx_dev.apricus.player'>
         <property name="mode" type="s" access="read"/>
-        <property name="data_source" type="s" access="readwrite"/>
+        <property name="data_source" type="a{ss}" access="readwrite"/>
         <property name="volume" type="i" access="readwrite"/>
         <property name="is_mute" type="b" access="readwrite"/>
         <property name="is_playing" type="b" access="read"/>

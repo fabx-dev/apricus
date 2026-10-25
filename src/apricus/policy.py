@@ -136,16 +136,25 @@ class PlaybackPolicyEngine:
         reasons raise ValueError: producers must register effects first.
         Updates for push-fed reasons are dropped while the push channel is
         down (conservative freeze); local reasons always apply."""
-        if reason in _RESERVED_AUTO_STOP:
-            raise ValueError(f"reserved auto-STOP reason not implemented: {reason}")
-        try:
-            entry = self._auto[reason]
-        except KeyError:
-            raise ValueError(f"unknown automatic reason: {reason!r}") from None
-        if reason in self._push_sources and not self._push_alive:
+        return self.reasons_active_changed({reason: active}, now=now)
+
+    def reasons_active_changed(self, updates, *, settled=False, now=None):
+        """Apply one sensor snapshot atomically. Only already-debounced push
+        snapshots use settled=True; local/X11 reasons retain engine debounce."""
+        for reason in updates:
+            if reason in _RESERVED_AUTO_STOP:
+                raise ValueError(f"reserved auto-STOP reason not implemented: {reason}")
+            if reason not in self._auto:
+                raise ValueError(f"unknown automatic reason: {reason!r}")
+        accepted = False
+        for reason, active in updates.items():
+            if reason in self._push_sources and not self._push_alive:
+                continue
+            self._auto[reason].active = bool(active)
+            accepted = True
+        if not accepted:
             return self.compute(), False
-        entry.active = bool(active)
-        return self._mutate(immediate=False, now=now)
+        return self._mutate(immediate=settled, now=now)
 
     def note_push_alive(self, alive):
         """Integration channel lost/restored. While down, updates for
