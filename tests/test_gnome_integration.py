@@ -884,6 +884,12 @@ def test_push_sensor_wired_without_playback_logic():
     assert "from './state.js'" in js
     assert "new DesktopStateTracker(" in js
     assert "new StatePublisher(" in js
+    # The tracker-to-publisher handoff is the whole point of the sensor:
+    # without an emit callback the tracker computes truth nobody receives.
+    assert (
+        "emit:"
+        in js[js.index("new DesktopStateTracker(") : js.index("this._statePublisher.start();")]
+    ), "tracker must be constructed with an emit callback"
     # Negative check scoped to the sensor wiring block: the rest of
     # extension.js legitimately mentions playback/VLC in comments.
     block = js[js.index("new DesktopStateTracker(") : js.index("this._statePublisher.start();")]

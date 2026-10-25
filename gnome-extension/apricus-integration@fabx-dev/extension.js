@@ -121,6 +121,10 @@ export default class ApricusIntegrationExtension extends Extension {
                     codeRevision: CODE_REVISION,
                     shellVersion,
                     extensionVersion,
+                    // State changes detected by the tracker are published on
+                    // D-Bus here: without this wiring the tracker would
+                    // compute truth nobody ever receives.
+                    emit: payload => this._statePublisher?.publish(payload),
                     subscribeDisplay: (name, callback) => global.display.connect(name, callback),
                     unsubscribeDisplay: id => global.display.disconnect(id),
                     subscribeWorkspace: (name, callback) => global.workspace_manager.connect(name, callback),
