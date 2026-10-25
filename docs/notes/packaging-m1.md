@@ -512,3 +512,97 @@ snapshot of the test profile retained by snapd (not restored, documented).
 LXD final state: instances STOPPED (base + builder retained for a possible
 rebuild — removal prep in §12e unchanged), network/storage present, no build
 processes left.
+
+## 15. Anomaly A — targeted diagnosis from existing code/logs (no live tests)
+
+### 15a. Warning sequence (facts)
+
+8 `_checkDefaultSource` warnings, all in `build/snap-live/server.log`
+lines 5355–5585 (static-OFF block era), all with `mode: MODE_VIDEO` and a
+`file://...web.html` URI as Default. Zero such warnings in all native logs,
+the Flatpak log, `server2.log` (post-restart), and zero `Rejected video
+path` lines except one intentional negative probe. The URI that kept
+reappearing was selected once via `webpage()` earlier in the same session;
+the plain-path videos (Hawaii/Kelp) were never rejected by the `isfile`
+guard (no rejection logs) and `snap run --shell` confirms their visibility.
+
+### 15b. IPC command and responses (facts)
+
+All implicated calls used socket RPC `{"op":"call","attr":"video",...}`,
+all returned `ok:true`, all round trips measured ≈0.00 s at the client
+(i.e. no 30 s `done.wait` timeout). Dispatch is `fn(*args)` with a
+per-request event — verified by reading `snap_ipc.py`, no shared-event
+reuse possible. A control call with a nonexistent path correctly returned
+ok + logged `Rejected video path`, proving the method body runs.
+
+### 15c. Subsequent wallpaper-state writes (facts)
+
+Every flip coincided with `_checkDefaultSource` replacements (logged) or
+with plain saves. Candidate writers enumerated from code: server paths
+(always load-then-modify-then-save), player `_save_queue_index`
+(loads fresh, skips when stopped, playlist-only), GUI (12 blind
+`ConfigUtil().save(self.config)` call sites, several without a preceding
+reload in the same handler). No orphan player existed at any check; the
+config lock was never contended (instant acquire); snapd recorded no tasks
+during the test window (rules out refresh-driven AppArmor churn).
+
+### 15d. Reload-previous-selection paths (code reading)
+
+`_checkDefaultSource` (replaces invalid/empty Default with first `isfile`
+value), `_migrateLegacyMonitorKeys`/`_createMissingMonitors` (key juggling,
+never invents values), GUI blind saves (can restore a stale snapshot),
+player queue-index save (guarded). `is_stopped=true/false` does not select
+the writer: flips were observed only while stopped because every snap
+selection change was deliberately made while stopped.
+
+### 15e. x3 vs M1 in the responsible files (artifact evidence, no install)
+
+Unsquashed the retained x3 payload and diffed `utils.py`/`server.py` against
+the M1 tree: `_checkDefaultSource` is byte-identical; `video()` source
+setting and `_setup_player` source block are unchanged; M1 touched only
+save locking + STOP latch preservation + the STOPPED guard + STOP/RESUME
+itself + GUI badge/button (no new saves, no save-path changes). So the
+validator and the selection-setting logic are pre-existing; they cannot be
+an M1 regression by code inspection.
+
+### 15f. Facts vs hypotheses
+
+- FACT: flips happened only while the first GUI instance was alive (opened
+  [event time omitted], closed before the surgical tests); 0 warnings before its launch,
+  0 after its death; native/Flatpak runs (never opened the GUI) show 0.
+- FACT: after the GUI was gone for good, repeated `video()` calls stick,
+  including the 30 s stability watch.
+- HYPOTHESIS H1 (GUI stale-snapshot save): fits the window correlation and
+  the both-directions reversions; NOT proven — no single GUI save was caught
+  red-handed in the logs, and one flip series appeared to start just after
+  a GUI close (teardown-save race possible but unlogged).
+- HYPOTHESIS H2 (transient `isfile` failure in the long-running server):
+  no supporting evidence; every direct visibility check passes; contradicts
+  nothing but explains nothing uniquely either.
+- CONCLUSION: most consistent with H1, but explicitly UNCONFIRMED. No code
+  changed, per authorization. The re-labeled NOT VERIFIED items from §14
+  stand as re-labeled.
+
+### 15g. Minimal comparative live-test plan (x3 vs M1 — NOT EXECUTED)
+
+Goal: decide whether the flip reproduces on validated x3 under identical
+conditions. No installs performed in this phase.
+- Artifacts (both verified, hashes recorded): x3
+  `<private-evidence-dir>`
+  (`b94fac7c…f76581`); M1 `dist/apricus_2.0.7_amd64.snap`
+  (`5091b926…e1e77`).
+- Preconditions per arm: no apricus installed/processes, URIs recorded,
+  no `~/snap/apricus` (fresh profile each install), GUI never launched.
+- Protocol per arm (identical): user-run `sudo snap install --dangerous
+  <artifact>` → launch `-b -d` → 10× [`video(Hawaii)` + read-back at +1 s
+  and +30 s] + 5× alternating Hawaii/Kelp with read-back → count flips
+  (flip = read-back differs from requested path at either checkpoint).
+- Objective criterion (pre-registered): flip-rate comparison; M1 "not worse
+  than x3" if both zero or statistically indistinguishable; flips ONLY on
+  M1 with zero on x3 across 15 trials each = evidence of an M1-introduced
+  difference → only then authorize code investigation.
+- Rollback per arm: socket `quit`, 0-process check, user-run `sudo snap
+  remove <name>` (no purge), URI restore + verification, snapshot-9 + PoC +
+  extensions check. No auto-restore, no snapshot touch.
+- Estimated time: ~20 min per arm including waits. A GUI-open arm follows
+  ONLY if both GUI-less arms are clean.
