@@ -606,3 +606,63 @@ conditions. No installs performed in this phase.
   extensions check. No auto-restore, no snapshot touch.
 - Estimated time: ~20 min per arm including waits. A GUI-open arm follows
   ONLY if both GUI-less arms are clean.
+
+## 16. Comparative protocol 2×2 for anomaly A (PREPARED — NOT EXECUTED)
+
+Supersedes the GUI-less-only plan in §15g. Four arms, same script:
+
+- A: Snap x3, GUI closed. B: Snap x3, GUI open.
+- C: Snap M1, GUI closed. D: Snap M1, GUI open.
+
+Fixed order A→B→C→D (one package fully before switching; order recorded as
+a limitation). Never both packages installed; server quit + 0-process check
++ user-run `sudo snap remove <name>` (no purge) between arms. No snapshot-9
+restore, PoC untouched, extension/AppArmor/manifests unchanged, no code
+changes. Live runs need a separate authorization; nothing below installs
+anything.
+
+Artifacts (hashes re-verified, no installs in this phase):
+x3 `<private-evidence-dir>`
+(`b94fac7c…f76581`); M1 `dist/apricus_2.0.7_amd64.snap` (`5091b926…e1e77`).
+
+Identical per-arm script (same wallpaper/URLs, commands, counts, intervals,
+log collection, initial config, start/stop conditions):
+1. Preconditions: no apricus snap/processes, record 3 GNOME URIs, no
+   `~/snap/apricus`, per-arm evidence dir `build/snap-compare/<arm>/`
+   (independent backup: URIs, install output, first-launch config copy).
+2. User-run `sudo snap install --dangerous <artifact>`; launch
+   `/snap/bin/apricus -b -d`; wait for socket RPC; open GUI only in B/D
+   via `show_gui` (no other GUI interaction).
+3. Phase 1 (plain paths): 10× `video(Hawaii)`; after each, record IPC reply
+   plus config+URI read-backs immediately, at +1 s and +30 s.
+4. Phase 2 (web-URI trigger, explicit): `webpage(file://…/.m1-cmp-web.html`
+   in `~/Video/Apricus`, created fresh per arm, deleted afterwards) →
+   STOP → 10× `video(Hawaii)` with the same +1 s/+30 s read-backs. This
+   replicates the historical flip pattern (webpage → STOP → video); whether
+   a URI-in-VIDEO state emerges is recorded as data, not assumed.
+5. Per attempt record: exact command, IPC reply, immediate selection,
+   +1 s/+30 s selections, config-write evidence (new `Saved` server-log
+   lines in the attempt window), any `_checkDefaultSource` WARNING or
+   `Rejected video path` lines, GUI-displayed selection at phase ends
+   (user reads the Now Playing panel in B/D), actually displayed wallpaper
+   at phase ends (user-confirmed when feasible).
+6. Server quit via IPC, 0-process check, user-run `sudo snap remove
+   apricus` (no purge), URI-restore check, PoC/extension/snapshot-9 check.
+
+Pre-registered criteria:
+- A log WARNING alone never counts as proof of a revert.
+- A revert counts as CONFIRMED only if the effective selection returns to
+  a previous state with no new user/test command in between (read-back
+  evidence required).
+- x3 ≈ M1 (same flip rate/pattern across matched arms) → anomaly probably
+  PRE-EXISTING.
+- Reproducible ONLY on M1 under identical conditions → investigate a
+  possible M1 regression (code work still needs its own authorization).
+- Not reproducible on either → report NOT REPRODUCED (not "resolved").
+- Abort (per arm): M1/server processes surviving quit, unexpected Apricus
+  processes, session instability → stop, restore, document.
+- Estimated time: ~15 min per arm including the +30 s waits (≈1 h total).
+
+Privileges: user-run sudo ONLY for install/remove. Observation, logging,
+verification and restore need no privileges. Sudo for anything else is out
+of scope.
