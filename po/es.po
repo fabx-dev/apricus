@@ -314,6 +314,14 @@ msgstr "{n} vídeos en cola (silenciados por diseño)"
 msgid "{n} videos in queue (paused)"
 msgstr "{n} vídeos en cola (en pausa)"
 
+#: src/apricus/gui/gtk4app.py:1517
+msgid "Pause"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:1517
+msgid "Play"
+msgstr ""
+
 #: src/apricus/gui/gtk4app.py:1315
 msgid "Play / Pause"
 msgstr "Reproducir / Pausar"
@@ -852,7 +860,8 @@ msgid "Preparing static wallpaper…"
 msgstr "Preparando el fondo de pantalla estático…"
 
 msgid "No video playing — static wallpaper will apply to the next video"
-msgstr "Ningún vídeo en reproducción — el fondo estático se aplicará al próximo vídeo"
+msgstr ""
+"Ningún vídeo en reproducción — el fondo estático se aplicará al próximo vídeo"
 
 #: src/apricus/gui/gtk4app.py:3913
 #, python-brace-format
@@ -966,6 +975,21 @@ msgstr "Recargar"
 msgid "Quit Apricus"
 msgstr "Salir de Apricus"
 
+msgid "Stop wallpaper"
+msgstr "Detener fondo"
+
+msgid "Resume wallpaper"
+msgstr "Reanudar fondo"
+
+msgid "Stopped"
+msgstr "Detenido"
+
+msgid "Playback unavailable"
+msgstr "Reproducción no disponible"
+
+msgid "Could not change wallpaper playback."
+msgstr "No se pudo cambiar la reproducción del fondo."
+
 #~ msgid "No video frames received yet"
 #~ msgstr "Aún no se han recibido fotogramas de vídeo"
 
@@ -1018,18 +1042,3 @@ msgstr "Salir de Apricus"
 
 #~ msgid "Restart Apricus to apply a new renderer"
 #~ msgstr "Reinicia Apricus para aplicar el nuevo renderizador"
-
-msgid "Stop wallpaper"
-msgstr "Detener fondo"
-
-msgid "Resume wallpaper"
-msgstr "Reanudar fondo"
-
-msgid "Stopped"
-msgstr "Detenido"
-
-msgid "Playback unavailable"
-msgstr "Reproducción no disponible"
-
-msgid "Could not change wallpaper playback."
-msgstr "No se pudo cambiar la reproducción del fondo."

@@ -2666,6 +2666,261 @@ def static_flag_toasts_and_persists():
             appmod.ConfigUtil = old
 
 
+class _NPBtn:
+    """Recording stand-in for a Now Playing transport button.
+
+    Deliberately WITHOUT set_label: the STOP affordance must stay an
+    icon button in every state (a set_label call would raise here).
+    """
+
+    def __init__(self):
+        self.visible = None
+        self.sensitive = None
+        self.icon = None
+        self.tooltip = None
+
+    def set_visible(self, value):
+        self.visible = value
+
+    def set_sensitive(self, value):
+        self.sensitive = value
+
+    def set_icon_name(self, name):
+        self.icon = name
+
+    def set_tooltip_text(self, text):
+        self.tooltip = text
+
+
+class _NPText:
+    def __init__(self):
+        self.text = None
+        self.visible = None
+
+    def set_text(self, text):
+        self.text = text
+
+    def set_visible(self, value):
+        self.visible = value
+
+    def set_icon_name(self, name):
+        pass
+
+    def set_tooltip_text(self, text):
+        pass
+
+    def set_sensitive(self, value):
+        pass
+
+
+class _NPScale:
+    def __init__(self):
+        self.sensitive = None
+        self._value = 50.0
+
+    def set_sensitive(self, value):
+        self.sensitive = value
+
+    def get_value(self):
+        return self._value
+
+    def set_value(self, value):
+        self._value = value
+
+
+class _NPMute(_NPText):
+    def __init__(self):
+        super().__init__()
+        self._active = False
+
+    def get_active(self):
+        return self._active
+
+    def set_active(self, value):
+        self._active = value
+
+
+class _NPServer:
+    """Fake server with a controllable playback state."""
+
+    def __init__(self, state="playing", paused=False):
+        self.playback_state = state
+        self.is_paused_by_user = paused
+        self.mode = "MODE_VIDEO"
+        self.volume = 50
+        self.is_mute = False
+        self.calls = []
+
+    def pause_playback(self):
+        self.calls.append("pause")
+
+    def start_playback(self):
+        self.calls.append("start")
+
+    def stop_playback(self):
+        self.calls.append("stop")
+
+    def resume_playback(self):
+        self.calls.append("resume")
+
+
+def _npanel(state="playing", paused=False, server="stub"):
+    obj, srv = _panel(_base_config(), [])
+    srv = _NPServer(state, paused) if server == "stub" else server
+    obj._server = lambda: srv
+    obj.config = {
+        "mode": "MODE_VIDEO",
+        "data_source": {"Default": "/v/a.mp4"},
+        "playlist": {"Default": []},
+        "playlist_shuffle": False,
+        "video_dir": None,
+        "is_mute": False,
+        "audio_volume": 50,
+    }
+    obj.playlist_paths = []
+    obj.np_content = _NPText()
+    obj.np_empty = _NPText()
+    obj.np_badge = _NPText()
+    obj.np_title = _NPText()
+    obj.np_subtitle = _NPText()
+    obj.now_playing_status = _NPText()
+    obj.np_play_btn = _NPBtn()
+    obj.np_stop_btn = _NPBtn()
+    obj.np_eq = _NPText()
+    obj.np_volume = _NPScale()
+    obj.np_mute_btn = _NPMute()
+    obj.np_mute_icon = _NPText()
+    obj.np_mute_label = _NPText()
+    obj._np_current_path = None
+    obj.np_generation = 0
+    obj._load_np_hero = lambda path, generation: None
+    obj._refresh_np_transport = lambda server: None
+    obj._refresh_np_details = lambda mode, current: None
+    obj._refresh_np_queue = lambda mode: None
+    obj._refresh_all_calls = []
+    obj._refresh_all = lambda: obj._refresh_all_calls.append(1)
+    return obj, srv
+
+
+@check
+def transport_stop_button_always_visible_and_state_gated():
+    for state, paused, server, want_sensitive in (
+        ("playing", False, "stub", True),
+        ("paused", True, "stub", True),
+        ("stopped", True, "stub", False),
+        ("playing", False, None, False),
+    ):
+        obj, _ = _npanel(state, paused, server=None if server is None else "stub")
+        if server is None:
+            obj._server = lambda: None
+        obj._refresh_now_playing()
+        assert obj.np_stop_btn.visible is True, (state, server)
+        assert obj.np_stop_btn.sensitive is want_sensitive, (state, server)
+    # Busy in-flight operation disables both buttons even when playing.
+    obj, _ = _npanel("playing", False)
+    obj._transport_busy = True
+    obj._refresh_now_playing()
+    assert obj.np_stop_btn.sensitive is False
+    assert obj.np_play_btn.sensitive is False
+
+
+@check
+def transport_play_tooltip_follows_state():
+    cases = [
+        ("playing", False, "media-playback-pause-symbolic", "Pause"),
+        ("paused", True, "media-playback-start-symbolic", "Play"),
+        ("stopped", True, "media-playback-start-symbolic", "Play"),
+    ]
+    for state, paused, icon, tip in cases:
+        obj, _ = _npanel(state, paused)
+        obj._refresh_now_playing()
+        assert obj.np_play_btn.icon == icon, (state, obj.np_play_btn.icon)
+        assert obj.np_play_btn.tooltip == tip, (state, obj.np_play_btn.tooltip)
+    # No server: both transport buttons disabled, no crash.
+    obj, _ = _npanel("playing", False, server=None)
+    obj._server = lambda: None
+    obj._refresh_now_playing()
+    assert obj.np_play_btn.sensitive is False
+    assert obj.np_stop_btn.sensitive is False
+
+
+@check
+def play_pause_honours_single_flight():
+    import threading
+
+    obj, srv = _npanel("playing", False)
+    obj.on_play_pause()
+    assert srv.calls == ["pause"], srv.calls
+    assert getattr(obj, "_transport_busy", False) is False
+    assert obj._refresh_all_calls == [1]
+    # A second click while busy is ignored instead of queuing IPC.
+    obj._transport_busy = True
+    obj.on_play_pause()
+    assert srv.calls == ["pause"], srv.calls
+
+
+@check
+def play_pause_when_stopped_delegates_to_resume_once():
+    import threading
+    import time
+
+    gate = threading.Event()
+    started = threading.Event()
+
+    class _Blocking(_NPServer):
+        def resume_playback(self):
+            started.set()
+            assert gate.wait(timeout=10)
+            self.calls.append("resume")
+
+    obj, _ = _npanel("stopped", True, server=None)
+    blocker = _Blocking("stopped", True)
+    obj._server = lambda: blocker
+    obj.on_play_pause()
+    assert started.wait(timeout=10), "resume worker never started"
+    obj.on_play_pause()  # re-entrant click while busy: ignored
+    gate.set()
+    deadline = time.monotonic() + 10
+    while getattr(obj, "_transport_busy", True) and time.monotonic() < deadline:
+        time.sleep(0.02)
+    assert blocker.calls == ["resume"], blocker.calls
+
+
+@check
+def stop_resume_single_flight_and_state_gating():
+    import threading
+    import time
+
+    gate = threading.Event()
+    started = threading.Event()
+
+    class _Blocking(_NPServer):
+        def stop_playback(self):
+            started.set()
+            assert gate.wait(timeout=10)
+            self.calls.append("stop")
+
+    obj, _ = _npanel("playing", False)
+    blocker = _Blocking("playing", False)
+    obj._server = lambda: blocker
+    obj.on_stop_resume()
+    assert started.wait(timeout=10), "stop worker never started"
+    obj.on_stop_resume()  # duplicate click while in flight: ignored
+    gate.set()
+    deadline = time.monotonic() + 10
+    while getattr(obj, "_transport_busy", True) and time.monotonic() < deadline:
+        time.sleep(0.02)
+    assert blocker.calls == ["stop"], blocker.calls
+    # Server gone: explains itself, touches no IPC, leaves no busy latch.
+    obj2, _ = _npanel("playing", False, server=None)
+    obj2._server = lambda: None
+    shown = []
+    obj2._show_server_missing = lambda: shown.append("missing")
+    obj2.on_stop_resume()
+    assert shown == ["missing"], shown
+    assert getattr(obj2, "_transport_busy", False) is False
+
+
 def main():
     name = sys.argv[1]
     try:
@@ -3053,3 +3308,23 @@ def test_integration_row_reflects_status():
 
 def test_host_install_rows_guide_sandbox_setup():
     _run("host_install_rows_guide_sandbox_setup")
+
+
+def test_transport_stop_button_always_visible_and_state_gated():
+    _run("transport_stop_button_always_visible_and_state_gated")
+
+
+def test_transport_play_tooltip_follows_state():
+    _run("transport_play_tooltip_follows_state")
+
+
+def test_play_pause_honours_single_flight():
+    _run("play_pause_honours_single_flight")
+
+
+def test_play_pause_when_stopped_delegates_to_resume_once():
+    _run("play_pause_when_stopped_delegates_to_resume_once")
+
+
+def test_stop_resume_single_flight_and_state_gating():
+    _run("stop_resume_single_flight_and_state_gating")

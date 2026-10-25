@@ -337,6 +337,7 @@ server = SimpleNamespace(playback_state="stopped", resume_playback=Mock(), stop_
 panel._server = lambda: server
 panel._refresh_all = Mock()
 panel.np_stop_btn = Mock()
+panel.np_play_btn = Mock()
 def thread(target, **kw):
     return SimpleNamespace(start=target)
 with patch.object(gui.threading, "Thread", thread), patch.object(gui.GLib, "idle_add", lambda f, *a: f(*a)):

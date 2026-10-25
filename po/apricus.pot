@@ -305,6 +305,14 @@ msgstr ""
 msgid "{n} videos in queue (paused)"
 msgstr ""
 
+#: src/apricus/gui/gtk4app.py:1517
+msgid "Pause"
+msgstr ""
+
+#: src/apricus/gui/gtk4app.py:1517
+msgid "Play"
+msgstr ""
+
 #: src/apricus/gui/gtk4app.py:1315
 msgid "Play / Pause"
 msgstr ""

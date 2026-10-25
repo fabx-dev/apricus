@@ -1498,3 +1498,23 @@ packaging commits), Flatpak experimental build running locally
 (artifact-only, no remote), Snap experimental build prepared but gated on
 explicit sudo approval. No installs, tags, releases or publications performed.
 No production, sandbox, SSRF-guard or renderer changes.
+
+### Now Playing two-button transport ([validation date omitted], authorized UX change)
+
+Per the approved UX spec, the Now Playing transport row is now exactly two
+adjacent buttons: dynamic Play/Pause (icon + tooltip follow PLAYING/PAUSED/
+STOPPED) and a separate always-visible square STOP icon button
+(`media-playback-stop-symbolic`), disabled when stopped or when no server
+is present. STOP no longer doubles as Resume; PLAYING-resume runs through
+the main button (STOPPED + Play icon → `resume_playback`, fresh player).
+A `_transport_busy` latch maps every click to one server call and disables
+both buttons until `_refresh_all` reconciles the real server state — including
+on IPC failure, so no success is ever displayed without confirmation.
+Handlers, IPC methods, static/playlist/volume/mute behavior and the GTK3
+context menu are unchanged on purpose (menu.py untouched). New msgids are
+only `Play`/`Pause` (tooltips); `it` translated (`Riproduci`/`Pausa`), other
+languages fall back to English. Regression coverage: 5 new headless
+`test_gtk4app.py` checks (visibility/gating, tooltip+icon per state,
+single-flight both paths, stopped→resume delegation); the existing
+`test_stop_resume.py` GUI wiring test gained the play-button stub it now
+needs. Full suite: 397 passed. No live runs, installs or releases.
