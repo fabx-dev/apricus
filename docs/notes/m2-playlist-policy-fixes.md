@@ -1,7 +1,7 @@
 # M2 consolidated playlist corrections
 
 Baseline: `041d1909e1a62b149ad1d2e684db898e6d3455ff`.
-Live evidence: `<private-evidence-dir>`.
+Live evidence: retained privately, not distributed with this repository.
 All 72 recorded checksums were verified; no live evidence was changed.
 
 ## Verified causes

@@ -4,8 +4,9 @@
 
 The second live run at `7b087fe` recorded `playback_state=playing`,
 `engine_snapshot.manual_pause=false`, and disk `policy_manual_pause=true` in
-`<private-evidence-dir>`. The preserved
-evidence checksums were verified without changing any evidence files.
+the private run's `resume-observation.json` (not distributed with this
+repository). The preserved evidence checksums were verified without changing
+any evidence files.
 
 The complete GUI path is:
 
