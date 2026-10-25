@@ -440,7 +440,7 @@ class ApricusServer:
             self._push_watcher = bus.subscribe(
                 sender="org.freedesktop.DBus",
                 iface="org.freedesktop.DBus",
-                member="NameOwnerChanged",
+                signal="NameOwnerChanged",
                 object="/org/freedesktop/DBus",
                 signal_fired=_changed,
             )

@@ -420,7 +420,7 @@ class ExtensionPushWindowStateBackend(WindowStateBackend):
             self._signal_sub = self._bus.subscribe(
                 sender=self._owner,
                 iface=self.INTERFACE,
-                member="DesktopStateChanged",
+                signal="DesktopStateChanged",
                 object=self.OBJECT_PATH,
                 signal_fired=self._on_signal,
             )
