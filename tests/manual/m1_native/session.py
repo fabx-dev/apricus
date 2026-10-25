@@ -210,12 +210,17 @@ def supervise(root, worktree):
         raise KeyboardInterrupt("Supervisor interrupted")
 
     signal.signal(signal.SIGTERM, interrupted)
+    # Test-only override (see source_entry.py): run M2 sources with an
+    # existing dependency venv when this worktree has no local .venv.
+    test_python = os.environ.get("APRICUS_TEST_PYTHON") or str(worktree / ".venv/bin/python")
+    if not os.path.isfile(test_python):
+        raise RuntimeError(f"Test interpreter missing: {test_python}")
     process = None
     try:
         with (root / "evidence/server.log").open("w") as log:
             process = subprocess.Popen(
                 [
-                    str(worktree / ".venv/bin/python"),
+                    test_python,
                     "-S",
                     str(worktree / "tests/manual/m1_native/source_entry.py"),
                     "--run",

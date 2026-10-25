@@ -8,8 +8,22 @@ import sysconfig
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
-if not sys.flags.no_site or Path(sys.prefix).resolve() != ROOT / ".venv":
-    raise RuntimeError("Use this worktree's .venv/bin/python -S")
+# Test-only override so the M2 tree (no local venv, no installs allowed) can
+# run with an existing dependency venv. Must be an explicit absolute path.
+# NOTE: compare lexically (no resolve() on the binary itself): venv launchers
+# are symlinks to the base interpreter, and resolving them would point at
+# /usr/bin instead of the venv.
+_TEST_PYTHON = os.environ.get("APRICUS_TEST_PYTHON")
+if _TEST_PYTHON:
+    _TEST_VENV = os.path.normpath(
+        os.path.join(os.path.dirname(os.path.abspath(_TEST_PYTHON)), "..")
+    )
+else:
+    _TEST_VENV = str(ROOT / ".venv")
+if not sys.flags.no_site or os.path.normpath(sys.prefix) != _TEST_VENV:
+    raise RuntimeError(
+        "Use -S with APRICUS_TEST_PYTHON=<venv>/bin/python (or this worktree's .venv)"
+    )
 sys.path[:0] = [str(ROOT / "src"), sysconfig.get_path("purelib"), "/usr/lib/python3/dist-packages"]
 
 
