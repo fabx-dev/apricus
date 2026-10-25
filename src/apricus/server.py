@@ -850,6 +850,42 @@ def get_instance(dbus_name):
     return instance
 
 
+class _DBusServer:
+    """Transport view: keep the server's logical/JSON snapshot unchanged."""
+
+    dbus = ApricusServer.__doc__
+
+    def __init__(self, server):
+        object.__setattr__(self, "_server", server)
+
+    def __getattr__(self, name):
+        return getattr(self._server, name)
+
+    def __setattr__(self, name, value):
+        setattr(self._server, name, value)
+
+    @property
+    def engine_snapshot(self):
+        # pydbus wraps this in GLib.Variant('a{sv}', ...): each 'v' must
+        # already be a Variant, including an explicitly typed empty array.
+        signatures = {
+            "desired": "s",
+            "wanted_mute": "b",
+            "manual_stop": "b",
+            "manual_pause": "b",
+            "manual_mute": "b",
+            "active_reasons": "as",
+            "push_alive": "b",
+            "generation": "t",
+            "policy_version": "u",
+            "debounced": "b",
+        }
+        return {
+            key: GLib.Variant(signatures[key], value)
+            for key, value in self._server.engine_snapshot.items()
+        }
+
+
 def main(version, pkgdatadir, localedir, args):
     server = get_instance(DBUS_NAME_SERVER)
     if server is not None:
@@ -872,7 +908,7 @@ def main(version, pkgdatadir, localedir, args):
                 global _bus_singleton
                 if _bus_singleton is None:
                     _bus_singleton = SessionBus()
-                _bus_singleton.publish(DBUS_NAME_SERVER, server)
+                _bus_singleton.publish(DBUS_NAME_SERVER, _DBusServer(server))
             if want_gui:
                 server.show_gui()
             loop.run()
