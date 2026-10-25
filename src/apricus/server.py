@@ -610,7 +610,8 @@ class ApricusServer:
         if self.policy.latches()["manual_stop"]:
             return  # M1 semantics: explicit resume_playback required.
         out, _ = self.policy.request_manual_resume()
-        self._sync_policy_persist()
+        # Explicit Play must clear the disk latch, not preserve its old value.
+        self._sync_policy_persist(pause_to=False)
         self._apply_policy_output(out)
 
     def reload(self, dbus_context=None):
@@ -770,7 +771,8 @@ class ApricusServer:
             out, _ = self.policy.request_manual_pause()
         else:
             out, _ = self.policy.request_manual_resume()
-        self._sync_policy_persist()
+        # The GUI's property write is an explicit manual command as well.
+        self._sync_policy_persist(pause_to=bool(is_paused_by_user))
         self._apply_policy_output(out)
 
     @property
