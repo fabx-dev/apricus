@@ -195,11 +195,111 @@ collect ≥5 STOP samples per backend before any comparison with native
 - Flatpak test status: matrix complete, restore verified, package
   uninstalled. Snap build/install: NOT STARTED, still gated.
 
-## 10. Current status
+## 10. Current status (Flatpak done, Snap gated)
 
-- Tests: PASS (392). Packaging diff: none. Snap build/install: NOT STARTED,
-  still gated (no release workflow invoked, no tags).
-- Flatpak matrix complete with one documented integration finding; restore
-  verified (data 51/51, URIs exact, no processes, Snap absent).
+- Tests: PASS (392). Packaging diff: none. Flatpak matrix complete with one
+  documented integration finding; restore verified (data 51/51, URIs exact,
+  no processes, Snap absent).
+- Snap build/install: NOT STARTED — verified plan in §11 below.
 - No merge/push/PR/tag/release/publication. No production/sandbox/permission
   changes.
+
+## 11. Snap core24 build plan — verified, NOT executed
+
+Context: Agent A validated the post-reload extension fix (local commit
+`31f0c36`, live GNOME Wayland PASS) in their repository. That fix is
+**validated but not installed**: the host extension is the pre-fix version
+(byte-identical to this worktree's `gnome-extension/`), M1 must not
+incorporate it, and the Snap test will run against the pre-fix host
+extension. Extension-reload re-adoption scenarios are therefore excluded
+from the Snap matrix (known limitation, same as observed); all other matrix
+items apply.
+
+### 11a. Isolation options actually available on this machine
+
+- LXD/multipass: ABSENT (no `lxd`/`multipass` snaps or binaries). Enabling
+  LXD needs `sudo snap install lxd` + `lxd init` (one-time privileged host
+  change) — not done, needs approval.
+- Destructive host build: `sudo snapcraft pack --destructive-mode` installs
+  build-packages into the HOST via apt and needs sudo every build — avoided
+  unless its necessity is demonstrated and separately approved.
+- GitHub `snap-test-build.yml` (artifact-only, no credentials/publish):
+  triggers on `pull_request` ONLY — no `workflow_dispatch`, so it cannot be
+  launched manually; it would need a push to a PR branch. M1 is local-only
+  (no push/PR allowed in this phase), and PR #1 must stay untouched.
+  Verdict: currently unusable without push + PR actions.
+- Conclusion: no unprivileged isolated local build exists today. Both viable
+  paths need exactly one approval: (A) one-time LXD setup, or (B) one
+  destructive build, or (C) push approval for the artifact-only workflow
+  (note: it checks out the PR *merge* commit, so provenance would be
+  M1+master rather than pure M1 HEAD — document the SHAs either way).
+
+Recommended: (A) LXD one-time setup, then unprivileged `snapcraft pack`
+(user already in the `lxd` group) — full isolation, host APT untouched,
+repeatable for re-verification.
+
+### 11b. Prerequisites (verified, nothing installed)
+
+- `snapcraft` 9.2.1 present (classic snap). LXD absent (see above).
+- `gh` authenticated as fabx-dev (read-only `auth status` check; no repo
+  changes made). No workflow invoked, no tags created.
+- Disk 61 GB free; RAM 4 GB total (tight but sufficient — the snap does not
+  compile VLC, it stage-packages `libvlc5`/`vlc-plugin-*`).
+- Network required at build time (stage-packages, Deno 2.9.7 zip, pip
+  yt-dlp 2026.7.4, Meson toolchain) — same as the validated branch.
+- No missing project files: `snap/snapcraft.yaml`, `pkgs/deno.env`,
+  `pkgs/ytdlp.env` pins and `meson.build` 2.0.7 all present and unchanged
+  vs the integration branch.
+
+### 11c. Exact commands (NOT executed — gated)
+
+Build (option A, after approved one-time `sudo snap install lxd` +
+`sudo lxd init --auto`):
+```sh
+cd <private-path>
+snapcraft pack
+mkdir -p dist && mv apricus_*.snap dist/
+sha256sum dist/apricus_*.snap | tee dist/apricus.snap.sha256
+unsquashfs -d /tmp/snap-check dist/apricus_*.snap \
+  usr/bin/apricus usr/share/apricus \
+  usr/share/apricus/gnome-extension/install-host.sh \
+  "usr/share/apricus/gnome-extension/apricus-integration@fabx-dev/metadata.json"
+head -n1 /tmp/snap-check/usr/bin/apricus | grep -q "/usr/bin/env python3"
+test -f /tmp/snap-check/usr/bin/apricus
+rm -rf /tmp/snap-check
+```
+Expected artifact: `dist/apricus_2.0.7_amd64.snap` (+ `.sha256` sidecar).
+Build (option B, only if A is rejected and approved):
+`sudo snapcraft pack --destructive-mode` in the worktree, then the same
+verify/move/hash steps.
+
+Install (later approval, strict, no store):
+`sudo snap install --dangerous dist/apricus_2.0.7_amd64.snap`
+Preseed selection via the sandbox profile
+`~/snap/apricus/<rev>/.config/apricus/config.json` (host-writable user
+file), exactly like the validated x3 layout; record GNOME URIs before/after
+each phase.
+
+### 11d. Snap test matrix (post-install approval)
+
+GUI/server start, Hawaii first frame (user-confirmed), STOP + player release,
+RESUME + new adoption, static + missing-cache fallback, STOP persistence
+(reload path), playlist advance/freeze/resume, public stream, local web,
+static OFF, 5x cycles + orphan check, adoption events, DING/Overview
+(user-confirmed), bridge telemetry via the `gnome-status` slot
+(applicable here, unlike Flatpak), STOP-latency breakdown with the
+`T_call → T_reply → T_death → T_uri → T_visible` method (≥5 samples; the
+Flatpak 3.9 s single sample is the comparison baseline, not a verdict),
+60 s PLAYING/STOPPED/RESUMED benchmarks kept separate from source/Flatpak
+numbers. Extension-reload scenarios EXCLUDED (pre-fix host extension).
+
+### 11e. Rollback (no automatic restore)
+
+`sudo snap remove apricus`; leave snapd snapshot 9 (old x3 data) untouched
+unless the user later explicitly asks for `snap restore`;
+restore recorded GNOME URIs; re-verify no Apricus processes, PoC installed,
+extensions ACTIVE. Never auto-reinstall the old x3 payload.
+
+STOPPED before compiling or installing Snap. No sudo used in this phase; no
+push/PR/tag/release/publication; no workflow, secret, ruleset, extension,
+sandbox, renderer or SSRF-guard changes.
