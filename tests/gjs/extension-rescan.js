@@ -74,10 +74,12 @@ class StatusBridge {
 }
 
 class DesktopStateTracker {
-    constructor(_readState, _options) {
+    constructor(readState, options) {
         this.stops = 0;
         this.watches = 0;
         this.changes = 0;
+        this.options = options || {};
+        DesktopStateTracker.instances.push(this);
     }
 
     watchBus() {
@@ -92,21 +94,29 @@ class DesktopStateTracker {
         this.stops++;
     }
 }
+DesktopStateTracker.instances = [];
 
 class StatePublisher {
-    constructor(_tracker, _options) {
+    constructor(tracker, _options) {
         this.stops = 0;
         this.starts = 0;
+        this.published = [];
+        StatePublisher.instances.push(this);
     }
 
     start() {
         this.starts++;
     }
 
+    publish(payload) {
+        this.published.push(payload);
+    }
+
     stop() {
         this.stops++;
     }
 }
+StatePublisher.instances = [];
 
 function makeGroup(name) {
     const handlers = {};
@@ -342,7 +352,22 @@ emitWindowCreated(videoWin2);
 assert(videoActor2._parent === bgGroup, 'new wallpaper window must adopt on window-created');
 assert(ext._adopted.size === 2, 'both wallpaper windows tracked');
 
-// 7. disable() hands every actor back and clears the overrides.
+// 7. Push wiring: the tracker's change notifications must reach the
+// publisher (this exact wiring was missing once; the sensor computed
+// truth nobody ever published). Checked before disable(), while the
+// wiring is live.
+assert(DesktopStateTracker.instances.length === 1, 'one tracker per enable');
+const wiredOptions = DesktopStateTracker.instances[0].options;
+assert(typeof wiredOptions.emit === 'function',
+    'tracker must be constructed with an emit callback');
+assert(StatePublisher.instances.length === 1, 'one publisher per enable');
+const wiredPublisher = StatePublisher.instances[0];
+wiredOptions.emit({seq: 7, fullscreen: true, note: 'wiring-probe'});
+assert(wiredPublisher.published.length === 1,
+    'tracker emission must reach StatePublisher.publish');
+assert(wiredPublisher.published[0].seq === 7, 'payload passes through unwrapped');
+
+// 8. disable() hands every actor back and clears the overrides.
 ext.disable();
 assert(videoActor._parent === windowGroup, 'first actor released on disable');
 assert(videoActor2._parent === windowGroup, 'second actor released on disable');

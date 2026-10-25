@@ -61,6 +61,10 @@ class _FakeSub:
 
 
 class _FakeBus:
+    # Mirrors the real pydbus SubscriptionMixin.subscribe signature
+    # EXACTLY (verified against the installed library): any unexpected
+    # keyword raises TypeError, so a wrong kwarg (e.g. member= instead
+    # of signal=) fails here exactly as it fails on the session bus.
     def __init__(self, daemon, proxies=None):
         self._daemon = daemon
         self._proxies = proxies or {}
@@ -71,9 +75,19 @@ class _FakeBus:
             return self._daemon
         return self._proxies[(name, path)]
 
-    def subscribe(self, **kwargs):
+    def subscribe(
+        self,
+        sender=None,
+        iface=None,
+        signal=None,
+        object=None,
+        arg0=None,
+        flags=0,
+        signal_fired=None,
+    ):
         sub = _FakeSub()
-        self.subs.append((kwargs, sub))
+        sub.callback = signal_fired
+        self.subs.append((dict(sender=sender, iface=iface, signal=signal, object=object), sub))
         return sub
 
 
@@ -192,6 +206,31 @@ def test_stop_unsubscribes_and_ignores_late_signals():
     backend._on_signal(":1.40", None, None, None, _state(seq=50, fullscreen=True))
     assert fed == [{"is_any_maximized": False, "is_any_fullscreen": False}]
     backend.stop()  # idempotent
+
+
+def test_subscribe_uses_real_pydbus_kwarg():
+    """The strict fake bus mirrors pydbus exactly: any unexpected keyword
+    raises TypeError, just like the live session bus did for member=."""
+    backend, _fed, bus = _backend()
+    assert backend.start() is True
+    assert len(bus.subs) == 1
+    kwargs, _sub = bus.subs[0]
+    assert kwargs["signal"] == "DesktopStateChanged"
+    assert kwargs["iface"] == Push.INTERFACE
+    assert kwargs["object"] == Push.OBJECT_PATH
+    assert kwargs["sender"] == ":1.40"
+
+
+def test_subscribe_kwarg_matches_installed_pydbus():
+    """Pin the new-subscriber contract to the really installed library:
+    the kwarg must be named exactly `signal`."""
+    import inspect
+
+    import pydbus.subscription
+
+    params = inspect.signature(pydbus.subscription.SubscriptionMixin.subscribe).parameters
+    assert "signal" in params, sorted(params)
+    assert "member" not in params, sorted(params)
 
 
 def _stub_server(monkeypatch):
@@ -344,6 +383,80 @@ def test_push_reappear_reconciles_and_resumes_push(monkeypatch):
     obj._on_push_appeared()
     assert obj._window_state is first
     assert len(bus.subs) == subs_before
+    obj._stop_window_state()
+
+
+def test_push_watcher_registers_with_signal_kwarg(monkeypatch):
+    """The NameOwnerChanged watch must use the real pydbus kwarg name;
+    with the strict fake bus the old member= call raises TypeError."""
+    import apricus.server as srv_mod
+    import apricus.utils as utils
+
+    monkeypatch.setattr(utils, "is_wayland", lambda: True)
+    monkeypatch.setattr(utils, "is_gnome", lambda: True)
+    daemon = _FakeDaemon(owner=None)
+    bus = _FakeBus(daemon, {})
+    monkeypatch.setattr(srv_mod, "SessionBus", lambda: bus)
+    obj = _stub_server(monkeypatch)
+    obj._watch_push_owner()
+    assert len(bus.subs) == 1
+    kwargs, _sub = bus.subs[0]
+    assert kwargs["signal"] == "NameOwnerChanged"
+    assert kwargs["iface"] == "org.freedesktop.DBus"
+    assert kwargs["sender"] == "org.freedesktop.DBus"
+
+
+def test_push_watcher_routes_appear_and_vanish(monkeypatch):
+    """End-to-end watcher behavior with the strict fake bus: appearance
+    starts the push backend, vanish falls back without auto-resume."""
+    import apricus.backends as backends
+    import apricus.server as srv_mod
+    import apricus.utils as utils
+
+    monkeypatch.setattr(utils, "is_wayland", lambda: True)
+    monkeypatch.setattr(utils, "is_gnome", lambda: True)
+    daemon = _FakeDaemon(owner=None)
+    proxy = _FakeProxy(state=_state(fullscreen=True))
+    bus = _FakeBus(daemon, {(Push.BUS_NAME, Push.OBJECT_PATH): proxy})
+    monkeypatch.setattr(srv_mod, "SessionBus", lambda: bus)
+    monkeypatch.setattr(backends, "SessionBus", lambda: bus)
+
+    class _Null:
+        name = "null"
+
+        def start(self):
+            pass
+
+        def stop(self):
+            pass
+
+    monkeypatch.setattr(backends, "create_window_state_backend", lambda cb: _Null())
+    obj = _stub_server(monkeypatch)
+    obj._watch_push_owner()
+    watcher = next(sub for kwargs, sub in bus.subs if kwargs.get("signal") == "NameOwnerChanged")
+    # Extension appears: GetState reconciles and push becomes the source.
+    daemon._owner = ":1.50"
+    watcher.callback(
+        ":1.0",
+        "/org/freedesktop/DBus",
+        "org.freedesktop.DBus",
+        "NameOwnerChanged",
+        (Push.BUS_NAME, "", ":1.50"),
+    )
+    assert obj._window_source == "extension-push"
+    assert obj.policy.snapshot()["push_alive"] is True
+    assert obj.policy.compute().desired == "paused"
+    # Extension vanishes: frozen reasons, fallback backend, no resume.
+    watcher.callback(
+        ":1.0",
+        "/org/freedesktop/DBus",
+        "org.freedesktop.DBus",
+        "NameOwnerChanged",
+        (Push.BUS_NAME, ":1.50", ""),
+    )
+    assert obj._window_source == "null"
+    assert obj.policy.snapshot()["push_alive"] is False
+    assert obj.policy.compute().desired == "paused"
     obj._stop_window_state()
 
 
