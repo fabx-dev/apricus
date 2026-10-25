@@ -316,11 +316,11 @@ msgstr "キューに {n} 件の動画（一時停止中）"
 
 #: src/apricus/gui/gtk4app.py:1517
 msgid "Pause"
-msgstr ""
+msgstr "一時停止"
 
 #: src/apricus/gui/gtk4app.py:1517
 msgid "Play"
-msgstr ""
+msgstr "再生"
 
 #: src/apricus/gui/gtk4app.py:1315
 msgid "Play / Pause"

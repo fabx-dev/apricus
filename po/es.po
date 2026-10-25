@@ -316,11 +316,11 @@ msgstr "{n} vídeos en cola (en pausa)"
 
 #: src/apricus/gui/gtk4app.py:1517
 msgid "Pause"
-msgstr ""
+msgstr "Pausar"
 
 #: src/apricus/gui/gtk4app.py:1517
 msgid "Play"
-msgstr ""
+msgstr "Reproducir"
 
 #: src/apricus/gui/gtk4app.py:1315
 msgid "Play / Pause"
