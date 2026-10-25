@@ -666,3 +666,62 @@ Pre-registered criteria:
 Privileges: user-run sudo ONLY for install/remove. Observation, logging,
 verification and restore need no privileges. Sudo for anything else is out
 of scope.
+
+## 17. Corrected 2x2 protocol (AUTHORIZED for live comparison)
+
+Supersedes §16: x3 has no STOP command, so Phase 1 is STOP-free for all
+arms (directly comparable); Phase 2 is package-specific and classified
+NON-equivalent. Arms: A=x3/GUI-closed, B=x3/GUI-open, C=M1/GUI-closed,
+D=M1/GUI-open. Fixed order A→B→C→D.
+
+Per arm (identical within phase): fresh profile (no `~/snap/apricus`
+before install), recorded URIs, per-arm dir `build/snap-compare/<arm>/`,
+user-run `sudo snap install --dangerous <artifact>` (no classic/devmode),
+launch `-b -d`, GUI only in B/D via `show_gui` (no other GUI interaction).
+Phase 1: 10× `video(Hawaii)` + config read-backs immediate/+1s/+30s.
+Phase 2: 5× [`webpage(local file)` then (STOP only on M1) then
+`video(Hawaii)`] with the same read-backs; file fixture
+`~/Video/Apricus/.m1-cmp-web.html` created per arm, deleted afterwards.
+Per attempt: command, IPC reply, immediate/+1s/+30s selection, new `Saved`
+lines, WARNING/Rejected lines, GUI-displayed selection at phase ends (B/D,
+user reads panel), displayed wallpaper at phase ends (user-confirmed when
+feasible). Between arms: IPC `quit`, 0-process check, user-run `sudo snap
+remove` (no purge), URI restore + verify, snapshot-9 + PoC + extension
+check. Snapshot 9 never restored. Abort on concurrent/orphan processes,
+confinement errors, session instability, unexpected config/data changes,
+or unverifiable restore.
+
+Pre-registered criteria: warning ≠ proof; CONFIRMED revert = selection back
+to a previous state with no justifying new command (read-back evidence).
+x3≈M1 → probably pre-existing. Only-M1 in Phase 1 → possible M1 regression
+to investigate (separate authorization). Only in M1 Phase 2 → investigate
+`manual_stop`-state interaction separately. Neither → NOT REPRODUCED.
+GUI-open-only on both → pre-existing-compatible.
+
+## 18. Comparative result 2x2 (80 attempts, 0 flips — NOT REPRODUCED)
+
+Arms A (x3/closed), B (x3/open), C (M1/closed), D (M1/open): 10× Phase-1
+`video(Hawaii)` + 5× Phase-2 [`webpage(local)` (+STOP on M1) +
+`video(Hawaii)`] each, read-backs immediate/+1 s/+30 s, unique per-attempt
+evidence (`matrix-compare-NNN.json`), GUI-displayed selection checked at
+phase ends in B (Hawaii, consistent) and D (nothing playing + test-video static
+— correct end-state: Phase 2 leaves the STOP latch on by design).
+Outcome per arm: 20/20 selections stable through +30 s, 0 `_checkDefaultSource`
+warnings, 0 `Rejected video path` lines. TOTAL: 80 attempts, 0 confirmed
+reverts, 0 warnings.
+
+Per the pre-registered criteria this is NOT REPRODUCED (not "resolved"):
+no M1 regression can be declared, and no pre-existing defect is confirmed
+either — x3 never flipped either. Honest limitation vs the original
+episode: these arms never started playback (selection changes only; the
+original flips occurred in sessions with active STOP/PLAY/RESUME cycling
+and media players alive). The GUI-open variable alone does not reproduce
+it (arms B and D clean). A future reproduction attempt, if authorized,
+should interleave selection changes with actual playback/STOP cycles.
+
+Restore after arm D: server quit via IPC, 0 processes, fixture deleted,
+user-run `sudo snap remove` (no purge), snap absent, snapshot 9 intact and
+untouched, PoC x1 intact, extensions ACTIVE, 3 GNOME URIs byte-identical to
+baseline, no `~/snap/apricus`. LXD stays installed (no build/remove this
+phase). GUI matrix helper `tests/manual/m1_native/compare_select.py`
+committed; per-arm evidence retained under `build/snap-compare/`.
