@@ -144,6 +144,33 @@ def test_stream_keys_backfilled_without_version_bump(tmp_path, monkeypatch):
     assert loaded["version"] == commons.CONFIG_VERSION
 
 
+def test_policy_keys_backfilled_without_version_bump(tmp_path, monkeypatch):
+    """Old configs without the M2 policy keys load with safe defaults."""
+    from unittest.mock import patch
+
+    from apricus import commons
+    from apricus.utils import ConfigUtil
+
+    new_dir = tmp_path / "apricus"
+    new_dir.mkdir()
+    legacy = dict(commons.CONFIG_TEMPLATE)
+    del legacy["policy_manual_pause"]
+    del legacy["policy_version"]
+    (new_dir / "config.json").write_text(json.dumps(legacy))
+    monkeypatch.setattr(commons, "CONFIG_DIR", str(new_dir))
+    monkeypatch.setattr(commons, "CONFIG_PATH", str(new_dir / "config.json"))
+    import apricus.utils as U
+
+    monkeypatch.setattr(U, "CONFIG_DIR", str(new_dir))
+    monkeypatch.setattr(U, "CONFIG_PATH", str(new_dir / "config.json"))
+
+    with patch("apricus.monitor.MonitorInfo.monitors", return_value=[]):
+        loaded = ConfigUtil().load()
+    assert loaded["policy_manual_pause"] is False
+    assert loaded["policy_version"] == 1
+    assert loaded["version"] == commons.CONFIG_VERSION
+
+
 def test_renderer_key_backfilled_and_sanitized(tmp_path, monkeypatch):
     """Old configs without video_renderer default to auto; junk is reset."""
     import json

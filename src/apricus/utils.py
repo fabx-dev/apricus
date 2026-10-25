@@ -42,6 +42,8 @@ from apricus.commons import (
     CONFIG_KEY_MUTE_WHEN_MAXIMIZED,
     CONFIG_KEY_PLAYLIST,
     CONFIG_KEY_PLAYLIST_POS,
+    CONFIG_KEY_POLICY_PAUSE,
+    CONFIG_KEY_POLICY_VERSION,
     CONFIG_KEY_RENDERER,
     CONFIG_KEY_SHUFFLE,
     CONFIG_KEY_STREAM_FAVORITES,
@@ -906,6 +908,10 @@ class ConfigUtil:
                     # video_dir was added after v4 without a version bump:
                     # default it instead of wiping the whole config.
                     config.setdefault(CONFIG_KEY_VIDEO_DIR, None)
+                    # M2 manual-pause latch and engine schema version: same
+                    # no-bump backfill policy.
+                    config.setdefault(CONFIG_KEY_POLICY_PAUSE, False)
+                    config.setdefault(CONFIG_KEY_POLICY_VERSION, 1)
                     config["is_stopped"] = config.get("is_stopped") is True
                     # Stored renderer id (same no-bump policy): no UI
                     # exposes it anymore, but old configs may carry it —
