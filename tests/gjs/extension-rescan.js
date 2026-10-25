@@ -56,6 +56,7 @@ class Extension {
 
 const Workspace = {prototype: {}};
 const WorkspaceThumbnail = {prototype: {}};
+const SHELL_VERSION = '50.1';
 
 class StatusBridge {
     constructor(_snapshot) {
@@ -71,8 +72,6 @@ class StatusBridge {
         this.stops++;
     }
 }
-
-const Config = {PACKAGE_VERSION: '50.1'};
 
 class DesktopStateTracker {
     constructor(_readState, _options) {
@@ -266,7 +265,7 @@ function loadExtensionClass() {
         "import Meta from 'gi://Meta';",
         "import Shell from 'gi://Shell';",
         "import {Extension, InjectionManager} from 'resource:///org/gnome/shell/extensions/extension.js';",
-        "import Config from 'resource:///org/gnome/shell/misc/config.js';",
+        "import {PACKAGE_VERSION as SHELL_VERSION} from 'resource:///org/gnome/shell/misc/config.js';",
         "import * as Main from 'resource:///org/gnome/shell/ui/main.js';",
         "import {Workspace} from 'resource:///org/gnome/shell/ui/workspace.js';",
         "import {WorkspaceThumbnail} from 'resource:///org/gnome/shell/ui/workspaceThumbnail.js';",

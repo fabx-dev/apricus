@@ -943,3 +943,64 @@ def test_push_sensor_wired_without_playback_logic():
     assert "org.gnome.Shell.Extensions.ApricusIntegration" in sensor
     assert "DesktopStateChanged" in sensor
     assert "GetState" in sensor and "Ping" in sensor
+
+
+def test_shell_imports_match_installed_runtime():
+    """M3 import contract, two layers (do not conflate them).
+
+    1. Static: misc/config.js must be imported by NAME
+       (``import {PACKAGE_VERSION as SHELL_VERSION}``). A default import
+       fails at module link time and bricks the whole extension — this is
+       exactly what broke the first M3 live load.
+    2. Real runtime (read-only, no session changes): every resource://
+       module the extension imports must exist in the *installed* GNOME
+       Shell, and misc/config.js must actually export PACKAGE_VERSION as a
+       named export with no default export. Skipped only when the
+       gresource tooling or the Shell libraries are absent (headless CI
+       without system packages can still run everything else).
+    """
+    import shutil
+    import subprocess
+
+    with open(EXT_JS, encoding="utf-8") as f:
+        js = f.read()
+    assert (
+        "import {PACKAGE_VERSION as SHELL_VERSION} "
+        "from 'resource:///org/gnome/shell/misc/config.js';" in js
+    ), "misc/config.js must be a NAMED import (default import breaks loading)"
+    assert "import Config from 'resource:///org/gnome/shell/misc/config.js'" not in js
+
+    gresource = shutil.which("gresource")
+    candidates = [
+        "/usr/lib/gnome-shell/libshell-18.so",
+        "/usr/lib/x86_64-linux-gnu/libgnome-shell.so",
+    ]
+    libshell = next((p for p in candidates if os.path.isfile(p)), None)
+    if gresource is None or libshell is None:
+        pytest.skip("GNOME Shell runtime libraries unavailable headless")
+    required = {
+        "/org/gnome/shell/extensions/extension.js",
+        "/org/gnome/shell/misc/config.js",
+        "/org/gnome/shell/ui/main.js",
+        "/org/gnome/shell/ui/workspace.js",
+        "/org/gnome/shell/ui/workspaceThumbnail.js",
+    }
+    listed = subprocess.run(
+        [gresource, "list", libshell], capture_output=True, text=True, timeout=60
+    )
+    assert listed.returncode == 0, listed.stderr
+    present = set(listed.stdout.splitlines())
+    missing = required - present
+    assert not missing, f"Shell modules missing from installed runtime: {missing}"
+    extracted = subprocess.run(
+        [gresource, "extract", libshell, "/org/gnome/shell/misc/config.js"],
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert extracted.returncode == 0, extracted.stderr
+    source = extracted.stdout
+    assert "export const PACKAGE_VERSION" in source, (
+        "installed Shell does not export PACKAGE_VERSION by name"
+    )
+    assert "export default" not in source, "installed Shell unexpectedly gained a default export"
