@@ -32,9 +32,12 @@ no policy, no window identities, and no playback verbs.
 - Verified Mutter 18 detail: there is no single `notify::maximized` — the
   sensor subscribes to `notify::fullscreen`, `notify::maximized-horizontally`
   and `notify::maximized-vertically` (plus enter/leave-monitor and workspace
-  signals). Debounce is trailing-edge 250 ms in the extension; the engine
-  keeps its own 250 ms debounce. Combined budget ≤500 ms, to be confirmed
-  by the live campaign.
+   signals). Debounce is trailing-edge 250 ms in the extension, using
+   `GLib.timeout_add(priority, milliseconds, callback)`. Each new edge cancels
+   and reschedules the source; stop cancels it. Already-settled push snapshots
+   update all three window reasons atomically without a second engine delay.
+   X11/polled/local producers retain the engine's 250 ms debounce. The ≤500 ms
+   latency objective is NOT yet validated on the compositor/player path.
 
 ## Server ladder (single active producer)
 
@@ -59,4 +62,14 @@ no stale or doubled updates.
   live verification of the sub-name talk permission.
 - No playback logic in the extension (asserted by tests).
 - No native GUI install claim and no live suspend/resume proof here;
-  those belong to the authorized live campaign.
+   those belong to the authorized live campaign.
+
+## Local closure after the third live campaign
+
+See [M3 local closure and reduced validation](m3-local-closure.md). The third
+campaign on `6fc5f3f` demonstrated the real native GNOME 50.1 push path and
+manual priorities. It did not validate exact latency or each maximize axis
+live. The original rev4 extension was restored and loaded after manual login;
+configuration and URI matched their backups. **The regenerated static PNG had
+no byte-identical baseline backup: full byte-identical restoration is not
+claimed.** This reservation remains open and is not repaired by code changes.
