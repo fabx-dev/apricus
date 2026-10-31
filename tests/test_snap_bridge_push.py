@@ -267,3 +267,19 @@ def test_bridge_window_dispatch_rejects_stranger(monkeypatch):
     bridge._call(bus, ":1.14", None, None, "Nope", glib.Variant("()", ()), unknown)
     assert "unknown method" in unknown.error
     assert bridge.registration.status() is None
+
+
+def test_pipe_ready_needs_no_shm_and_survives_pickling():
+    import pickle
+
+    from apricus.server import _PipeReady
+
+    ready = _PipeReady()
+    assert ready.is_set() is False
+    clone = pickle.loads(pickle.dumps(ready))
+    clone.set()
+    assert ready.is_set() is True
+    assert clone.is_set() is True
+    # Idempotent: no second byte, no block, no error.
+    clone.set()
+    assert ready.is_set() is True

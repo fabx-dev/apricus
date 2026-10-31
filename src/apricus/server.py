@@ -66,6 +66,47 @@ def _video_player_target(ready=None, initially_paused=False):
     video_player_main(ready=ready, initially_paused=initially_paused)
 
 
+class _PipeReady:
+    """One-shot cross-process readiness flag over multiprocessing.Pipe.
+
+    mp.Event needs named POSIX semaphores (/dev/shm), which strict Snap
+    confinement denies (PermissionError at player spawn: no playback at
+    all). A pipe needs no filesystem and rides the same fd-inheritance as
+    the forkserver child; Connection objects pickle by fd passing, so the
+    child copy shares the channel. Same set()/is_set() contract, polled by
+    the existing 50 ms readiness timer.
+    """
+
+    def __init__(self):
+        from multiprocessing import Pipe
+
+        self._reader, self._writer = Pipe(duplex=False)
+        self._set = False
+
+    def set(self):
+        if self._set:
+            return
+        self._set = True
+        try:
+            self._writer.send_bytes(b"1")
+        except (OSError, EOFError):
+            pass
+
+    def is_set(self):
+        if self._set:
+            return True
+        try:
+            while self._reader.poll():
+                self._set = True
+                try:
+                    self._reader.recv_bytes()
+                except (OSError, EOFError):
+                    break
+        except (OSError, EOFError):
+            pass
+        return self._set
+
+
 def _web_player_target(ready=None, initially_paused=False):
     os.setsid()
     from apricus.player.web_player import main as web_player_main
@@ -709,7 +750,7 @@ class ApricusServer:
                 self.player_process.join(timeout=2)
             self.player_process = None
 
-        ready = mp.Event()
+        ready = _PipeReady()
         initially_paused = self.policy.compute().desired == PAUSED
         if mode in [MODE_VIDEO, MODE_STREAM, MODE_PLAYLIST]:
             self.player_process = Process(
