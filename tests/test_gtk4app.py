@@ -1908,6 +1908,27 @@ def window_policy_capability_survives_disconnect():
 
 
 @check
+def remote_bridge_status_survives_absent_server():
+    obj, _ = _panel(_base_config(), [])
+    obj._server = lambda: None
+    assert obj._remote_bridge_status() == ("unknown", {})
+
+    class Server:
+        def gnome_bridge_status(self):
+            return ["active", {"bridge": True, "adopted": 2}]
+
+    obj._server = lambda: Server()
+    assert obj._remote_bridge_status() == ("active", {"bridge": True, "adopted": 2})
+
+    class Broken:
+        def gnome_bridge_status(self):
+            raise RuntimeError("ipc down")
+
+    obj._server = lambda: Broken()
+    assert obj._remote_bridge_status() == ("unknown", {})
+
+
+@check
 def settings_has_no_mute_volume_or_lucky():
     """Volume/Mute live only in Now Playing; Feeling Lucky was never a switch."""
     import os
@@ -3775,6 +3796,10 @@ def test_settings_flag_persists_and_calls_server():
 
 def test_window_policy_capability_survives_disconnect():
     _run("window_policy_capability_survives_disconnect")
+
+
+def test_remote_bridge_status_survives_absent_server():
+    _run("remote_bridge_status_survives_absent_server")
 
 
 def test_settings_has_no_mute_volume_or_lucky():

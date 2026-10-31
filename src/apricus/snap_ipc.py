@@ -138,6 +138,7 @@ class ServiceProxy:
         "playlist",
         "pause_playback",
         "start_playback",
+        "gnome_bridge_status",
         "window_push_frame",
         "window_push_lost",
         "stop_playback",

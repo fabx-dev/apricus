@@ -31,33 +31,34 @@ no manifest or snapcraft change:
   `WindowState(subb)`, `WindowUnregister(su)` on stop. UnknownMethod (older
   Snap without window push) quiets only this channel; the status bridge is
   unaffected.
-- Snap GUI (`src/apricus/gnome_bridge.py`): `WindowRegistration` mirrors the
-  `Registration` trust model (generation/sequence/lease, strict bool
-  validation, suspend-aware clocks) on the same interface. Accepted frames
-  are forwarded to the server over the existing Snap IPC socket
-  (`window_push_frame`/`window_push_lost`, allowlisted in `snap_ipc.py`).
-- Server (`src/apricus/server.py`): `window_push_frame` is same-UID
-  authorized like every other mutating verb, drops duplicates/obsolete
-  sequences, rebaselines on new generations, and feeds the policy through
-  the settled path (`snap-bridge-push` source, no second 250 ms debounce).
-  Loss freezes without auto-resume, mirroring extension-push loss.
+- Snap side (`src/apricus/gnome_bridge.py` + `src/apricus/server.py`): the
+  **server process itself owns the bridge name** (same declared slot, same
+  app label: no manifest, slot or permission change, nothing for the Store
+  to re-approve), so the push survives the control center being closed.
+  `WindowRegistration` mirrors the `Registration` trust model
+  (generation/sequence/lease, strict bool validation, suspend-aware clocks)
+  on the same interface. `window_push_frame`/`window_push_lost` are
+  same-UID authorized like every other mutating verb, drop
+  duplicates/obsolete sequences, rebaseline on new generations, and feed
+  the policy through the settled path (`snap-bridge-push` source, no second
+  250 ms debounce). Loss freezes without auto-resume, mirroring
+  extension-push loss. The control center reads the registration snapshot
+  over Snap IPC (`gnome_bridge_status`) for its integration row instead of
+  owning the name; it forwards nothing.
 - GUI (`policy_support.py`, `gtk4app.py`): Snap + Wayland preferences are
-  enabled only with verified bridge-carried push, retained across transient
+  enabled with verified bridge-carried push, retained across transient
   loss like Flatpak. Native/X11 behavior is byte-identical.
 
 ## Honest limits (must stay in release docs)
 
-1. **GUI-dependent.** The bridge (status and window push alike) lives in the
-   Snap control-center process. With the GUI closed there is no push; the
-   server freezes on the last state and the rows disable again. Native M3
-   has no such dependence.
-2. **Not live-verified end to end.** All transport/auth/sequencing/policy
+1. **Not live-verified end to end.** All transport/auth/sequencing/policy
    paths are covered by unit, private-bus and GJS regression tests, but no
    strict-Snap install + rev6 extension + logout/login campaign has run here
-   (install/login/logout are out of scope). The dedicated server-owned slot
-   alternative (headless, no GUI dependence) still needs a new slot plus
-   Store declaration approval and is intentionally **not** implemented.
-3. The extension revision moved 5 → 6 and `metadata.json` 1 → 2 for the
+   (install/login/logout are out of scope). The dedicated *new-slot*
+   alternative (separate trust domain) still needs a slot plus Store
+   declaration approval and is intentionally **not** implemented: the
+   server-owned existing slot achieves persistence without it.
+2. The extension revision moved 5 → 6 and `metadata.json` 1 → 2 for the
    protocol addition. Older extension + new Snap: no frames, old degraded
    path. New extension + older Snap: UnknownMethod tolerated, old degraded
    path. The ZIP (`build-zip.sh`) picks up `windowPush.js` automatically.

@@ -361,6 +361,25 @@ class ApricusServer:
             self._watch_push_owner()
         if not (pushable and self._start_push_backend()):
             self._start_fallback_backend()
+        # Strict Snap cannot subscribe to the extension's signals, so the
+        # server itself owns the Snap-declared bridge name (same slot, same
+        # app label: no manifest or permission change) and receives the
+        # settled frames as inbound method calls. Unlike the earlier GUI
+        # hosted bridge, this survives the control center being closed.
+        self._bridge = None
+        try:
+            from apricus import gnome_bridge
+            from apricus.utils import is_snap as _is_snap
+
+            if _is_snap() and pushable:
+                self._bridge = gnome_bridge.start(
+                    self._on_bridge_changed,
+                    self._on_bridge_window_frame,
+                    self._on_bridge_window_lost,
+                )
+        except Exception as e:  # noqa: BLE001 - push stays unavailable, never fatal
+            logger.debug(f"[Policy] snap bridge unavailable: {e}")
+            self._bridge = None
 
     def _start_push_backend(self):
         """Prefer the extension push channel (no polling while healthy)."""
@@ -540,6 +559,39 @@ class ApricusServer:
         self._stop_window_state()
         self.policy.note_push_alive(False)
         self._start_fallback_backend()
+
+    def _on_bridge_changed(self):
+        logger.debug("[Policy] snap bridge registration changed")
+
+    def _on_bridge_window_frame(self, fullscreen, maximized, seq, generation):
+        """Direct in-process feed from the server-owned bridge (no GUI hop)."""
+        try:
+            self.window_push_frame(generation, seq, fullscreen, maximized)
+        except Exception as e:  # noqa: BLE001 - a bad frame must not break the bridge
+            logger.debug(f"[Policy] bridge frame dropped: {e}")
+
+    def _on_bridge_window_lost(self, generation):
+        try:
+            self.window_push_lost(generation)
+        except Exception as e:  # noqa: BLE001 - loss handling must not raise
+            logger.debug(f"[Policy] bridge loss handling skipped: {e}")
+
+    def gnome_bridge_status(self):
+        """Bridge registration snapshot for the Snap control center.
+
+        Snap IPC only (allowlisted method): the GUI no longer owns the
+        bridge, so it reads status here instead of a local object.
+        """
+        try:
+            from apricus import gnome_bridge
+
+            status = gnome_bridge.status()
+        except Exception:  # noqa: BLE001 - diagnostics must never raise
+            return None
+        if status is None:
+            return None
+        state, detail = status
+        return [state, dict(detail)]
 
     def _on_lock_changed(self, active):
         self.reason_active_changed("screen_locked", bool(active))
@@ -942,6 +994,12 @@ class ApricusServer:
 
     def quit(self, dbus_context=None):
         _authorize("quit", dbus_context)
+        try:
+            from apricus import gnome_bridge
+
+            gnome_bridge.stop()
+        except Exception:  # noqa: BLE001 - shutdown continues regardless
+            pass
         try:
             self._quit_player()
         except GLib.Error:

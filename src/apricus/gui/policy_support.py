@@ -6,7 +6,7 @@ def window_policy_support(*, wayland, gnome, snap, flatpak, verified=False):
     Callers retain verified capability across temporary push disconnections.
     Snap Wayland is enabled only with verified bridge-carried push: the strict
     sandbox cannot subscribe to the extension's signals, so frames arrive as
-    method calls on the Snap-owned bridge while the control center runs.
+    method calls on the server-owned Snap bridge (no control-center dependence).
     """
     if not wayland:
         return True, ""

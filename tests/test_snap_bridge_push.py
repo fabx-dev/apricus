@@ -125,6 +125,90 @@ def test_snap_ipc_allows_bridge_push_methods():
 
     assert "window_push_frame" in snap_ipc.ServiceProxy._METHODS
     assert "window_push_lost" in snap_ipc.ServiceProxy._METHODS
+    assert "gnome_bridge_status" in snap_ipc.ServiceProxy._METHODS
+
+
+def _sensor_server(monkeypatch, fake_bus=None):
+    import apricus.backends as backends
+    from apricus import utils as utils_mod
+    from apricus.backends import ExtensionPushWindowStateBackend as Push
+
+    monkeypatch.setattr(utils_mod, "is_snap", lambda: True)
+    monkeypatch.setattr(utils_mod, "is_gnome", lambda: True)
+    monkeypatch.setattr(utils_mod, "is_wayland", lambda: True)
+    monkeypatch.setattr(Push, "try_probe", lambda _cb, **_kw: None)
+
+    class _Null:
+        name = "null"
+
+        def start(self):
+            pass
+
+        def stop(self):
+            pass
+
+    monkeypatch.setattr(backends, "create_window_state_backend", lambda _cb: _Null())
+    obj = server_mod.ApricusServer.__new__(server_mod.ApricusServer)
+    obj.config = {"is_pause_when_maximized": True, "is_mute_when_maximized": False}
+    obj.policy = PlaybackPolicyEngine()
+    obj._auto_fed = {}
+    obj._window_state = None
+    obj._window_source = "none"
+    obj._bridge_push = {"generation": None, "seq": 0}
+    obj._bridge = None
+    obj._save_config = lambda: None
+    import apricus.server as srv
+
+    monkeypatch.setattr(srv, "get_instance", lambda _name: None)
+    return obj
+
+
+def test_server_owns_bridge_on_snap_and_feeds_frames_directly(monkeypatch):
+    from apricus import gnome_bridge
+
+    started = {}
+    stopped = []
+
+    def fake_start(changed, on_frame, on_lost):
+        started["callbacks"] = (changed, on_frame, on_lost)
+
+        class FakeBridge:
+            def stop(self):
+                stopped.append(True)
+
+        return FakeBridge()
+
+    monkeypatch.setattr(gnome_bridge, "start", fake_start)
+    monkeypatch.setattr(gnome_bridge, "stop", lambda: stopped.append(True))
+    obj = _sensor_server(monkeypatch)
+    applied = []
+    obj._apply_policy_output = applied.append
+    obj._start_environment_sensors()
+    assert "callbacks" in started
+    assert obj._bridge is not None
+    # Frames arrive in-process: no GUI hop, no second debounce.
+    obj._on_bridge_window_frame(True, False, 1, "e" * 32)
+    assert obj._window_source == "snap-bridge-push"
+    assert obj.policy.compute().desired == "paused"
+    assert applied and applied[-1].desired == "paused"
+    # Loss freezes without auto-resume.
+    count = len(applied)
+    obj._on_bridge_window_lost("e" * 32)
+    assert obj._window_source != "snap-bridge-push"
+    assert obj.policy.compute().desired == "paused"
+    assert len(applied) == count
+    # Unknown generation loss is ignored.
+    assert obj.window_push_lost("f" * 32) is False
+
+
+def test_server_bridge_status_property_shape(monkeypatch):
+    from apricus import gnome_bridge
+
+    obj = _sensor_server(monkeypatch)
+    monkeypatch.setattr(gnome_bridge, "status", lambda: None)
+    assert obj.gnome_bridge_status() is None
+    monkeypatch.setattr(gnome_bridge, "status", lambda: ("active", {"bridge": True, "adopted": 3}))
+    assert obj.gnome_bridge_status() == ["active", {"bridge": True, "adopted": 3}]
 
 
 def test_snap_policy_support_requires_verified_bridge():

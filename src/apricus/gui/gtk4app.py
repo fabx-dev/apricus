@@ -158,13 +158,10 @@ class ControlPanel(Adw.Application):
 
     def do_startup(self):
         Adw.Application.do_startup(self)
-        from apricus.gnome_bridge import start
-
-        self._gnome_bridge = start(
-            self._refresh_integration_row,
-            self._forward_window_push,
-            self._forward_window_push_lost,
-        )
+        # The status/window bridge is server-owned (snap): the control
+        # center only reads its snapshot over Snap IPC so M3 survives the
+        # panel being closed. Never own the well-known name here.
+        self._gnome_bridge = None
 
     def do_shutdown(self):
         from apricus.gnome_bridge import stop
@@ -3966,29 +3963,24 @@ class ControlPanel(Adw.Application):
                 self._refresh_integration_row()
         return True
 
-    def _forward_window_push(self, fullscreen, maximized, seq, generation):
-        """Snap bridge-carried M3 frames: Shell → bridge → server.
-
-        Runs only where the bridge runs (Snap GUI on GNOME Wayland). The
-        server authenticates and sequences every frame; here we only forward
-        and never decide playback.
-        """
-        server = self._server()
-        if server is None:
-            return
+    def _remote_bridge_status(self):
+        """Server-owned bridge snapshot (snap IPC); ("unknown", {}) when absent."""
         try:
-            server.window_push_frame(generation, seq, fullscreen, maximized)
-        except Exception:  # noqa: BLE001 - transient IPC; next frame retries
-            logger.debug("[GUI4] window push forward failed")
-
-    def _forward_window_push_lost(self, generation):
-        server = self._server()
+            server = self._server()
+        except Exception:  # noqa: BLE001 - panel without server stays unknown
+            return "unknown", {}
         if server is None:
-            return
+            return "unknown", {}
         try:
-            server.window_push_lost(generation)
-        except Exception:  # noqa: BLE001 - transient IPC; freeze is server-side
-            logger.debug("[GUI4] window push loss forward failed")
+            remote = server.gnome_bridge_status()
+        except Exception:  # noqa: BLE001 - transient IPC; fall back below
+            return "unknown", {}
+        if not remote:
+            return "unknown", {}
+        try:
+            return remote[0], dict(remote[1])
+        except Exception:  # noqa: BLE001 - malformed payload is not a state
+            return "unknown", {}
 
     def _refresh_integration_row(self):
         """Show the GNOME Shell integration state (never raises)."""
@@ -4000,7 +3992,12 @@ class ControlPanel(Adw.Application):
         try:
             from apricus.gnome_shell import EXTENSION_UUID, integration_status
 
-            state, detail = integration_status()
+            if is_snap():
+                state, detail = self._remote_bridge_status()
+                if state == "unknown" and not detail:
+                    state, detail = integration_status()
+            else:
+                state, detail = integration_status()
         except Exception:  # noqa: BLE001 - status must never break settings
             from apricus.gnome_shell import EXTENSION_UUID
 
