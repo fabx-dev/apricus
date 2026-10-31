@@ -147,6 +147,11 @@ class WindowRegistration:
         self.maximized = False
         self.deadline = 0
         self.reason = "not_registered"
+        # Last lapsed generation: a fresh authenticated frame after quiet
+        # is proof of life, so frame() can rebaseline without a
+        # reject→vanish→re-register round trip (which would freeze policy
+        # for seconds on the next event after >90 s of silence).
+        self._expired = None
 
     def invalidate(self, reason):
         self.generation = ""
@@ -162,8 +167,11 @@ class WindowRegistration:
         offset = self.clock() - self.monotonic()
         if abs(offset - self.offset) > 2:
             self.offset = offset
+            self._expired = None
             self.invalidate("resume")
         elif self.deadline and self.clock() >= self.deadline:
+            if self.generation:
+                self._expired = (self.sender, self.generation, self.sequence)
             self.invalidate("lease_expired")
 
     @staticmethod
@@ -180,6 +188,7 @@ class WindowRegistration:
         self.seen = True
         self.sender = sender
         self.generation = secrets.token_hex(16)
+        self._expired = None
         self.sequence = sequence
         self.fullscreen = frame["fullscreen"]
         self.maximized = frame["maximized"]
@@ -190,7 +199,11 @@ class WindowRegistration:
 
     def frame(self, sender, generation, sequence, fullscreen, maximized):
         frame = self.validate_frame(fullscreen, maximized)
-        self._match(sender, generation, sequence)
+        try:
+            self._match(sender, generation, sequence)
+        except ValueError:
+            if not self._recover(sender, generation, sequence):
+                raise
         self.sequence = sequence
         self.fullscreen = frame["fullscreen"]
         self.maximized = frame["maximized"]
@@ -198,8 +211,32 @@ class WindowRegistration:
         self.reason = "updated"
         self.changed()
 
+    def _recover(self, sender, generation, sequence):
+        """Rebaseline after a quiet-period lease lapse without rejecting.
+
+        A fresh, owner-verified frame carrying the just-lapsed generation
+        with a newer sequence is proof of life: re-arm the same generation
+        instead of forcing a reject→vanish→re-register round trip (which
+        would freeze policy for seconds on the first event after silence).
+        Anything else (unknown generation, stale sequence, explicit
+        unregister, suspend/resume) still fails closed.
+        """
+        if self._expired is None:
+            return False
+        old_sender, old_generation, old_seq = self._expired
+        if sender != old_sender or generation != old_generation:
+            return False
+        if not old_seq < sequence <= 0xFFFFFFFF:
+            return False
+        self.sender = sender
+        self.generation = generation
+        self._expired = None
+        self.reason = "re-registered"
+        return True
+
     def unregister(self, sender, generation, sequence):
         self._match(sender, generation, sequence)
+        self._expired = None
         self.invalidate("unregistered")
         # Explicit disable is bounded like the status channel: it is not a
         # perpetual assertion, only the end of this generation.

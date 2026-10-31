@@ -283,3 +283,27 @@ def test_pipe_ready_needs_no_shm_and_survives_pickling():
     # Idempotent: no second byte, no block, no error.
     clone.set()
     assert ready.is_set() is True
+
+
+def test_window_lease_lapse_rebaselines_without_reject():
+    clocks = [100.0, 100.0]
+    state = WindowRegistration(clock=lambda: clocks[0], monotonic=lambda: clocks[1])
+    token = state.register(":1.14", 1, 7, True, False)
+    clocks[:] = [195.0, 195.0]  # >90 s of compositor silence
+    # First frame after quiet: accepted in place, no vanish/fallback churn.
+    state.frame(":1.14", token, 8, False, True)
+    assert state.current()["sequence"] == 8
+    assert state.current()["fullscreen"] is False
+    assert state.current()["maximized"] is True
+    # Stale, foreign and post-unregister frames still fail closed.
+    import pytest
+
+    with pytest.raises(ValueError):
+        state.frame(":1.14", token, 8, False, True)
+    with pytest.raises(ValueError):
+        state.frame(":1.14", "wrong", 9, False, True)
+    with pytest.raises(ValueError):
+        state.frame(":1.99", token, 9, False, True)
+    state.unregister(":1.14", token, 9)
+    with pytest.raises(ValueError):
+        state.frame(":1.14", token, 10, False, False)
