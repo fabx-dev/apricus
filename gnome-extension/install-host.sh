@@ -104,6 +104,9 @@ fi
 if [ -f "$SRC_DIR/state.js" ]; then
     install_file "$SRC_DIR/state.js" "$DEST_DIR/state.js"
 fi
+if [ -f "$SRC_DIR/windowPush.js" ]; then
+    install_file "$SRC_DIR/windowPush.js" "$DEST_DIR/windowPush.js"
+fi
 install_file "$SRC_DIR/extension.js" "$DEST_DIR/extension.js"
 echo "Installed $UUID to $DEST_DIR"
 

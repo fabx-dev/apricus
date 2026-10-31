@@ -38,6 +38,7 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import {Workspace} from 'resource:///org/gnome/shell/ui/workspace.js';
 import {WorkspaceThumbnail} from 'resource:///org/gnome/shell/ui/workspaceThumbnail.js';
 import {StatusBridge} from './statusBridge.js';
+import {WindowPush} from './windowPush.js';
 import {DesktopStateTracker, StatePublisher} from './state.js';
 
 // Must match WALLPAPER_WINDOW_ROLE in src/apricus/gnome_shell.py and the
@@ -46,7 +47,7 @@ const WALLPAPER_ROLE = 'apricus-wallpaper';
 
 // Bumped on every code change; logged from enable() so the journal shows
 // which revision the running shell actually loaded.
-const CODE_REVISION = 5;
+const CODE_REVISION = 6;
 
 const WINDOW_MATCH_RETRIES = 10;
 const WINDOW_MATCH_INTERVAL_MS = 100;
@@ -124,7 +125,17 @@ export default class ApricusIntegrationExtension extends Extension {
                     // State changes detected by the tracker are published on
                     // D-Bus here: without this wiring the tracker would
                     // compute truth nobody ever receives.
-                    emit: payload => this._statePublisher?.publish(payload),
+                    emit: payload => {
+                        this._statePublisher?.publish(payload);
+                        // Strict Snap confinement cannot subscribe to our
+                        // signals; the same frame is pushed as a method call
+                        // to the Snap-owned bridge (best effort, silent when
+                        // no Snap bridge owner exists).
+                        try { this._windowPush?.notify(); }
+                        catch (error) {
+                            console.warn(`[ApricusPush] snap push failed: ${error.message}`);
+                        }
+                    },
                     subscribeDisplay: (name, callback) => global.display.connect(name, callback),
                     unsubscribeDisplay: id => global.display.disconnect(id),
                     subscribeWorkspace: (name, callback) => global.workspace_manager.connect(name, callback),
@@ -141,6 +152,22 @@ export default class ApricusIntegrationExtension extends Extension {
             });
             this._stateTracker.watchBus();
             this._statePublisher.start();
+            // Snap-bridge window push: same frames as method calls to the
+            // Snap-owned bridge name. Absent Snap GUI: the watch never fires
+            // and this stays idle without touching adoption or stacking.
+            try {
+                this._windowPush = new WindowPush(() => {
+                    const state = this._stateTracker?.getState();
+                    return state ? {
+                        seq: state.seq,
+                        fullscreen: state.fullscreen,
+                        maximized: state.maximized,
+                    } : null;
+                });
+            } catch (error) {
+                console.warn(`[ApricusPush] snap push unavailable: ${error.message}`);
+                this._windowPush = null;
+            }
         } catch (error) {
             console.warn(`[ApricusPush] unavailable: ${error.message}`);
             this._stateTracker = null;
@@ -169,6 +196,8 @@ export default class ApricusIntegrationExtension extends Extension {
         this._stateTracker = null;
         this._statePublisher?.stop();
         this._statePublisher = null;
+        this._windowPush?.stop();
+        this._windowPush = null;
         this._statusBridge?.stop();
         this._statusBridge = null;
         this._operational = false;

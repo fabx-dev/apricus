@@ -12,7 +12,7 @@ from types import SimpleNamespace
 import pytest
 
 from apricus import gnome_bridge, gnome_shell
-from apricus.gnome_bridge import Bridge, Registration
+from apricus.gnome_bridge import Bridge, Registration, WindowRegistration
 
 
 @pytest.fixture
@@ -133,6 +133,8 @@ def fake_bridge(monkeypatch, owners, uid=None, pid=42):
     bridge = Bridge.__new__(Bridge)
     bridge.GLib = GLib
     bridge.registration = Registration()
+    bridge.window_registration = WindowRegistration()
+    bridge._window_notified = None
     bridge.closed = False
     bridge.epoch = 0
     bridge.pending = 0

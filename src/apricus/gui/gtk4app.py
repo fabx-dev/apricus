@@ -160,7 +160,11 @@ class ControlPanel(Adw.Application):
         Adw.Application.do_startup(self)
         from apricus.gnome_bridge import start
 
-        self._gnome_bridge = start(self._refresh_integration_row)
+        self._gnome_bridge = start(
+            self._refresh_integration_row,
+            self._forward_window_push,
+            self._forward_window_push_lost,
+        )
 
     def do_shutdown(self):
         from apricus.gnome_bridge import stop
@@ -3962,8 +3966,33 @@ class ControlPanel(Adw.Application):
                 self._refresh_integration_row()
         return True
 
+    def _forward_window_push(self, fullscreen, maximized, seq, generation):
+        """Snap bridge-carried M3 frames: Shell → bridge → server.
+
+        Runs only where the bridge runs (Snap GUI on GNOME Wayland). The
+        server authenticates and sequences every frame; here we only forward
+        and never decide playback.
+        """
+        server = self._server()
+        if server is None:
+            return
+        try:
+            server.window_push_frame(generation, seq, fullscreen, maximized)
+        except Exception:  # noqa: BLE001 - transient IPC; next frame retries
+            logger.debug("[GUI4] window push forward failed")
+
+    def _forward_window_push_lost(self, generation):
+        server = self._server()
+        if server is None:
+            return
+        try:
+            server.window_push_lost(generation)
+        except Exception:  # noqa: BLE001 - transient IPC; freeze is server-side
+            logger.debug("[GUI4] window push loss forward failed")
+
     def _refresh_integration_row(self):
         """Show the GNOME Shell integration state (never raises)."""
+        self._refresh_window_policy_support()
         row = getattr(self, "integ_row", None)
         switch = getattr(self, "integ_switch", None)
         if row is None:
@@ -4240,8 +4269,9 @@ class ControlPanel(Adw.Application):
         try:
             server = self._server()
             snapshot = server.engine_snapshot if server is not None else {}
-            if snapshot.get("window_state_source") == "extension-push" and snapshot.get(
-                "push_alive"
+            if snapshot.get("push_alive") and snapshot.get("window_state_source") in (
+                "extension-push",
+                "snap-bridge-push",
             ):
                 self._window_policy_verified = True
         except Exception:  # noqa: BLE001 - temporary service absence is not incapability
@@ -4268,7 +4298,11 @@ class ControlPanel(Adw.Application):
         return enabled, messages.get(message, message)
 
     def _refresh_window_policy_support(self):
-        sensitive, subtitle = self._window_policy_support()
+        # Best effort: policy rows must never break integration refresh.
+        try:
+            sensitive, subtitle = self._window_policy_support()
+        except Exception:  # noqa: BLE001 - keep last known row state
+            return
         for name in ("pause_max", "mute_max"):
             switch = getattr(self, f"{name}_switch", None)
             row = getattr(self, f"{name}_row", None)

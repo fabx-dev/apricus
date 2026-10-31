@@ -124,6 +124,106 @@ class Registration:
         }
 
 
+class WindowRegistration:
+    """Window-state frames carried by the status bridge channel.
+
+    Same trust model as Registration (sender == current Shell owner,
+    credential-checked per call), but independent generation/sequence/lease:
+    status snapshots and window frames evolve on different cadences.
+    Payload is aggregate truth only (two booleans + sequence), never window
+    identities. Frames are absolute, so a new generation simply rebaselines.
+    """
+
+    def __init__(self, changed=lambda: None, clock=boot_time, monotonic=time.monotonic):
+        self.changed = changed
+        self.clock = clock
+        self.monotonic = monotonic
+        self.offset = clock() - monotonic()
+        self.seen = False
+        self.generation = ""
+        self.sender = None
+        self.sequence = 0
+        self.fullscreen = False
+        self.maximized = False
+        self.deadline = 0
+        self.reason = "not_registered"
+
+    def invalidate(self, reason):
+        self.generation = ""
+        self.sender = None
+        self.sequence = 0
+        self.fullscreen = False
+        self.maximized = False
+        self.deadline = 0
+        self.reason = reason
+        self.changed()
+
+    def check(self):
+        offset = self.clock() - self.monotonic()
+        if abs(offset - self.offset) > 2:
+            self.offset = offset
+            self.invalidate("resume")
+        elif self.deadline and self.clock() >= self.deadline:
+            self.invalidate("lease_expired")
+
+    @staticmethod
+    def validate_frame(fullscreen, maximized):
+        if type(fullscreen) is not bool or type(maximized) is not bool:
+            raise ValueError("invalid window frame flags")
+        return {"fullscreen": fullscreen, "maximized": maximized}
+
+    def register(self, sender, version, sequence, fullscreen, maximized):
+        if version != 1 or sequence < 1:
+            raise ValueError("unsupported version or initial sequence")
+        frame = self.validate_frame(fullscreen, maximized)
+        self.check()
+        self.seen = True
+        self.sender = sender
+        self.generation = secrets.token_hex(16)
+        self.sequence = sequence
+        self.fullscreen = frame["fullscreen"]
+        self.maximized = frame["maximized"]
+        self.deadline = self.clock() + LEASE_SECONDS
+        self.reason = "registered"
+        self.changed()
+        return self.generation
+
+    def frame(self, sender, generation, sequence, fullscreen, maximized):
+        frame = self.validate_frame(fullscreen, maximized)
+        self._match(sender, generation, sequence)
+        self.sequence = sequence
+        self.fullscreen = frame["fullscreen"]
+        self.maximized = frame["maximized"]
+        self.deadline = self.clock() + LEASE_SECONDS
+        self.reason = "updated"
+        self.changed()
+
+    def unregister(self, sender, generation, sequence):
+        self._match(sender, generation, sequence)
+        self.invalidate("unregistered")
+        # Explicit disable is bounded like the status channel: it is not a
+        # perpetual assertion, only the end of this generation.
+        self.deadline = self.clock() + LEASE_SECONDS
+
+    def _match(self, sender, generation, sequence):
+        self.check()
+        if not self.generation or self.sender != sender or generation != self.generation:
+            raise ValueError("registration expired or replaced")
+        if not self.sequence < sequence <= 0xFFFFFFFF:
+            raise ValueError("duplicate or out-of-order sequence")
+
+    def current(self):
+        self.check()
+        if not self.seen or not self.generation:
+            return None
+        return {
+            "generation": self.generation,
+            "sequence": self.sequence,
+            "fullscreen": self.fullscreen,
+            "maximized": self.maximized,
+        }
+
+
 XML = f"""<node><interface name="{INTERFACE}">
  <method name="Register">
   <arg type="u" direction="in" name="version"/>
@@ -146,15 +246,38 @@ XML = f"""<node><interface name="{INTERFACE}">
   <arg type="s" direction="in" name="generation"/>
   <arg type="u" direction="in" name="sequence"/>
  </method>
+ <method name="WindowRegister">
+  <arg type="u" direction="in" name="version"/>
+  <arg type="u" direction="in" name="sequence"/>
+  <arg type="b" direction="in" name="fullscreen"/>
+  <arg type="b" direction="in" name="maximized"/>
+  <arg type="s" direction="out" name="generation"/>
+  <arg type="u" direction="out" name="lease"/>
+  <arg type="u" direction="out" name="renew"/>
+ </method>
+ <method name="WindowState">
+  <arg type="s" direction="in" name="generation"/>
+  <arg type="u" direction="in" name="sequence"/>
+  <arg type="b" direction="in" name="fullscreen"/>
+  <arg type="b" direction="in" name="maximized"/>
+ </method>
+ <method name="WindowUnregister">
+  <arg type="s" direction="in" name="generation"/>
+  <arg type="u" direction="in" name="sequence"/>
+ </method>
 </interface></node>"""
 
 
 class Bridge:
-    def __init__(self, changed):
+    def __init__(self, changed, on_window_frame=None, on_window_lost=None):
         from gi.repository import Gio, GLib
 
         self.Gio, self.GLib = Gio, GLib
         self.registration = Registration(changed)
+        self.window_registration = WindowRegistration(lambda: self._window_changed())
+        self._on_window_frame = on_window_frame
+        self._on_window_lost = on_window_lost
+        self._window_notified = None
         self.bus = None
         self.object_id = 0
         self.subscription = 0
@@ -180,9 +303,36 @@ class Bridge:
         self.registration.check()
         return True
 
+    def _window_changed(self):
+        current = self.window_registration.current()
+        if current is None:
+            notified, self._window_notified = self._window_notified, None
+            if notified is not None and self._on_window_lost is not None:
+                try:
+                    self._on_window_lost(notified)
+                except Exception:  # noqa: BLE001 - listener failure must not break the bridge
+                    logger.debug("[GnomeBridge] window-lost listener failed")
+            return
+        self._window_notified = current["generation"]
+        if self._on_window_frame is not None:
+            try:
+                self._on_window_frame(
+                    current["fullscreen"],
+                    current["maximized"],
+                    current["sequence"],
+                    current["generation"],
+                )
+            except Exception:  # noqa: BLE001 - listener failure must not break the bridge
+                logger.debug("[GnomeBridge] window-frame listener failed")
+
+    def window_push_active(self):
+        """True while a live window-push generation exists."""
+        return self.window_registration.current() is not None
+
     def _invalidate(self, reason):
         self.epoch += 1
         self.registration.invalidate(reason)
+        self.window_registration.invalidate(reason)
 
     def _bus_acquired(self, bus, _name):
         self.bus = bus
@@ -257,6 +407,8 @@ class Bridge:
                 elif method == "Unregister":
                     state.unregister(sender, *args)
                     reply = self.GLib.Variant("()", ())
+                elif method in ("WindowRegister", "WindowState", "WindowUnregister"):
+                    reply = self._window_call(sender, method, args)
                 else:
                     raise ValueError("unknown method")
                 logger.debug("[GnomeBridge] accepted %s sender=%s", method, sender)
@@ -292,6 +444,17 @@ class Bridge:
         except Exception as error:
             finish(error)
 
+    def _window_call(self, sender, method, args):
+        state = self.window_registration
+        if method == "WindowRegister":
+            generation = state.register(sender, *args)
+            return self.GLib.Variant("(suu)", (generation, LEASE_SECONDS, RENEW_SECONDS))
+        if method == "WindowState":
+            state.frame(sender, *args)
+            return self.GLib.Variant("()", ())
+        state.unregister(sender, *args)
+        return self.GLib.Variant("()", ())
+
     def stop(self):
         self.closed = True
         self._invalidate("stopped")
@@ -311,14 +474,14 @@ class Bridge:
 _bridge = None
 
 
-def start(changed):
+def start(changed, on_window_frame=None, on_window_lost=None):
     """Snap GUI only. Flatpak/native retain their tested detection paths."""
     global _bridge
     from apricus.utils import is_gnome, is_snap, is_wayland
 
     if _bridge is None and is_snap() and is_gnome() and is_wayland():
         try:
-            _bridge = Bridge(changed)
+            _bridge = Bridge(changed, on_window_frame, on_window_lost)
         except Exception:
             logger.exception("[GnomeBridge] unavailable; host receipt fallback")
     return _bridge

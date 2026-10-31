@@ -606,13 +606,20 @@ def test_host_zip_and_installer_roundtrip(tmp_path):
         "apricus-integration@fabx-dev/metadata.json",
         "apricus-integration@fabx-dev/state.js",
         "apricus-integration@fabx-dev/statusBridge.js",
+        "apricus-integration@fabx-dev/windowPush.js",
     ], names
     with zipfile.ZipFile(out_zip) as zf:
         meta = json.loads(zf.read("apricus-integration@fabx-dev/metadata.json"))
     assert meta["uuid"] == EXTENSION_UUID
     assert set(meta["shell-version"]) == {"49", "50", "51"}
     with zipfile.ZipFile(out_zip) as zf:
-        for name in ("metadata.json", "extension.js", "statusBridge.js", "state.js"):
+        for name in (
+            "metadata.json",
+            "extension.js",
+            "statusBridge.js",
+            "state.js",
+            "windowPush.js",
+        ):
             zipped = zf.read(f"apricus-integration@fabx-dev/{name}")
             source = (repo / "gnome-extension" / EXTENSION_UUID / name).read_bytes()
             assert zipped == source, name
@@ -629,7 +636,7 @@ def test_host_zip_and_installer_roundtrip(tmp_path):
     )
     assert proc.returncode == 0, proc.stderr
     installed = fake_home / ".local/share/gnome-shell/extensions" / EXTENSION_UUID
-    for name in ("metadata.json", "extension.js", "statusBridge.js", "state.js"):
+    for name in ("metadata.json", "extension.js", "statusBridge.js", "state.js", "windowPush.js"):
         src = (repo / "gnome-extension" / EXTENSION_UUID / name).read_bytes()
         assert (installed / name).read_bytes() == src
     # The host run also leaves a machine-readable status receipt next to
@@ -649,7 +656,7 @@ def test_host_zip_and_installer_roundtrip(tmp_path):
         env=env,
     )
     assert proc.returncode == 0, proc.stderr
-    for name in ("metadata.json", "extension.js", "statusBridge.js", "state.js"):
+    for name in ("metadata.json", "extension.js", "statusBridge.js", "state.js", "windowPush.js"):
         src = (repo / "gnome-extension" / EXTENSION_UUID / name).read_bytes()
         assert (installed / name).read_bytes() == src
     assert sorted(p.name for p in installed.iterdir()) == [
@@ -657,6 +664,7 @@ def test_host_zip_and_installer_roundtrip(tmp_path):
         "metadata.json",
         "state.js",
         "statusBridge.js",
+        "windowPush.js",
     ]
     proc = subprocess.run(
         ["bash", installer, "--bogus"], capture_output=True, text=True, timeout=60, env=env

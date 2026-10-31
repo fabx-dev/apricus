@@ -18,7 +18,7 @@ Apricus 2.1.0 closes the M1–M3 cycle: playback controls, a server-owned policy
 
 - **DEB/RPM:** full M1–M3 when the extension is installed and enabled.
 - **Flatpak:** M3 availability depends on verified window-state access at runtime.
-- **Strict Snap on Wayland:** the M3 push channel is unavailable in 2.1.0; integration preferences stay disabled there.
+- **Snap:** bridge-carried M3 while the control center runs (rev6 extension required); direct signal subscription remains unavailable under strict confinement.
 
 ## Known limitations
 
@@ -31,4 +31,4 @@ Apricus 2.1.0 closes the M1–M3 cycle: playback controls, a server-owned policy
 
 - `apricus --version` (or the About/Settings row) must report 2.1.0.
 - Native installs: extension revision 5 loaded, `DesktopStateChanged` received, policy `extension-push`, preferences editable.
-- Strict Snap: expect the integration rows disabled; this is intended, not a broken install.
+- Strict Snap: without the rev6 extension or with the control center closed, expect the integration rows disabled; bridge-carried M3 needs both.

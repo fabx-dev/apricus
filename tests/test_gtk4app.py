@@ -1895,8 +1895,14 @@ def window_policy_capability_survives_disconnect():
     obj._server = lambda: None
     assert obj._window_policy_support()[0]
     app.is_snap = lambda: True
-    assert not obj._window_policy_support()[0]  # never promise strict Snap M3
+    app.is_flatpak = lambda: False
+    obj._window_policy_verified = False
+    assert not obj._window_policy_support()[0]  # unverified snap stays disabled
     check_sensitivity(False)
+    server.engine_snapshot = {"window_state_source": "snap-bridge-push", "push_alive": True}
+    obj._server = lambda: server
+    assert obj._window_policy_support()[0]  # bridge-carried push enables Snap M3
+    check_sensitivity(True)
     app.is_wayland = lambda: False
     assert obj._window_policy_support()[0]  # unchanged X11
 

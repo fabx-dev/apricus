@@ -118,6 +118,27 @@ class StatePublisher {
 }
 StatePublisher.instances = [];
 
+class WindowPush {
+    constructor(getFrame) {
+        this.stops = 0;
+        this.notifies = 0;
+        this.frames = [];
+        this._getFrame = getFrame;
+        WindowPush.instances.push(this);
+    }
+
+    notify() {
+        this.notifies++;
+        try { this.frames.push(this._getFrame()); }
+        catch (_error) { /* broken snapshot: recorded as attempted */ }
+    }
+
+    stop() {
+        this.stops++;
+    }
+}
+WindowPush.instances = [];
+
 function makeGroup(name) {
     const handlers = {};
     return {
@@ -280,6 +301,7 @@ function loadExtensionClass() {
         "import {Workspace} from 'resource:///org/gnome/shell/ui/workspace.js';",
         "import {WorkspaceThumbnail} from 'resource:///org/gnome/shell/ui/workspaceThumbnail.js';",
         "import {StatusBridge} from './statusBridge.js';",
+        "import {WindowPush} from './windowPush.js';",
         "import {DesktopStateTracker, StatePublisher} from './state.js';",
     ]) {
         if (!src.includes(line))
@@ -366,11 +388,23 @@ wiredOptions.emit({seq: 7, fullscreen: true, note: 'wiring-probe'});
 assert(wiredPublisher.published.length === 1,
     'tracker emission must reach StatePublisher.publish');
 assert(wiredPublisher.published[0].seq === 7, 'payload passes through unwrapped');
+// 7b. Snap bridge push wiring: the same emission must also notify the
+// Snap-owned bridge channel (strict confinement cannot read our signals).
+// No bridge owner exists in this harness; notify() must stay a safe no-op
+// that still observes the tracker frame without sending.
+assert(WindowPush.instances.length === 1, 'one window push per enable');
+const wiredPush = WindowPush.instances[0];
+const notifiesBefore = wiredPush.notifies;
+wiredOptions.emit({seq: 8, fullscreen: false, maximized: true, note: 'snap-probe'});
+assert(wiredPush.notifies === notifiesBefore + 1,
+    'tracker emission must also notify the snap bridge push');
 
 // 8. disable() hands every actor back and clears the overrides.
 ext.disable();
 assert(videoActor._parent === windowGroup, 'first actor released on disable');
 assert(videoActor2._parent === windowGroup, 'second actor released on disable');
+assert(StatePublisher.instances[0].stops === 1, 'publisher stopped on disable');
+assert(WindowPush.instances[0].stops === 1, 'window push stopped on disable');
 assert(ext._adopted.size === 0, 'adopted map cleared on disable');
 assert(global.get_window_actors().includes(videoActor),
     'filter overrides must be removed on disable');

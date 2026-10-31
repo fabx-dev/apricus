@@ -3,6 +3,6 @@
   "name": "Apricus Wallpaper Integration",
   "description": "Keeps Apricus live-wallpaper windows below desktop icons (DING) and application windows. No configuration; disabling restores normal window behavior.",
   "shell-version": ["49", "50", "51"],
-  "version": 1,
+  "version": 2,
   "session-modes": ["user"]
 }

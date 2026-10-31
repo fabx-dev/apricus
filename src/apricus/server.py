@@ -39,6 +39,12 @@ from apricus.policy import PAUSED, POLICY_VERSION, STOPPED, PlaybackPolicyEngine
 from apricus.stop_support import finish_process, stopped_background
 from apricus.utils import ConfigUtil, EndSessionHandler, _authorize, get_video_paths, is_snap
 
+# Window-state sources whose snapshots arrive already debounced by the
+# Shell (no second engine delay): the native extension push and the
+# Snap bridge-carried push (method calls, same settled frames).
+BRIDGE_PUSH_SOURCE = "snap-bridge-push"
+_SETTLED_PUSH_SOURCES = frozenset({"extension-push", BRIDGE_PUSH_SOURCE})
+
 # NOTE: menu and the player mains pin Gtk 3 namespaces at import time
 # (gi forbids two Gtk majors in one process). They must never be imported
 # at server top-level: the forkserver image inherits the parent's loaded
@@ -337,6 +343,7 @@ class ApricusServer:
         self._active_handler = None
         self._window_state = None
         self._window_source = "none"
+        self._bridge_push = {"generation": None, "seq": 0}
         self._push_watcher = None
         try:
             from apricus.utils import ActiveHandler
@@ -470,6 +477,70 @@ class ApricusServer:
         self.policy.note_push_alive(False)
         self._start_fallback_backend()
 
+    def window_push_frame(self, generation, seq, fullscreen, maximized, dbus_context=None):
+        """Snap bridge-carried window state (M3 under strict confinement).
+
+        The Snap cannot subscribe to the extension's signals, so the Shell
+        pushes the same settled frames as method calls to the Snap-owned
+        bridge; the GUI forwards them here over Snap IPC. Same-UID callers
+        only (like every other mutating verb). Epochs rebasline; duplicates
+        and obsolete sequences are dropped; loss freezes (never resumes).
+        """
+        _authorize("window_push_frame", dbus_context)
+        if type(generation) is not str or len(generation) != 32:
+            raise ValueError("window_push_frame: invalid generation")
+        if type(fullscreen) is not bool or type(maximized) is not bool:
+            raise ValueError("window_push_frame: flags must be bools")
+        try:
+            seq = int(seq)
+        except (TypeError, ValueError):
+            raise ValueError("window_push_frame: invalid sequence") from None
+        from apricus.utils import is_snap
+
+        if not is_snap():
+            logger.debug("[Policy] bridge window frame ignored (not a Snap)")
+            return False
+        state = getattr(self, "_bridge_push", None) or {"generation": None, "seq": 0}
+        if state.get("generation") != generation:
+            state = {"generation": generation, "seq": 0}
+            self._bridge_push = state
+            self._on_bridge_push_appeared()
+        if seq <= state["seq"]:
+            return False
+        state["seq"] = seq
+        self._on_window_state_changed(
+            {
+                "is_any_maximized": maximized,
+                "is_any_fullscreen": fullscreen,
+            }
+        )
+        return True
+
+    def window_push_lost(self, generation, dbus_context=None):
+        """End of a bridge window-push generation: freeze, never resume."""
+        _authorize("window_push_lost", dbus_context)
+        state = getattr(self, "_bridge_push", None) or {}
+        if state.get("generation") != generation:
+            return False
+        self._bridge_push = {"generation": None, "seq": 0}
+        self._on_bridge_push_vanished()
+        return True
+
+    def _on_bridge_push_appeared(self):
+        if getattr(self, "_window_source", "none") == BRIDGE_PUSH_SOURCE:
+            return
+        self._stop_window_state()
+        self._window_source = BRIDGE_PUSH_SOURCE
+        self.policy.note_push_alive(True)
+        logger.info("[Policy] window-state source: snap bridge push")
+
+    def _on_bridge_push_vanished(self):
+        if getattr(self, "_window_source", "none") != BRIDGE_PUSH_SOURCE:
+            return
+        self._stop_window_state()
+        self.policy.note_push_alive(False)
+        self._start_fallback_backend()
+
     def _on_lock_changed(self, active):
         self.reason_active_changed("screen_locked", bool(active))
 
@@ -484,7 +555,7 @@ class ApricusServer:
             "maximized": pause and is_max,
             "maximized_mute": not pause and mute and (is_max or is_full),
         }
-        if getattr(self, "_window_source", None) == "extension-push":
+        if getattr(self, "_window_source", None) in _SETTLED_PUSH_SOURCES:
             # The Shell already coalesced this snapshot. Do not add another
             # 250 ms; update all reasons atomically to avoid transient resumes.
             if all(self._auto_fed.get(k) == v for k, v in updates.items()):

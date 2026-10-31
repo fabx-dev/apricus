@@ -166,7 +166,7 @@ Package differences:
 
 - **Native DEB/RPM**: full M3 push channel when the extension is installed and enabled.
 - **Flatpak**: window-state access depends on verified runtime permissions; preferences stay disabled until the running server reports a healthy `extension-push` source.
-- **Strict Snap on Wayland**: the M3 push channel is not available in this release; the integration preferences remain disabled there. This is a known limitation, not a configuration error.
+- **Strict Snap on Wayland**: window push arrives bridge-carried from the rev6 extension while the control center runs (method calls to the Snap-owned bridge); direct signal subscription stays unavailable under strict confinement. This is a known limitation, not a configuration error.
 
 ---
 
@@ -188,7 +188,7 @@ Package differences:
 | GNOME 49 / 51 | Shipped per static API review, not runtime-tested |
 | X11 sessions | Existing behavior retained |
 | Flatpak | Works, but M3 availability depends on verified window-state access |
-| Strict Snap on Wayland | M3 push not available; preferences disabled there |
+| Strict Snap on Wayland | Bridge-carried push while control center runs; direct push unavailable |
 | Detection+decision latency ≤ 500 ms | NOT rigorously attested (observer saw policy update ~93 ms after signal receipt; player pause ~1.6 s with the default 1.5 s fade) |
 | Other desktops (KDE, XFCE, …) | Not claimed; GNOME is the supported target |
 
@@ -202,7 +202,7 @@ On non-GNOME X11 desktops, playback works but icon stacking and static-wallpaper
 - **YouTube fails**: native packages bundle Deno and vendored yt-dlp; if playback still fails, open Now Playing for the surfaced error, update to the latest 2.1.0 package, and check network/proxy before retrying.
 - **Missing video deps**: install `vlc`, `ffmpeg`, `python3-vlc` and the GTK4/Libadwaita typelibs listed in `docs/dev.md`.
 - **Extension missing or stale**: Settings explains the requirement; reinstall the 2.1.0 extension files, enable, log out/in, and check `journalctl --user -g apricus-integration`.
-- **Strict Snap shows integration disabled**: expected in 2.1.0 — M3 push is unavailable under Snap strict confinement.
+- **Strict Snap shows integration disabled**: with an older Snap or extension, or with the control center closed (no bridge), the rows stay disabled — bridge-carried M3 needs the rev6 extension and a running control center.
 - **Flatpak cannot see videos**: it has read-only `xdg-videos` access; keep media under Videos or grant access with Flatseal.
 
 ---
