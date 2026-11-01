@@ -2045,6 +2045,50 @@ class ControlPanel(Adw.Application):
     # page would collapse and the heroes would render at different widths.
     PAGE_MIN_WIDTH = 600
 
+    # Shared copy for the Streaming availability notice: the tooltip and the
+    # popover render the same strings, so there is a single source of truth.
+    STREAM_AVAILABILITY_TITLE = "Streaming availability"
+    STREAM_AVAILABILITY_BODY = (
+        "Some YouTube videos may not play reliably due to streaming service "
+        "restrictions or compatibility limitations."
+    )
+
+    @staticmethod
+    def _stream_availability_info():
+        """Info button + popover for the Streaming page (native GTK4 only).
+
+        A flat symbolic button: hover shows the body as tooltip, click (or
+        keyboard activation) opens a small popover with title + body. The
+        popover auto-hides on outside click / Esc; no dialogs involved.
+        """
+        info_btn = Gtk.MenuButton()
+        info_btn.set_icon_name("dialog-information-symbolic")
+        info_btn.add_css_class("flat")
+        info_btn.add_css_class("dim-label")
+        info_btn.update_property(
+            [Gtk.AccessibleProperty.LABEL], [ControlPanel.STREAM_AVAILABILITY_TITLE]
+        )
+        info_btn.set_tooltip_text(ControlPanel.STREAM_AVAILABILITY_BODY)
+        info_btn.set_valign(Gtk.Align.CENTER)
+        popover = Gtk.Popover()
+        pop_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        pop_box.set_margin_top(12)
+        pop_box.set_margin_bottom(12)
+        pop_box.set_margin_start(12)
+        pop_box.set_margin_end(12)
+        title = Gtk.Label(label=ControlPanel.STREAM_AVAILABILITY_TITLE)
+        title.add_css_class("heading")
+        title.set_xalign(0)
+        body = Gtk.Label(label=ControlPanel.STREAM_AVAILABILITY_BODY)
+        body.set_xalign(0)
+        body.set_wrap(True)
+        body.set_max_width_chars(38)
+        pop_box.append(title)
+        pop_box.append(body)
+        popover.set_child(pop_box)
+        info_btn.set_popover(popover)
+        return info_btn, popover
+
     def _build_hero(self, icon_name, title, subtitle):
         """Shared Streaming/Web Page hero: identical structure and geometry.
 
@@ -2106,7 +2150,12 @@ class ControlPanel(Adw.Application):
         self.stream_entry.connect("activate", self.on_stream_apply)
         self.stream_entry.connect("icon-press", self._on_stream_icon_press)
         self.stream_entry.connect("changed", self._on_stream_entry_changed)
-        box.append(self.stream_entry)
+        self.stream_entry.set_hexpand(True)
+        url_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        url_row.append(self.stream_entry)
+        self.stream_info_btn, self.stream_info_popover = self._stream_availability_info()
+        url_row.append(self.stream_info_btn)
+        box.append(url_row)
         self.stream_type_row = Adw.ActionRow()
         self.stream_type_row.set_title(_("Detected"))
         self.stream_type_row.set_subtitle(_("Paste a link to detect its type"))
