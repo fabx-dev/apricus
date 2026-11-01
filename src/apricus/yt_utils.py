@@ -187,14 +187,14 @@ def save_cached_meta(raw_url, meta):
         pass
 
 
-def get_formats(raw_url):
+def get_formats(raw_url, *, fresh=False):
     from apricus.utils import public_http_url, valid_http_url
 
     if not valid_http_url(raw_url):
         raise ValueError(f"URL not supported: {raw_url}")
     if not public_http_url(raw_url):
         raise ValueError("Local network address not supported.")
-    info = get_cached_meta(raw_url)
+    info = None if fresh else get_cached_meta(raw_url)
     if info is None:
         try:
             with youtube_dl.YoutubeDL(base_options()) as ydl:

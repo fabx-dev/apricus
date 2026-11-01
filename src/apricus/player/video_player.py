@@ -8,7 +8,7 @@ import sys
 import tempfile
 import threading
 import time
-from threading import Timer
+from urllib.parse import parse_qs, urlsplit
 
 import gi
 
@@ -55,6 +55,22 @@ from apricus.yt_utils import get_best_audio, get_formats, get_optimal_video
 from apricus.yt_utils import youtube_dl as yt_dlp
 
 logger = logging.getLogger(LOGGER_NAME)
+
+
+def stream_expiry(*urls):
+    """Earliest explicit signed-URL expiry, or None (never guess a TTL)."""
+    stamps = []
+    for url in urls:
+        parts = urlsplit(url)
+        values = parse_qs(parts.query).get("expire", [])
+        path = parts.path.split("/")
+        values += [path[i + 1] for i, part in enumerate(path[:-1]) if part == "expire"]
+        for value in values:
+            try:
+                stamps.append(int(value))
+            except ValueError:
+                pass
+    return min(stamps) if stamps else None
 
 
 def _vlc_options(disable_audio: bool, vout):
@@ -147,6 +163,7 @@ class Fade:
     def __init__(self):
         self.timer = None
         self.is_active = False
+        self.generation = 0
 
     def start(
         self,
@@ -160,35 +177,48 @@ class Fade:
         # Cancel any existing timer first
         self.cancel()
         self.is_active = True
-        self._fade_step(cur, target, step, fade_interval, update_callback, complete_callback)
+        self._fade_step(
+            cur, target, step, fade_interval, update_callback, complete_callback, self.generation
+        )
 
-    def _fade_step(self, cur, target, step, fade_interval, update_callback, complete_callback):
-        if not self.is_active:
-            return
+    def _fade_step(
+        self, cur, target, step, fade_interval, update_callback, complete_callback, generation
+    ):
+        if not self.is_active or generation != self.generation:
+            return False
+        self.timer = None
 
         new_cur = cur + step
-        if (step < 0 and new_cur <= target) or (step > 0 and new_cur >= target):
+        if step == 0 or (step < 0 and new_cur <= target) or (step > 0 and new_cur >= target):
             new_cur = target
+            self.is_active = False
             if update_callback:
                 update_callback(int(new_cur))
             if complete_callback:
                 complete_callback()
-            self.is_active = False
         else:
             if update_callback:
                 update_callback(int(new_cur))
-            self.timer = Timer(
-                fade_interval,
+            # Transport IPC already runs on the GTK main loop. Keep fade
+            # completion there too: an old worker must never pause a new play.
+            self.timer = GLib.timeout_add(
+                max(1, round(fade_interval * 1000)),
                 self._fade_step,
-                args=[new_cur, target, step, fade_interval, update_callback, complete_callback],
+                new_cur,
+                target,
+                step,
+                fade_interval,
+                update_callback,
+                complete_callback,
+                generation,
             )
-            self.timer.daemon = True  # Make timer daemon to prevent blocking shutdown
-            self.timer.start()
+        return False
 
     def cancel(self):
         self.is_active = False
+        self.generation += 1
         if self.timer:
-            self.timer.cancel()
+            GLib.source_remove(self.timer)
             self.timer = None
 
 
@@ -310,14 +340,54 @@ class PlayerWindow(Gtk.ApplicationWindow):
         self.__vlc_widget.player.event_manager().event_attach(
             vlc.EventType.MediaPlayerEncounteredError, self._on_media_error
         )
+        self.__vlc_widget.player.event_manager().event_attach(
+            vlc.EventType.MediaPlayerPlaying, self._on_stream_playing
+        )
 
         self.menu = None
         self.connect("button-press-event", self._on_button_press_event)
 
     def play(self):
-        self.__vlc_widget.player.play()
+        player = self.__vlc_widget.player
+        if self._mode == MODE_STREAM:
+            self._stream_wants_play = True
+            if getattr(self, "_stream_restart", False):
+                # VLC 3 stops a non-pausable input but retains its dead input
+                # thread. play()/set_pause(0) then return success without
+                # creating an input. stop() releases that thread; retain the
+                # same media, slave and process (no yt-dlp request).
+                self._stream_epoch = getattr(self, "_stream_epoch", 0) + 1
+                player.stop()
+                self._stream_restart = False
+                self._play_error = None
+                self._first_frame_reported = False
+        if player.play() == -1:
+            self._play_error = "error"
+            if self._mode == MODE_STREAM:
+                self._stream_restart = True
+
+    def _on_stream_playing(self, _event):
+        if self._mode == MODE_STREAM:
+            GLib.idle_add(self._restore_stream_time, getattr(self, "_stream_epoch", 0))
+
+    def _restore_stream_time(self, epoch):
+        if epoch != getattr(self, "_stream_epoch", 0):
+            return False
+        if not getattr(self, "_stream_wants_play", False):
+            self.pause()
+            return False
+        stamp = getattr(self, "_stream_resume_time", None)
+        if stamp is not None:
+            self._stream_resume_time = None
+            player = self.__vlc_widget.player
+            if player.is_seekable():
+                player.set_time(stamp)
+        return False
 
     def stop(self):
+        self.fade.cancel()
+        self._stream_wants_play = False
+        self._stream_epoch = getattr(self, "_stream_epoch", 0) + 1
         try:
             self.__vlc_widget.player.stop()
         except Exception as e:
@@ -334,6 +404,7 @@ class PlayerWindow(Gtk.ApplicationWindow):
         )
 
     def play_fade(self, target, fade_duration_sec, fade_interval):
+        self.fade.cancel()
         self.play()
         cur = 0
         step = (target - cur) / (fade_duration_sec / fade_interval)
@@ -350,10 +421,22 @@ class PlayerWindow(Gtk.ApplicationWindow):
         return self.__vlc_widget.player.is_playing()
 
     def pause(self):
+        if getattr(self, "_mode", None) == MODE_STREAM:
+            self._stream_wants_play = False
+            player = self.__vlc_widget.player
+            if self.is_playing() and not player.can_pause():
+                self._stream_restart = True
+                stamp = player.get_time()
+                if getattr(self, "_stream_resume_time", None) is None:
+                    self._stream_resume_time = (
+                        stamp if stamp >= 0 and player.is_seekable() else None
+                    )
         if self.is_playing():
             self.__vlc_widget.player.pause()
 
     def pause_fade(self, fade_duration_sec, fade_interval):
+        self._stream_wants_play = False
+        self._stream_epoch = getattr(self, "_stream_epoch", 0) + 1
         cur = self.get_volume()
         target = 0
         step = (target - cur) / (fade_duration_sec / fade_interval)
@@ -387,11 +470,18 @@ class PlayerWindow(Gtk.ApplicationWindow):
         return self.__vlc_widget.instance.media_new(*args)
 
     def set_media(self, *args):
+        self.fade.cancel()
+        self._stream_wants_play = False
+        self._stream_epoch = getattr(self, "_stream_epoch", 0) + 1
+        # set_media joins the old input. Reset its verdict only afterwards,
+        # so a final old-input error cannot poison the replacement.
+        self.__vlc_widget.player.set_media(*args)
+        self._stream_restart = False
+        self._stream_resume_time = None
         # New media, new verdict: drop the previous error/frame state so a
         # stale failure can never mask the fresh attempt (and vice versa).
         self._play_error = None
         self._first_frame_reported = False
-        self.__vlc_widget.player.set_media(*args)
 
     def _on_media_error(self, _event):
         # libvlc gives no message payload: record the fact, never the URL
@@ -399,6 +489,8 @@ class PlayerWindow(Gtk.ApplicationWindow):
         if self._play_error is None:
             self._play_error = "error"
             logger.warning(f"[Player:{self.name}] Playback failed ({self._mode})")
+        if self._mode == MODE_STREAM:
+            self._stream_restart = True
 
     def playback_error(self):
         """Human-readable failure for the current media, or None.
@@ -668,6 +760,10 @@ class VideoPlayer(BasePlayer):
     FIRST_FRAME_TIMEOUT_SEC = 20
 
     def _apply_source(self, data_source):
+        self._stream_refresh_epoch = getattr(self, "_stream_refresh_epoch", 0) + 1
+        self._stream_refreshing = set()
+        for window in self.windows.values():
+            window._mode = self.mode
         self._static_token = getattr(self, "_static_token", 0) + 1
         self._static_in_flight = None
         # New media, new verdict: drop the previous resolution failure so a
@@ -753,6 +849,8 @@ class VideoPlayer(BasePlayer):
                     continue
 
                 for monitor, window in targets:
+                    window._stream_source = source
+                    window._stream_expiry = stream_expiry(video_url, audio_url)
                     media = window.media_new(video_url)
                     media.add_option("input-repeat=65535")
                     window.set_media(media)
@@ -1023,6 +1121,7 @@ class VideoPlayer(BasePlayer):
 
     def pause_playback(self, dbus_context=None):
         _authorize("player.pause_playback", dbus_context)
+        self._stream_resume_wanted = False
         for _monitor, window in self.windows.items():
             window.pause_fade(
                 fade_duration_sec=self.config[CONFIG_KEY_FADE_DURATION_SEC],
@@ -1031,6 +1130,7 @@ class VideoPlayer(BasePlayer):
 
     def start_playback(self, dbus_context=None):
         _authorize("player.start_playback", dbus_context)
+        self._stream_resume_wanted = True
         if getattr(self, "_closing", False) or ConfigUtil().load().get("is_stopped", False):
             return
         if getattr(self, "_source_switch_pending", False):
@@ -1039,11 +1139,76 @@ class VideoPlayer(BasePlayer):
             for _monitor, window in self.windows.items():
                 if self.mode == MODE_PLAYLIST and not getattr(window, "_queue", []):
                     continue  # No selected media on this monitor.
+                if self.mode == MODE_STREAM and self._refresh_stream_if_needed(window):
+                    continue
                 window.play_fade(
                     target=self.volume,
                     fade_duration_sec=self.config[CONFIG_KEY_FADE_DURATION_SEC],
                     fade_interval=self.config[CONFIG_KEY_FADE_INTERVAL],
                 )
+
+    def _refresh_stream_if_needed(self, window):
+        expiry = getattr(window, "_stream_expiry", None)
+        source = getattr(window, "_stream_source", None)
+        pending = getattr(self, "_stream_refreshing", set())
+        if source in pending:
+            return True
+        expired = expiry is not None and expiry <= time.time()
+        failed = getattr(window, "_play_error", None) is not None
+        if not (getattr(window, "_stream_restart", False) and source and (expired or failed)):
+            return False
+        targets = [
+            (m, w) for m, w in self.windows.items() if getattr(w, "_stream_source", None) == source
+        ]
+        height = max(m.get_geometry().height for m, _ in targets)
+        epoch = getattr(self, "_stream_refresh_epoch", 0)
+        self._stream_refreshing = pending
+        pending.add(source)
+
+        def resolve():
+            try:
+                formats = get_formats(source, fresh=True)
+                result = (*get_optimal_video(formats, height), get_best_audio(formats))
+            except Exception:  # noqa: BLE001 - report safely; retry only on a new Play
+                result = None
+            GLib.idle_add(self._finish_stream_refresh, epoch, source, targets, result)
+
+        threading.Thread(target=resolve, daemon=True, name="stream-refresh").start()
+        return True
+
+    def _finish_stream_refresh(self, epoch, source, targets, result):
+        if (
+            epoch != getattr(self, "_stream_refresh_epoch", 0)
+            or getattr(self, "_closing", False)
+            or getattr(self, "_source_switch_pending", False)
+            or self.mode != MODE_STREAM
+        ):
+            return False
+        self._stream_refreshing.discard(source)
+        if result is None:
+            for _, window in targets:
+                window._play_error = "error"
+            logger.warning("[Stream] Resume resolution failed; explicit Play can retry")
+            return False
+        video, width, height, audio = result
+        for monitor, window in targets:
+            stamp = getattr(window, "_stream_resume_time", None)
+            window.stop()
+            media = window.media_new(video)
+            media.add_option("input-repeat=65535")
+            if not monitor.is_primary():
+                media.add_option("no-audio")
+            window.set_media(media)
+            if monitor.is_primary():
+                window.add_audio_track(audio)
+            window._stream_expiry = stream_expiry(video, audio)
+            window._stream_resume_time = stamp
+            window.centercrop(width, height)
+        # A pause/STOP/source replacement while resolving must win. No worker
+        # touches VLC, GTK or policy; all completion is serialized on GLib.
+        if getattr(self, "_stream_resume_wanted", False):
+            self.start_playback()
+        return False
 
     def monitor_sync(self):
         primary_monitor = None

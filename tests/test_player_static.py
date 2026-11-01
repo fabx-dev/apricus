@@ -193,6 +193,7 @@ def _window_stub(**attrs):
         _mode="MODE_STREAM",
         _play_error=None,
         _first_frame_reported=False,
+        fade=types.SimpleNamespace(cancel=lambda: None),
         _PlayerWindow__cover_image=_Cover(),
     )
     for key, value in attrs.items():

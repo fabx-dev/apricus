@@ -35,7 +35,7 @@ from apricus.commons import (
     resolve_video_dir,
 )
 from apricus.monitor import Monitors
-from apricus.policy import PAUSED, POLICY_VERSION, STOPPED, PlaybackPolicyEngine
+from apricus.policy import PAUSED, PLAY, POLICY_VERSION, STOPPED, PlaybackPolicyEngine
 from apricus.stop_support import finish_process, stopped_background
 from apricus.utils import ConfigUtil, EndSessionHandler, _authorize, get_video_paths, is_snap
 
@@ -258,7 +258,7 @@ class ApricusServer:
             self.config[CONFIG_KEY_STOPPED] = bool(stop_to)
             self._save_config(manual_stop=bool(stop_to), manual_pause=pause)
 
-    def _apply_policy_output(self, output, *, fresh=False):
+    def _apply_policy_output(self, output, *, fresh=False, retry_play=False):
         """Actuate an engine output. Idempotent: re-applying the same
         (desired, wanted_mute) pair is a no-op (no double fades). A mute-only
         change never restarts playback, it only flips the mute switch.
@@ -269,7 +269,8 @@ class ApricusServer:
             last_desired, last_mute = None, None
         else:
             last_desired, last_mute = self._last_applied
-        if (output.desired, output.wanted_mute) == (last_desired, last_mute):
+        retry_play = retry_play and output.desired == PLAY
+        if (output.desired, output.wanted_mute) == (last_desired, last_mute) and not retry_play:
             return False
         if output.desired == STOPPED:
             self._terminate_player()
@@ -283,7 +284,14 @@ class ApricusServer:
         if player is None:
             return False
         try:
-            if output.desired != last_desired:
+            # Only explicit Play may retry an acknowledged but failed input.
+            # Sensor updates remain deduplicated; automatic/manual holds win.
+            retry_play = (
+                retry_play
+                and last_desired == PLAY
+                and getattr(player, "playback_state", PLAY) != PLAY
+            )
+            if output.desired != last_desired or retry_play:
                 if output.desired == PAUSED:
                     try:
                         player.is_paused_by_user = True
@@ -951,7 +959,7 @@ class ApricusServer:
         out, _ = self.policy.request_manual_resume()
         # Explicit Play must clear the disk latch, not preserve its old value.
         self._sync_policy_persist(pause_to=False)
-        self._apply_policy_output(out)
+        self._apply_policy_output(out, retry_play=True)
 
     def reload(self, dbus_context=None):
         _authorize("reload", dbus_context)
