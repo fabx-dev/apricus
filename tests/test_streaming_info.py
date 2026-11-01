@@ -23,7 +23,7 @@ BODY = (
     "restrictions or compatibility limitations."
 )
 
-DRIVER = r'''
+DRIVER = r"""
 import sys
 import time
 
@@ -223,7 +223,7 @@ def _():
 
 checks[sys.argv[1]]()
 print("CHECK-OK " + sys.argv[1])
-'''
+"""
 
 
 @pytest.fixture(scope="module")
@@ -234,7 +234,16 @@ def display():
     proc = None
     try:
         proc = subprocess.Popen(
-            ["Xvfb", "-displayfd", str(write_fd), "-screen", "0", "1280x800x24", "-nolisten", "tcp"],
+            [
+                "Xvfb",
+                "-displayfd",
+                str(write_fd),
+                "-screen",
+                "0",
+                "1280x800x24",
+                "-nolisten",
+                "tcp",
+            ],
             pass_fds=(write_fd,),
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
@@ -256,7 +265,10 @@ def display():
 
 def _run(display, name):
     env = dict(
-        os.environ, DISPLAY=display, GDK_BACKEND="x11", GSK_RENDERER="cairo",
+        os.environ,
+        DISPLAY=display,
+        GDK_BACKEND="x11",
+        GSK_RENDERER="cairo",
         PYTHONPATH=str(ROOT / "src"),
     )
     proc = subprocess.run(
