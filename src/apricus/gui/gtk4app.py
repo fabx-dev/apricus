@@ -1542,12 +1542,17 @@ class ControlPanel(Adw.Application):
         stopped = state == "stopped"
         if stopped:
             paused = True
+        # The button must agree with the badge: it offers the action that
+        # matches the effective state, not just the manual latch. Otherwise
+        # an automatic pause (maximized/fullscreen) shows "Paused" next to
+        # a button still offering "Pause".
+        effective_paused = paused or state in ("paused", "unavailable")
         badge = {
             "stopped": _("Stopped"),
             "playing": _("Playing"),
             "paused": _("Paused"),
             "unavailable": _("Playback unavailable"),
-        }.get(state, self._np_badge(mode, paused))
+        }.get(state, self._np_badge(mode, effective_paused))
         self.np_badge.set_text(badge)
         stop_btn = getattr(self, "np_stop_btn", None)
         busy = getattr(self, "_transport_busy", False)
@@ -1556,7 +1561,7 @@ class ControlPanel(Adw.Application):
             # nothing to stop or an operation is already in flight.
             stop_btn.set_visible(True)
             stop_btn.set_sensitive(server is not None and not stopped and not busy)
-        playing = not paused and mode in (MODE_VIDEO, MODE_STREAM, MODE_PLAYLIST)
+        playing = not effective_paused and mode in (MODE_VIDEO, MODE_STREAM, MODE_PLAYLIST)
         settings = Gtk.Settings.get_default()
         animations = bool(settings and settings.props.gtk_enable_animations)
         self.np_eq.set_visible(bool(playing and animations))
@@ -1566,9 +1571,9 @@ class ControlPanel(Adw.Application):
         self.np_subtitle.set_text(self._mode_text(mode))
         self.now_playing_status.set_text(self._now_playing_text(mode, current))
         self.np_play_btn.set_icon_name(
-            "media-playback-start-symbolic" if paused else "media-playback-pause-symbolic"
+            "media-playback-start-symbolic" if effective_paused else "media-playback-pause-symbolic"
         )
-        self.np_play_btn.set_tooltip_text(_("Play") if paused else _("Pause"))
+        self.np_play_btn.set_tooltip_text(_("Play") if effective_paused else _("Pause"))
         # WebKit had no working PAUSE API; STOP/RESUME is supported in M1.
         self.np_play_btn.set_sensitive(
             server is not None and not busy and (mode != MODE_WEBPAGE or stopped)

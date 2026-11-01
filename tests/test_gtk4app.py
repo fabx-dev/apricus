@@ -1929,6 +1929,85 @@ def remote_bridge_status_survives_absent_server():
 
 
 @check
+def play_button_matches_effective_state_not_just_manual_latch():
+    """Badge said Paused while the button still offered Pause: the icon
+    must follow the effective playback state (manual or automatic)."""
+    obj, _ = _panel(_base_config(), [])
+    icons, tooltips = {}, {}
+
+    class _W:
+        def __init__(self, name):
+            self._name = name
+
+        def set_text(self, text):
+            pass
+
+        def set_visible(self, visible):
+            pass
+
+        def set_icon_name(self, name):
+            icons[self._name] = name
+
+        def set_tooltip_text(self, text):
+            tooltips[self._name] = text
+
+        def set_sensitive(self, value):
+            pass
+
+        def set_value(self, value):
+            pass
+
+        def get_value(self):
+            return 50
+
+        def get_active(self):
+            return False
+
+        def set_active(self, value):
+            pass
+
+    class _Any:
+        def __getattr__(self, name):
+            return _W(name)
+
+    obj.__dict__.update(
+        {key: _W(key) for key in (
+            "np_content", "np_empty", "np_badge", "np_title",
+            "np_subtitle", "np_play_btn", "np_eq", "np_volume",
+            "np_mute_btn", "np_mute_icon", "np_mute_label",
+        )}
+    )
+    obj.now_playing_status = _W("status")
+    obj.np_play_btn = _W("play")
+
+    class _Srv:
+        mode = "MODE_VIDEO"
+        is_paused_by_user = False  # no manual latch...
+        playback_state = "paused"  # ...but automatically paused
+
+    obj._server = lambda: _Srv()
+    obj.config = {
+        "mode": "MODE_VIDEO",
+        "data_source": {"Default": "/v/a.mp4"},
+        "playlist": {"Default": []},
+        "playlist_shuffle": False,
+        "video_dir": None,
+        "is_mute": False,
+        "audio_volume": 50,
+    }
+    obj.playlist_paths = []
+    obj._np_current_path = None
+    obj.np_generation = 0
+    obj._load_np_hero = lambda path, generation: None
+    obj._refresh_np_transport = lambda server: None
+    obj._refresh_np_details = lambda mode, current: None
+    obj._refresh_np_queue = lambda mode: None
+    obj._refresh_now_playing()
+    assert icons["play"] == "media-playback-start-symbolic", icons
+    assert tooltips["play"] == "Play", tooltips
+
+
+@check
 def settings_has_no_mute_volume_or_lucky():
     """Volume/Mute live only in Now Playing; Feeling Lucky was never a switch."""
     import os
@@ -3800,6 +3879,10 @@ def test_window_policy_capability_survives_disconnect():
 
 def test_remote_bridge_status_survives_absent_server():
     _run("remote_bridge_status_survives_absent_server")
+
+
+def test_play_button_matches_effective_state():
+    _run("play_button_matches_effective_state_not_just_manual_latch")
 
 
 def test_settings_has_no_mute_volume_or_lucky():
