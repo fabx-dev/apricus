@@ -421,6 +421,11 @@ class PlayerWindow(Gtk.ApplicationWindow):
         return self.__vlc_widget.player.is_playing()
 
     def pause(self):
+        # Immediate pause by product decision: no pre-pause fade. A fade-out
+        # would keep presenting video for its whole duration after the click.
+        # Cancel any in-flight volume ramp (e.g. a resume fade-in) so no
+        # stale step touches the mixer after the stop.
+        self.fade.cancel()
         if getattr(self, "_mode", None) == MODE_STREAM:
             self._stream_wants_play = False
             player = self.__vlc_widget.player
@@ -433,22 +438,6 @@ class PlayerWindow(Gtk.ApplicationWindow):
                     )
         if self.is_playing():
             self.__vlc_widget.player.pause()
-
-    def pause_fade(self, fade_duration_sec, fade_interval):
-        self._stream_wants_play = False
-        self._stream_epoch = getattr(self, "_stream_epoch", 0) + 1
-        cur = self.get_volume()
-        target = 0
-        step = (target - cur) / (fade_duration_sec / fade_interval)
-        self.fade.cancel()
-        self.fade.start(
-            cur=cur,
-            target=target,
-            step=step,
-            fade_interval=fade_interval,
-            update_callback=self.set_volume,
-            complete_callback=self.pause,
-        )
 
     def volume_fade(self, target, fade_duration_sec, fade_interval):
         cur = self.get_volume()
@@ -1115,11 +1104,10 @@ class VideoPlayer(BasePlayer):
     def pause_playback(self, dbus_context=None):
         _authorize("player.pause_playback", dbus_context)
         self._stream_resume_wanted = False
+        # Immediate actuation by product decision: pausing VLC first and
+        # fading afterwards would still present video for the fade duration.
         for _monitor, window in self.windows.items():
-            window.pause_fade(
-                fade_duration_sec=self.config[CONFIG_KEY_FADE_DURATION_SEC],
-                fade_interval=self.config[CONFIG_KEY_FADE_INTERVAL],
-            )
+            window.pause()
 
     def start_playback(self, dbus_context=None):
         _authorize("player.start_playback", dbus_context)

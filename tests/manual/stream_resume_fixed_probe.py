@@ -102,8 +102,10 @@ def run():
         for cycle in range(int(os.environ.get("APRICUS_PROBE_CYCLES", "6"))):
             assert main_call(player.can_pause), "input is not genuinely pausable"
             identity = main_call(media_pointer)
-            main_call(lambda: window.pause_fade(1.5, 0.1))
-            until(lambda: not window.fade.is_active and not window.is_playing())
+            t_pause = time.monotonic()
+            main_call(window.pause)
+            until(lambda: not window.is_playing())
+            pause_latency = round(time.monotonic() - t_pause, 3)
             assert main_call(player.get_state) == vlc.State.Paused
             assert not getattr(window, "_stream_restart", False), "recreation is not continuity"
             saved = main_call(player.get_time)
@@ -123,6 +125,7 @@ def run():
             # by snap_youtube_frame_continuity.py, never inferred here.
             emit(
                 cycle=cycle + 1,
+                pause_latency_sec=pause_latency,
                 elapsed=round(time.monotonic() - t0, 3),
                 saved_ms=saved,
                 actual_ms=actual,

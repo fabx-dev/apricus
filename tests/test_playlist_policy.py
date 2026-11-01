@@ -132,12 +132,9 @@ def system(lifecycle, monkeypatch):
         p = x.processes[-1]
         p.activate()
         x.pump()
-        for w in p.player.windows.values():
-            w.complete()
         return p
 
     x.ready = ready
-    x.complete = lambda p: [window.complete() for window in p.player.windows.values()]
     return x
 
 
@@ -147,7 +144,6 @@ def test_playlist_play_after_paused_restart_loads_saved_item(system):
     old = x.start()
     previous = x.ready()
     old.pause_playback()
-    x.complete(previous)
     previous.terminate()
     new = x.start()
     fresh = x.ready()
@@ -169,7 +165,6 @@ def test_playlist_selected_while_paused_replaces_old_media_without_autoplay(syst
     window = p.player.windows["Virtual-1"]
     old_media = window.loaded
     obj.pause_playback()
-    x.complete(p)
     obj.playlist(x.clips[:2], "")
     x.pump()  # Deliver switch_media's real deferred source application.
     assert p.player.playback_state == "paused"
@@ -204,10 +199,9 @@ def test_transport_restart_and_selection_while_stopped(system, mode, muted):
     cfg["is_mute"] = muted
     x.path.write_text(json.dumps(cfg))
     obj = x.start()
-    old = x.ready()
+    x.ready()
     assert obj.playback_state == "playing"
     obj.pause_playback()
-    x.complete(old)
     assert obj.playback_state == obj.engine_snapshot["desired"] == "paused"
     assert json.loads(x.path.read_text())["policy_manual_pause"] is True
     obj.start_playback()
@@ -258,7 +252,6 @@ def test_multi_monitor_playlist_positions_and_no_advance_during_pause(system):
     one, two = p.player.windows.values()
     assert (one.loaded, two.loaded) == (x.clips[1], x.clips[0])
     obj.pause_playback()
-    x.complete(p)
     positions = json.loads(x.path.read_text())["playlist_position"]
     for w in (one, two):
         p.player._on_media_end(w)  # Late end notifications cannot advance PAUSE.
@@ -282,7 +275,6 @@ def test_play_before_deferred_selection_does_not_resume_previous_media(system):
     w = p.player.windows["Virtual-1"]
     original = w.loaded
     obj.pause_playback()
-    x.complete(p)
     obj.playlist(x.clips[:2], "")
     obj.start_playback()  # Arrives before switch_media's source callback.
     assert not w.playing
@@ -316,7 +308,6 @@ def test_automatic_pause_veto_and_manual_priority_hold_playlist(system):
     w = p.player.windows["Virtual-1"]
     obj.policy.reason_active_changed("fullscreen", True)
     obj._apply_policy_output(obj.policy.compute())
-    x.complete(p)
     p.player._on_media_end(w)
     assert w._queue_index == 0 and not w.playing
     obj.pause_playback()
@@ -373,7 +364,6 @@ def test_nonplaylist_selection_during_pause_keeps_new_content(system, kind):
     obj = x.start()
     first = x.ready()
     obj.pause_playback()
-    x.complete(first)
     if kind == "video":
         obj.video(x.clips[2], "")
         x.pump()
@@ -401,7 +391,6 @@ def test_monitor_without_queue_does_not_keep_old_video(system):
     obj = x.start()
     p = x.ready()
     obj.pause_playback()
-    x.complete(p)
     cfg = utils.ConfigUtil().load()
     cfg.update(mode="MODE_PLAYLIST", playlist={"Default": [], "Virtual-2": x.clips[:2]})
     utils.ConfigUtil().save(cfg)

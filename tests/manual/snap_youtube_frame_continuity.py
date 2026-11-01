@@ -46,6 +46,7 @@ class Transport:
     play = PlayerWindow.play
     pause = PlayerWindow.pause
     is_playing = PlayerWindow.is_playing
+    fade = SimpleNamespace(cancel=lambda: None)
 
 
 def pixel_continuity(before, after, count):

@@ -23,17 +23,18 @@ class Event:
 
 
 class Window:
-    """Use the real fade/pause methods with a manually completed fade and VLC stub."""
+    """Use the real play/pause methods with a manually completed fade and VLC stub."""
 
-    pause_fade = PlayerWindow.pause_fade
     play_fade = PlayerWindow.play_fade
-    pause = PlayerWindow.pause
     is_playing = PlayerWindow.is_playing
+
+    def pause(self):
+        self.pause_calls += 1
+        PlayerWindow.pause(self)
 
     def __init__(self):
         self.playing = False
-        self.completion = None
-        self.pause_requests = 0
+        self.pause_calls = 0
         self.play_requests = 0
         self._PlayerWindow__vlc_widget = SimpleNamespace(
             player=SimpleNamespace(is_playing=lambda: self.playing, pause=self._pause)
@@ -44,14 +45,7 @@ class Window:
         self.playing = False
 
     def _fade(self, **kwargs):
-        if kwargs.get("complete_callback"):
-            self.pause_requests += 1
-        self.completion = kwargs.get("complete_callback")
-
-    def complete(self):
-        if self.completion:
-            callback, self.completion = self.completion, None
-            callback()
+        pass
 
     def get_volume(self):
         return 50
@@ -160,15 +154,11 @@ def lifecycle(tmp_path, monkeypatch):
     def start():
         return server.ApricusServer("test", "", "", SimpleNamespace(reset=False, background=True))
 
-    def complete(p):
-        p.player.windows["Default"].complete()
-
     return SimpleNamespace(
         seed=seed,
         start=start,
         processes=processes,
         pump=pump,
-        complete=complete,
         registry=registry,
         path=path,
         tasks=tasks,
@@ -183,8 +173,9 @@ def test_persisted_pause_restart_waits_for_new_player_and_actuates(lifecycle):
     p0.activate()
     x.pump()
     old.pause_playback()
-    x.complete(p0)
+    # Immediate pause: no fade completion round-trip.
     assert p0.player.playback_state == "paused"
+    assert p0.player.windows["Default"].pause_calls == 1
     assert json.loads(x.path.read_text())["policy_manual_pause"] is True
     p0.terminate()
     del old
@@ -195,18 +186,16 @@ def test_persisted_pause_restart_waits_for_new_player_and_actuates(lifecycle):
     x.pump()  # Not activated/published yet; must not mark it as applied.
     p1.activate()
     assert p1.player._should_playback_start() is False
-    # Even a queued backend start must be corrected by the real pause/fade
+    # Even a queued backend start must be corrected by the real pause
     # actuator, rather than only changing a logical flag.
     p1.player.windows["Default"].playing = True
     x.pump()
-    assert p1.player.playback_state == "playing"  # Fade not completed yet.
-    x.complete(p1)
-    assert p1.player.windows["Default"].pause_requests == 1
-    assert p1.player.playback_state == "paused"
+    assert p1.player.playback_state == "paused"  # Actuated synchronously.
+    assert p1.player.windows["Default"].pause_calls == 1
     p1.player.start_playback()  # A late source-autoplay call must remain vetoed.
     assert p1.player.playback_state == "paused"
     assert new._apply_policy_output(new.policy.compute()) is False
-    assert p1.player.windows["Default"].pause_requests == 1
+    assert p1.player.windows["Default"].pause_calls == 1
     new.start_playback()
     assert new.engine_snapshot["manual_pause"] is False
     assert json.loads(x.path.read_text())["policy_manual_pause"] is False
@@ -222,7 +211,6 @@ def test_new_wallpaper_player_cannot_inherit_old_dedup(lifecycle):
     old = x.processes[-1]
     old.activate()
     x.pump()
-    x.complete(old)
     assert obj._last_applied == ("paused", False)
     old.terminate()
     other = x.path.parent / "another.mp4"
@@ -231,8 +219,7 @@ def test_new_wallpaper_player_cannot_inherit_old_dedup(lifecycle):
     fresh = x.processes[-1]
     fresh.activate()
     x.pump()
-    x.complete(fresh)
-    assert fresh.player.windows["Default"].pause_requests == 1
+    assert fresh.player.windows["Default"].pause_calls == 1
     assert fresh.player.playback_state == "paused"
     assert obj.engine_snapshot["manual_pause"] is True
 
@@ -245,7 +232,7 @@ def test_fresh_player_without_pause_and_persistent_stop(lifecycle):
     fresh.activate()
     x.pump()
     assert fresh.player.playback_state == "playing"
-    assert fresh.player.windows["Default"].pause_requests == 0
+    assert fresh.player.windows["Default"].pause_calls == 0
     assert fresh.player.windows["Default"].play_requests == 0
     fresh.terminate()
     x.seed(stop=True)
@@ -287,9 +274,8 @@ def test_readiness_budget_and_stale_callbacks(lifecycle):
     assert obj._reconcile_new_player(old, old.args[0], True, time.monotonic() + 30) is False
     fresh.activate()
     x.pump()
-    x.complete(fresh)
     assert fresh.player.playback_state == "paused"
-    assert fresh.player.windows["Default"].pause_requests == 1
+    assert fresh.player.windows["Default"].pause_calls == 1
 
 
 def test_failed_actuation_is_not_deduplicated(lifecycle, monkeypatch):
@@ -308,7 +294,6 @@ def test_failed_actuation_is_not_deduplicated(lifecycle, monkeypatch):
     assert obj._last_applied is None
     monkeypatch.setattr(fresh.player, "pause_playback", real_pause)
     x.pump()
-    x.complete(fresh)
     assert obj._last_applied == ("paused", False)
     assert fresh.player.playback_state == "paused"
 
@@ -336,7 +321,7 @@ def test_video_readiness_is_after_source_activation(lifecycle, monkeypatch):
     assert fresh.player._policy_ready is None
 
 
-def test_mute_failure_does_not_repeat_successful_pause_fade(lifecycle, monkeypatch):
+def test_mute_failure_does_not_repeat_successful_pause(lifecycle, monkeypatch):
     x = lifecycle
     x.seed(pause=True, mute=True)
     obj = x.start()
@@ -353,12 +338,11 @@ def test_mute_failure_does_not_repeat_successful_pause_fade(lifecycle, monkeypat
     monkeypatch.setattr(VideoPlayer, "is_mute", property(original.fget, set_mute))
     x.pump()
     assert obj._last_applied == ("paused", None)
-    assert fresh.player.windows["Default"].pause_requests == 1
+    assert fresh.player.windows["Default"].pause_calls == 1
     unavailable[0] = False
     x.pump()
-    x.complete(fresh)
     assert obj._last_applied == ("paused", True)
-    assert fresh.player.windows["Default"].pause_requests == 1
+    assert fresh.player.windows["Default"].pause_calls == 1
     assert fresh.player.windows["Default"].muted is True
 
 
@@ -372,7 +356,7 @@ def test_stop_cancels_pending_player_readiness(lifecycle):
     x.pump()
     assert obj.player_process is None
     assert obj.engine_snapshot["desired"] == "stopped"
-    assert fresh.player.windows["Default"].pause_requests == 0
+    assert fresh.player.windows["Default"].pause_calls == 0
 
 
 def test_web_readiness_after_initial_freeze(lifecycle, monkeypatch):

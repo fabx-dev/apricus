@@ -65,7 +65,6 @@ class Window:
     set_media = video.PlayerWindow.set_media
     is_playing = video.PlayerWindow.is_playing
     play_fade = video.PlayerWindow.play_fade
-    pause_fade = video.PlayerWindow.pause_fade
     _on_stream_playing = video.PlayerWindow._on_stream_playing
     _restore_stream_time = video.PlayerWindow._restore_stream_time
     _on_media_error = video.PlayerWindow._on_media_error
@@ -131,7 +130,7 @@ def loop(monkeypatch):
 def test_repeated_resume_only_releases_nonpausable_stream_input(loop, pausable):
     w = Window(pausable=pausable)
     for cycle in range(6):
-        w.pause_fade(1.5, 0.1)
+        w.pause()
         loop.drain()
         assert not w.is_playing()
         w.play_fade(50, 1.5, 0.1)
@@ -144,7 +143,7 @@ def test_repeated_resume_only_releases_nonpausable_stream_input(loop, pausable):
 
 def test_local_video_keeps_existing_resume_path(loop):
     w = Window(mode=video.MODE_VIDEO, pausable=True)
-    w.pause_fade(1.5, 0.1)
+    w.pause()
     loop.drain()
     w.play_fade(50, 1.5, 0.1)
     loop.drain()
@@ -153,17 +152,41 @@ def test_local_video_keeps_existing_resume_path(loop):
     assert w.input.seeks == []
 
 
-def test_old_fade_cannot_pause_new_play_and_zero_step_completes(loop):
+@pytest.mark.parametrize("mode,pausable", [(video.MODE_VIDEO, True), (video.MODE_STREAM, False)])
+def test_production_pause_actuates_immediately_without_fade(loop, mode, pausable):
+    """VideoPlayer.pause_playback calls window.pause() directly.
+
+    No fade step may be scheduled however large the configured duration is:
+    there is no intentional wait left in the pause path.
+    """
+    app = video.VideoPlayer.__new__(video.VideoPlayer)
+    app.config = {"mode": mode, "fade_duration_sec": 60.0, "fade_interval": 0.1}
+    app._stream_resume_wanted = True
+    w = Window(mode=mode, pausable=pausable)
+    app.windows = {object(): w}
+    assert w.is_playing()
+    app.pause_playback()
+    assert not w.is_playing()
+    assert loop.queue == {}
+    assert app._stream_resume_wanted is False
+
+
+def test_pause_cancels_inflight_fade_and_zero_step_completes(loop):
+    # No pre-pause fade exists anymore: an in-flight resume ramp must die
+    # with the pause, leaving no timer behind, and a zero step still ends.
     w = Window()
     w.get_volume = lambda: 50
-    w.pause_fade(1.5, 0.1)
-    stale_fn, stale_args = next(iter(loop.queue.values()))
-    w.play_fade(0, 1.5, 0.1)
-    stale_fn(*stale_args)  # simulate a callback already queued at cancellation
+    w.play_fade(50, 1.5, 0.1)
+    assert loop.queue  # resume ramp pending
+    w.pause()
+    assert not w.is_playing()
+    assert loop.queue == {}  # no intentional wait left behind
     loop.drain()
-    assert w.is_playing()
-    assert w.input.stops == 0
+    assert not w.is_playing()
     assert not w.fade.is_active
+    v = Window(mode=video.MODE_VIDEO, pausable=True)
+    v.play_fade(0, 1.5, 0.1)
+    assert not v.fade.is_active
 
 
 def test_pause_wins_during_opening_and_stale_seek_is_discarded(loop):
@@ -171,8 +194,7 @@ def test_pause_wins_during_opening_and_stale_seek_is_discarded(loop):
     w.pause()
     w.play()
     w._on_stream_playing(None)
-    w.pause_fade(1.5, 0.1)
-    loop.drain()
+    w.pause()
     assert not w.is_playing()
     assert w.input.seeks == []
     w.input.state = vlc.State.Playing  # late input-open completion
