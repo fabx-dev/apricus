@@ -59,7 +59,7 @@ See [RELEASE_NOTES_2.1.0.md](RELEASE_NOTES_2.1.0.md) and [CHANGELOG.md](CHANGELO
 
 - **Local video wallpapers** from your video folder, with asynchronous thumbnails and per-monitor selection.
 - **Looping playlists** with drag-and-drop reorder, shuffle and undo.
-- **Streams**: YouTube, Twitch, live and direct video links, with 10-second preview, favorites and history. Native packages bundle Deno and a vendored yt-dlp stack so YouTube works out of the box.
+- **Streams**: YouTube, Twitch, live and direct video links, with 10-second preview, favorites and history. Native packages bundle Deno and yt-dlp; some YouTube videos may not play reliably. The Streaming information button explains this limitation on demand.
 - **Web pages**: any URL or local `.html` file as wallpaper, with an Inspiration gallery.
 - **Multi-monitor**: deterministic per-monitor selection, including identical models.
 - **Now Playing**: live status, transport (Play/Pause, Stop, volume/mute), media inspector and up-next preview.
@@ -85,7 +85,7 @@ Screenshots live in `res/` and show the current GTK4 interface:
 
 ## Installation
 
-Packages are attached to each [GitHub Release](https://github.com/fabx-dev/apricus/releases). Filenames below follow the `2.1.0` naming pattern used by the build scripts.
+Published packages are attached to [GitHub Releases](https://github.com/fabx-dev/apricus/releases). **2.1.0 is currently an unpublished local candidate.** Filenames below describe the intended 2.1.0 packages, not a claim that they are already available.
 
 ### Debian / Ubuntu (`.deb`)
 
@@ -129,7 +129,7 @@ make flatpak
 sudo snap install apricus
 ```
 
-Or install a release-attached `.snap` file. The Snap is strict-confined; see Compatibility below.
+This installs the currently published Store version (2.0.7 rev15 during local 2.1.0 preparation), not the unpublished candidate. For an explicitly approved local test, quit Apricus first and verify its app/helper processes have exited, then use `sudo snap install --dangerous ./apricus_2.1.0_amd64.snap`. The Snap remains strict-confined. Back up user data before replacing an installation; see the release readiness report for upgrade reservations.
 
 ### From source
 
@@ -147,7 +147,7 @@ make run       # launch in debug mode
 
 ## GNOME integration
 
-Apricus ships a companion extension, `apricus-integration@fabx-dev` (source in `gnome-extension/`), revision 5 in this release:
+Apricus ships a companion extension, `apricus-integration@fabx-dev` (source in `gnome-extension/`), revision 6 in this release:
 
 - Hosts wallpaper windows in the Shell background layer, below DING icons and app windows.
 - Reports fullscreen/maximized state to the server over `org.gnome.Shell.Extensions.ApricusIntegration`.
@@ -158,7 +158,7 @@ Setup:
 1. Native `.deb`/`.rpm` installs place the extension under `/usr/share/gnome-shell/extensions/`. For Snap/Flatpak, which cannot write host extension directories from their sandbox, build the ZIP with `gnome-extension/build-zip.sh` and run `gnome-extension/install-host.sh --zip <file.zip> --enable` on the host (per-user, no sudo).
 2. Enable once: `gnome-extensions enable apricus-integration@fabx-dev`.
 3. Log out and back in so the Shell loads the new code.
-4. Confirm with `journalctl --user -g apricus-integration` (expect `enabled, code revision 5`).
+4. Confirm with `journalctl --user -g apricus-integration` (expect `enabled, code revision 6`).
 
 Updating works the same way: overwrite the files, then log out/in. Removing Apricus never touches `~/.local/share/gnome-shell/extensions/`; disable and delete that directory manually if desired.
 
@@ -187,9 +187,10 @@ Package differences:
 | Native GNOME Wayland (Shell 50.1) | Functionally validated, with documented timing/PNG reservations |
 | GNOME 49 / 51 | Shipped per static API review, not runtime-tested |
 | X11 sessions | Existing behavior retained |
-| Flatpak | Works, but M3 availability depends on verified window-state access |
+| Flatpak | Earlier package smoke tests passed; final candidate validation pending. M3 depends on verified window-state access |
 | Strict Snap on Wayland | Server-owned bridge push; direct signals unavailable |
-| Detection+decision latency ≤ 500 ms | NOT rigorously attested (observer saw policy update ~93 ms after signal receipt; player pause ~1.6 s with the default 1.5 s fade) |
+| Detection+decision latency ≤ 500 ms | NOT rigorously attested; the pre-pause fade was removed, but no final sensor-to-visible-pause bound is certified |
+| YouTube streaming | Some videos exhibit intermittent audio/video stalls; unresolved known limitation, not a guaranteed service |
 | Other desktops (KDE, XFCE, …) | Not claimed; GNOME is the supported target |
 
 On non-GNOME X11 desktops, playback works but icon stacking and static-wallpaper sync are GNOME-specific. KDE Plasma manages its own background surface and is not supported.
@@ -199,7 +200,7 @@ On non-GNOME X11 desktops, playback works but icon stacking and static-wallpaper
 ## Troubleshooting
 
 - **Wrong GUI launches (`~/.local/bin/apricus` shadows `/usr/bin/apricus`)**: an old per-user install takes precedence on `PATH`. Check with `which -a apricus` and `apricus --version`, remove or update the stale `~/.local` copy, then launch the packaged binary explicitly while testing.
-- **YouTube fails**: native packages bundle Deno and vendored yt-dlp; if playback still fails, open Now Playing for the surfaced error, update to the latest 2.1.0 package, and check network/proxy before retrying.
+- **YouTube fails or stalls**: some videos may not play reliably due to streaming service restrictions or compatibility limitations. The exact cause of the observed intermittent stalls is not established. Bundled Deno/yt-dlp and the Streaming information button do not imply the issue is fixed.
 - **Missing video deps**: install `vlc`, `ffmpeg`, `python3-vlc` and the GTK4/Libadwaita typelibs listed in `docs/dev.md`.
 - **Extension missing or stale**: Settings explains the requirement; reinstall the 2.1.0 extension files, enable, log out/in, and check `journalctl --user -g apricus-integration`.
 - **Strict Snap shows integration disabled**: with an older Snap or extension, the rows stay disabled — bridge-carried M3 needs the rev6 extension and a Snap that owns the bridge in its server process.

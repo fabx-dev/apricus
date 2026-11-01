@@ -1,15 +1,17 @@
 # Changelog
 
-## 2.1.0 — 2026-10-26
+## 2.1.0 — unreleased
 
 - M1: Now Playing panel with dynamic Play/Pause and separate Stop; persisted manual actions with precedence over automation.
 - M2: Server-owned Playback Policy Engine with pause/mute preferences, playlist-aware behavior and immediate application to current state.
-- M3: GNOME Shell extension revision 5 with `DesktopStateChanged` push channel, sender/sequence validation, reconnect reconciliation and safe freeze on loss.
-- GUI pause/mute rows editable on capable GNOME Wayland with extension-requirement messaging; strict Snap Wayland remains without M3 push.
+- M3: GNOME Shell extension revision 6 with `DesktopStateChanged` push channel, sender/sequence validation, reconnect reconciliation and safe freeze on loss.
+- GUI pause/mute rows editable on capable GNOME Wayland with extension-requirement messaging; strict Snap uses the server-owned bridge for M3 push.
 - Player D-Bus `data_source` type corrected to `a{ss}`; window-policy setters recompute current state without reloading player config.
 - Now Playing Play/Pause button and action follow the effective playback state, not just the manual latch (auto-paused video offers Play, and Play resumes instead of silently adding a manual hold).
-- Pause is now immediate: the pre-pause volume fade-out no longer delays VLC `pause()`, so video and audio stop at once on manual and automatic (fullscreen/maximized) pauses. Resume still fades in and restarts from the paused position without recreating media. Installed-app acceptance on x9 (strict Snap, YouTube): immediate pause with correct transport labeling across repeated GUI pause/play cycles, clean engine transitions, no playback errors.
-- Snap stream playback uses native VLC HTTP/TLS with a narrowly scoped TCP Fast Open compatibility fallback, restoring genuine PAUSE without media recreation or fresh YouTube resolution. The x7 reconnect/reseek candidate failed continuity and is superseded; installed-app acceptance of the new candidate remains pending (see `docs/notes/snap-stream-resume.md`).
+- Pause invokes VLC immediately, without the former pre-pause fade delay; resume retains fade-in. Immediate GUI pause and correct YouTube resume were accepted on the tested VM with x9/x8 respectively, not certified across all streams or hardware.
+- Snap stream playback uses native VLC HTTP/TLS with a narrowly scoped TCP Fast Open compatibility fallback. Restart/reseek recovery remains available for non-pausable inputs; native pausable inputs retain their media across pause/resume.
+- Streaming page: discreet information button with a shared tooltip/popover notice, keyboard navigation and native light/dark styling.
+- Known limitation: some YouTube videos may stall or lose reliable audio/video playback. This remains unresolved; no universal streaming reliability or confirmed upstream root cause is claimed.
 - Strict Snap: player readiness uses a pipe-based flag instead of `multiprocessing.Event`, because the sandbox denies `/dev/shm` (without this, setting any video failed with `PermissionError` and no player ever spawned).
 - M3 on strict Snap via bridge-carried window push (extension rev6 → Snap-owned bridge → policy engine); direct signal subscription remains unavailable under strict confinement by design.
 - Localizations updated for the four capability subtitles across all supported catalogs.

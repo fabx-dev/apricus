@@ -40,13 +40,15 @@
   </screenshots>
 
   <releases>
-    <release version="2.1.0" date="2026-10-26" type="stable">
+    <release version="2.1.0" date="2026-11-01" type="development">
       <description>
         <ul>
           <li>Now Playing panel with dynamic Play/Pause and separate Stop, with correct manual-action handling</li>
           <li>Playback Policy Engine: automatic rules with persisted manual pause/stop taking precedence, plus playlist-aware behavior</li>
           <li>GNOME Wayland fullscreen/maximized sensing: extension push channel feeding the policy engine without unnecessary restarts</li>
+          <li>Immediate pause without a pre-pause fade and an on-demand Streaming availability information button</li>
         </ul>
+        <p>Some YouTube videos may not play reliably due to streaming service restrictions or compatibility limitations. Intermittent audio/video stalls remain a known limitation.</p>
       </description>
     </release>
     <release version="2.0.7" date="2026-10-19" type="stable">
