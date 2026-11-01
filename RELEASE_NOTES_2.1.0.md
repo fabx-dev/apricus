@@ -37,6 +37,6 @@ Apricus 2.1.0 closes the M1–M3 cycle: playback controls, a server-owned policy
 
 ## Verifying the release
 
-- `apricus --version` (or the About/Settings row) must report 2.1.0.
+- `apricus --help` (the description), the startup log or the About/Settings row must report 2.1.0. There is no `--version` option.
 - Native installs: extension revision 6 loaded, `DesktopStateChanged` received, policy `extension-push`, preferences editable.
 - Strict Snap: without the rev6 extension, expect the integration rows disabled; bridge-carried M3 needs the rev6 extension and a Snap whose server owns the bridge.

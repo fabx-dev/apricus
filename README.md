@@ -70,7 +70,7 @@ See [RELEASE_NOTES_2.1.0.md](RELEASE_NOTES_2.1.0.md) and [CHANGELOG.md](CHANGELO
 
 ## Screenshots
 
-Screenshots live in `res/` and show the current GTK4 interface:
+Screenshots live in `res/` and illustrate the GTK4 interface; they predate final candidate acceptance:
 
 ![Library](res/apricus-2-library.png)
 ![Now Playing](res/apricus-2-now-playing.png)
@@ -79,7 +79,7 @@ Screenshots live in `res/` and show the current GTK4 interface:
 ![Web page](res/apricus-2-webpage.png)
 ![Settings](res/apricus-2-settings.png)
 
-> Note: the Settings screenshot still shows the previous “Requires X11” subtitle. In 2.1.0 the pause/mute rows are editable on capable GNOME Wayland and explain the extension requirement instead. An updated Settings screenshot is still needed; see the report.
+> Note: the Settings screenshot still shows the previous “Requires X11” subtitle, and Streaming does not yet show the new information button. In 2.1.0 the pause/mute rows explain the extension requirement on capable GNOME Wayland. These images are illustrative, not final-package validation evidence.
 
 ---
 
@@ -184,7 +184,7 @@ Package differences:
 
 | Area | Status in 2.1.0 |
 |---|---|
-| Native GNOME Wayland (Shell 50.1) | Functionally validated, with documented timing/PNG reservations |
+| Native GNOME Wayland (Shell 50.1) | Earlier VM validation with timing/PNG reservations; final-package acceptance pending |
 | GNOME 49 / 51 | Shipped per static API review, not runtime-tested |
 | X11 sessions | Existing behavior retained |
 | Flatpak | Earlier package smoke tests passed; final candidate validation pending. M3 depends on verified window-state access |
@@ -199,7 +199,7 @@ On non-GNOME X11 desktops, playback works but icon stacking and static-wallpaper
 
 ## Troubleshooting
 
-- **Wrong GUI launches (`~/.local/bin/apricus` shadows `/usr/bin/apricus`)**: an old per-user install takes precedence on `PATH`. Check with `which -a apricus` and `apricus --version`, remove or update the stale `~/.local` copy, then launch the packaged binary explicitly while testing.
+- **Wrong GUI launches (`~/.local/bin/apricus` shadows `/usr/bin/apricus`)**: an old per-user install takes precedence on `PATH`. Check with `which -a apricus` and `apricus --help` (the description reports the version), remove or update the stale `~/.local` copy, then launch the packaged binary explicitly while testing.
 - **YouTube fails or stalls**: some videos may not play reliably due to streaming service restrictions or compatibility limitations. The exact cause of the observed intermittent stalls is not established. Bundled Deno/yt-dlp and the Streaming information button do not imply the issue is fixed.
 - **Missing video deps**: install `vlc`, `ffmpeg`, `python3-vlc` and the GTK4/Libadwaita typelibs listed in `docs/dev.md`.
 - **Extension missing or stale**: Settings explains the requirement; reinstall the 2.1.0 extension files, enable, log out/in, and check `journalctl --user -g apricus-integration`.
