@@ -307,3 +307,55 @@ def test_window_lease_lapse_rebaselines_without_reject():
     state.unregister(":1.14", token, 9)
     with pytest.raises(ValueError):
         state.frame(":1.14", token, 10, False, False)
+
+
+def test_cross_channel_calls_share_sender_without_false_busy(monkeypatch):
+    from tests.test_gnome_bridge import Invocation, fake_bridge
+
+    bridge, bus, glib = fake_bridge(monkeypatch, [":1.14", ":1.14", ":1.14", ":1.14", ":1.14"])
+    bridge.window_registration = WindowRegistration(lambda: bridge._window_changed())
+    bridge._window_notified = None
+    bridge._on_window_frame = lambda *args: None
+    bridge._on_window_lost = lambda *args: None
+    reg = Invocation()
+    bridge._call(
+        bus,
+        ":1.14",
+        None,
+        None,
+        "WindowRegister",
+        glib.Variant("(uubb)", (1, 1, False, False)),
+        reg,
+    )
+    assert not reg.error
+    # A status-channel call in flight must not reject a window frame.
+    bridge.senders.add((":1.14", "Update"))
+    state = Invocation()
+    bridge._call(
+        bus,
+        ":1.14",
+        None,
+        None,
+        "WindowState",
+        glib.Variant(
+            "(subb)", (bridge.window_registration.current()["generation"], 2, True, False)
+        ),
+        state,
+    )
+    assert not state.error
+    assert bridge.window_registration.current()["fullscreen"] is True
+    # The same method re-entered is still rejected.
+    bridge.senders.add((":1.14", "WindowState"))
+    dup = Invocation()
+    bridge._call(
+        bus,
+        ":1.14",
+        None,
+        None,
+        "WindowState",
+        glib.Variant(
+            "(subb)", (bridge.window_registration.current()["generation"], 3, True, False)
+        ),
+        dup,
+    )
+    assert "busy or invalid request" in dup.error

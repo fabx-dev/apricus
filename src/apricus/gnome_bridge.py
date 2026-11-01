@@ -401,17 +401,21 @@ class Bridge:
 
     def _call(self, bus, sender, _path, _interface, method, parameters, invocation):
         # Small typed API; no strings except the fixed-size opaque generation.
+        # The re-entrancy key is (sender, method): the status and window-push
+        # channels share one sender over async D-Bus, so scoping by sender
+        # alone would falsely reject a legitimate concurrent frame.
         args = parameters.unpack()
+        key = (sender, method)
         if (
             self.closed
             or self.pending >= 8
-            or sender in self.senders
+            or key in self.senders
             or any(isinstance(arg, str) and len(arg) > 32 for arg in args)
         ):
             invocation.return_dbus_error(INTERFACE + ".Rejected", "busy or invalid request")
             return
         self.pending += 1
-        self.senders.add(sender)
+        self.senders.add(key)
         epoch = self.epoch
         suspend_offset = boot_time() - time.monotonic()
         finished = False
@@ -422,7 +426,7 @@ class Bridge:
                 return
             finished = True
             self.pending -= 1
-            self.senders.discard(sender)
+            self.senders.discard(key)
             if error:
                 invocation.return_dbus_error(INTERFACE + ".Rejected", str(error))
 
