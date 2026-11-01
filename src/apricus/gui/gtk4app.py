@@ -4550,11 +4550,18 @@ class ControlPanel(Adw.Application):
         self.np_play_btn.set_sensitive(False)
         self.np_stop_btn.set_sensitive(False)
         try:
-            prev = server.is_paused_by_user
-            server.is_paused_by_user = not prev
-            if not prev:
+            # Act on the EFFECTIVE state, not just the manual latch: the
+            # button offers Play whenever nothing is playing (including
+            # automatic pauses), and Pause only while actually playing.
+            try:
+                playing = server.playback_state == "playing"
+            except Exception:  # noqa: BLE001 - assume playing, act, reconcile
+                playing = True
+            if playing:
+                server.is_paused_by_user = True
                 server.pause_playback()
             else:
+                server.is_paused_by_user = False
                 server.start_playback()
         finally:
             self._transport_busy = False

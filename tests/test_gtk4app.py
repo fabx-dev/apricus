@@ -2978,6 +2978,7 @@ def transport_play_tooltip_follows_state():
     cases = [
         ("playing", False, "media-playback-pause-symbolic", "Pause"),
         ("paused", True, "media-playback-start-symbolic", "Play"),
+        ("paused", False, "media-playback-start-symbolic", "Play"),
         ("stopped", True, "media-playback-start-symbolic", "Play"),
     ]
     for state, paused, icon, tip in cases:
@@ -2991,6 +2992,26 @@ def transport_play_tooltip_follows_state():
     obj._refresh_now_playing()
     assert obj.np_play_btn.sensitive is False
     assert obj.np_stop_btn.sensitive is False
+
+
+@check
+def play_pause_acts_on_effective_state_not_just_latch():
+    # Auto-paused (no manual latch): the Play-labeled button must attempt
+    # a resume, not silently add a manual hold.
+    obj, srv = _npanel("paused", False)
+    obj.on_play_pause()
+    assert srv.calls == ["start"], srv.calls
+    assert srv.is_paused_by_user is False
+    # Actually playing: the Pause-labeled button holds playback.
+    obj, srv = _npanel("playing", False)
+    obj.on_play_pause()
+    assert srv.calls == ["pause"], srv.calls
+    assert srv.is_paused_by_user is True
+    # Manually paused: the Play-labeled button releases the hold.
+    obj, srv = _npanel("paused", True)
+    obj.on_play_pause()
+    assert srv.calls == ["start"], srv.calls
+    assert srv.is_paused_by_user is False
 
 
 @check
@@ -4031,6 +4052,10 @@ def test_transport_stop_button_always_visible_and_state_gated():
 
 def test_transport_play_tooltip_follows_state():
     _run("transport_play_tooltip_follows_state")
+
+
+def test_play_pause_acts_on_effective_state():
+    _run("play_pause_acts_on_effective_state_not_just_latch")
 
 
 def test_play_pause_honours_single_flight():
