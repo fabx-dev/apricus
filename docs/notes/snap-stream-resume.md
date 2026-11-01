@@ -1,6 +1,25 @@
 # Strict Snap stream resume — continuity correction, 2026-11-01
 
-## Current verdict: x7 rejected; native HTTP candidate awaiting sideload
+## Current verdict: x8 ACCEPTED for stream continuity on this VM (2026-11-01)
+
+Installed x8 (`d0fa49f2…`, source `018dd5b`) passed the checks the x7
+candidate failed:
+
+- Manual YouTube pause/Play ×3 via installed-app IPC: back to `playing`,
+  no playback error.
+- Fullscreen and maximized automatic pause/resume with GUI closed:
+  user-observed resume **from the correct point** in both cases.
+- Observer record: every automatic reason produced `paused` on hold and
+  `playing` on release, with `push_alive: true`, no active-reason leaks
+  and no player errors.
+- No TLS/HTTP failures in the installed-app log; first frame ~4 s.
+
+Remaining explicit reservations: perceived resume latency on real
+hardware, audible-mute validation, and Store upgrade path are still
+NOT TESTED. No publication was performed; Store stable 2.0.7 rev15
+untouched.
+
+### Historical x7 rejection (superseded)
 
 The user observed that installed x7 restarted from a different point. Its
 continuity acceptance is **FAIL**, superseding any earlier inference that
