@@ -1,7 +1,8 @@
-"""Real updated PlayerWindow inside strict Snap; not installed-app acceptance.
+"""Native HTTP pause continuity with real PlayerWindow inside strict Snap.
 
 Run with the worktree src first in PYTHONPATH and GDK_BACKEND=x11, through
-the installed app's command chain. Never publishes IPC or writes preferences.
+the installed app's command chain, with the packaged TCP fallback preloaded.
+Never publishes IPC or writes preferences. Not installed-app acceptance.
 """
 
 import json
@@ -22,7 +23,7 @@ from apricus.yt_utils import get_best_audio, get_formats, get_optimal_video
 
 
 def emit(**values):
-    print(json.dumps(values), flush=True)
+    print(json.dumps({"mono": round(time.monotonic(), 3), **values}), flush=True)
 
 
 def main_call(fn):
@@ -69,6 +70,14 @@ def displayed_frames():
         media.release()
 
 
+def media_pointer():
+    media = player.get_media()
+    try:
+        return media._as_parameter_.value
+    finally:
+        media.release()
+
+
 def run():
     passed = False
     try:
@@ -89,40 +98,37 @@ def run():
         until(lambda: window.is_playing() and displayed_frames() > 0)
         emit(initial_first_display_sec=round(time.monotonic() - initial, 3))
         until(lambda: window.is_playing() and player.get_time() >= 2000)
-        for cycle in range(6):
+        hold = float(os.environ.get("APRICUS_PROBE_HOLD_SECONDS", "0.5"))
+        for cycle in range(int(os.environ.get("APRICUS_PROBE_CYCLES", "6"))):
+            assert main_call(player.can_pause), "input is not genuinely pausable"
+            identity = main_call(media_pointer)
             main_call(lambda: window.pause_fade(1.5, 0.1))
             until(lambda: not window.fade.is_active and not window.is_playing())
-            saved = main_call(lambda: window._stream_resume_time)
-            t0 = time.monotonic()
-
-            def resume_at_start(saved=saved):
-                media = window.media_new(video)
-                media.add_option("input-repeat=65535")
-                if saved is not None:
-                    media.add_option(f"start-time={saved / 1000:.3f}")
-                window.set_media(media)
-                window.add_audio_track(audio)
-                window.play_fade(50, 1.5, 0.1)
-
-            if os.environ.get("APRICUS_PROBE_START_TIME"):
-                main_call(resume_at_start)
-            else:
-                main_call(lambda: window.play_fade(50, 1.5, 0.1))
-            until(lambda: window.is_playing() and window._stream_resume_time is None)
+            assert main_call(player.get_state) == vlc.State.Paused
+            assert not getattr(window, "_stream_restart", False), "recreation is not continuity"
+            saved = main_call(player.get_time)
+            # Intentional test hold, not a recovery delay in production.
+            time.sleep(hold)
+            assert main_call(player.get_time) == saved, "time advanced while paused"
             frames = main_call(displayed_frames)
-            until(
-                lambda saved=saved, frames=frames: (
-                    window.is_playing()
-                    and window._stream_resume_time is None
-                    and player.get_time() >= (saved or 0) + 250
-                    and displayed_frames() > frames
-                )
-            )
+            t0 = time.monotonic()
+            main_call(lambda: window.play_fade(50, 1.5, 0.1))
+            until(lambda frames=frames: window.is_playing() and displayed_frames() > frames)
+            assert main_call(media_pointer) == identity, "media was replaced"
+            actual = main_call(player.get_time)
+            length = main_call(player.get_length)
+            # VLC's get_time()/displayed counter are NOT a content oracle:
+            # counters may include repeated paused pictures and time can lag
+            # decoded output near EOF. Pixel continuity is tested separately
+            # by snap_youtube_frame_continuity.py, never inferred here.
             emit(
                 cycle=cycle + 1,
                 elapsed=round(time.monotonic() - t0, 3),
                 saved_ms=saved,
-                actual_ms=main_call(player.get_time),
+                actual_ms=actual,
+                declared_length_ms=length,
+                hold_sec=hold,
+                media_reused=True,
                 error=window.playback_error(),
                 displayed_frames=main_call(displayed_frames),
             )

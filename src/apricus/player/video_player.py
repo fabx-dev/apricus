@@ -463,10 +463,6 @@ class PlayerWindow(Gtk.ApplicationWindow):
         )
 
     def media_new(self, *args):
-        if args and isinstance(args[0], str) and os.environ.get("SNAP"):
-            mrl = args[0]
-            if mrl.startswith(("https://", "http://")):
-                args = (f"avio://{mrl}", *args[1:])
         return self.__vlc_widget.instance.media_new(*args)
 
     def set_media(self, *args):
@@ -556,9 +552,6 @@ class PlayerWindow(Gtk.ApplicationWindow):
         self.__vlc_widget.player.video_set_crop_geometry(crop_geometry)
 
     def add_audio_track(self, audio):
-        if isinstance(audio, str) and os.environ.get("SNAP"):
-            if audio.startswith(("https://", "http://")):
-                audio = f"avio://{audio}"
         self.__vlc_widget.player.add_slave(vlc.MediaSlaveType(1), audio, True)
 
     def set_cover(self, image_path):

@@ -1,4 +1,93 @@
-# Strict Snap stream resume — local candidate, 2026-11-01
+# Strict Snap stream resume — continuity correction, 2026-11-01
+
+## Current verdict: x7 rejected; native HTTP candidate awaiting sideload
+
+The user observed that installed x7 restarted from a different point. Its
+continuity acceptance is **FAIL**, superseding any earlier inference that
+`set_time()` plus advancing time/display counters proved restored content.
+
+### Confirmed operational cause and narrower correction
+
+The earlier Snap-specific AVIO routing made both video/audio inputs report
+non-pausable. VLC 3 stops such an input on pause. Reopening it and seeking did
+not provide acceptable continuity. The new candidate removes AVIO routing and
+restores VLC's native HTTP/TLS and genuine input-preserving PAUSE.
+
+Native TLS previously failed. A syscall comparison **inside the same strict
+Snap** isolated an actionable difference: connected TCP `sendmsg()` sent its
+payload successfully, while `sendmsg(MSG_FASTOPEN | MSG_NOSIGNAL, peer)` returned
+`EACCES`. VLC 3.0.20's `src/network/tls.c:vlc_tls_ConnectWrite()` falls back to
+ordinary `connect()` for `EOPNOTSUPP`, but not for this error. The exact kernel
+policy layer returning the denial is not established; no hardware/decoder
+diagnosis is inferred from it.
+
+`src/compat/vlc_fastopen.c` preserves the failed operation and reports only
+denied TCP Fast Open as unsupported to VLC, selecting **VLC's existing normal
+TCP fallback**. It does not open sockets or grant permissions. Ordinary denied
+writes, other errors, UDP/Unix sockets and successful writes retain their
+results. Tests pin these boundaries. HTTPS then opened successfully with
+`can_pause=1`, `seekable=1`; bare Play resumed at the same paused time.
+
+The helper is built only in Snapcraft's Meson environment and installed under
+`usr/lib/apricus/`. Before the forkserver/player interpreters start,
+`snap_vlc.prepare_snap_vlc()` adds its immutable Snap path to their `LD_PRELOAD`,
+preserving other entries. Missing packaged compatibility fails loudly. Native
+and Flatpak startup do not change their environment or build this helper.
+
+No relay, callback transport, `start-time`/demux override, new listener, new
+permission, manifest change, or security-profile change is used in production.
+Those transport/reseek prototypes were rejected. A host-side observation of the
+strict diagnostic process confirmed `snap.apricus.apricus (enforce)`, seccomp
+mode 2 with two filters, and the compatibility library mapped at the same time.
+The kernel still rejects Fast Open; no AppArmor/seccomp policy is weakened.
+
+### Content-based validation, not clock/counter-based inference
+
+The previous oracle was wrong in two ways: a seek can echo its requested time
+before output replays an earlier prefix; and VLC can increment its displayed
+counter while repeatedly displaying the **same paused picture**. In the test
+sample `get_time()` also lagged decoded output near EOF (frame 449 of 450 was
+reported around 9 s). None of these values alone proves continuity.
+
+The replacement diagnostic compares the paused decoded pixels and the **first
+different decoded picture** after Play with the same fixed 15 s YouTube source
+decoded independently. It includes the real audio slave, production
+`PlayerWindow.play/pause` methods and the strict installed Snap runtime with
+worktree code and the helper preloaded. One bounded reference download is a
+diagnostic oracle, **not a production download/cache feature**.
+
+Six successive pairs matched frames **90→91, 180→181, 270→271, 360→361,
+449→0 (natural EOF), 90→91**. First-new-picture times were **51–71 ms**. A
+separate 30 s pause matched **90→91 in 61 ms**. Scaled-RGB reference matching is
+approximate (a small neighbouring-frame tolerance is explicit in the script).
+An independently numbered-pixel network source gives an exact oracle: after
+holding frame **66 for 30 s**, the first new frame was **67**, with the same
+input and no seek/recreation. One already-submitted picture may complete as
+pause takes effect; subsequent repeated pictures are not treated as progress.
+
+These tests do not measure full Shell/wallpaper presentation latency or audible
+mute. Real installed-app manual/fullscreen/maximized continuity, GUI open and
+closed, remain **PENDING**. No release approval is implied.
+
+Final automated run for this candidate: **606 passed, 5 skipped, 28 warnings**.
+The prior pipe-readiness bad-FD warning remains outside this fix. Ruff passed.
+The new tests exercise the C interposer against a deterministic syscall stub,
+including unchanged non-TFO/other-socket denials; Snap bootstrap ordering and
+preload idempotence; native video/audio URL preservation; rejection of repeated
+paused pictures and replayed-prefix false positives; and the GUI-independent
+server manual/fullscreen/maximized path with genuinely pausable input. Meson
+configuration/compilation confirmed the helper target exists for Snapcraft's
+environment and is absent from an ordinary native build.
+
+Reproduction sources: `tests/manual/snap_youtube_frame_continuity.py`,
+`tests/manual/stream_resume_probe.py`, `tests/manual/stream_resume_fixed_probe.py`.
+The latter is now only a transport/capability check, not a content verdict.
+Evidence under `/tmp/opencode/stream-resume-analysis/` includes
+`fastopen-syscall-proof.log`, `native-http-fastopen-fallback.log`,
+`strict-profile-with-fallback.json`, `native-youtube-six-frame-cycles.log`,
+`native-youtube-30s-hold.log`, and `native-marked-next-frame-30s.log`.
+
+## Historical x7 candidate below — not current acceptance evidence
 
 ## Status and scope
 
@@ -41,7 +130,7 @@ mode. **Why this resolved AVIO stream reports non-pausable, and any additional
 decoder/network behavior, remain unproven.** Hardware, AppArmor and the sandbox
 itself are not established root causes. Decoder warnings alone are not proof.
 
-## Applied correction
+## Historical x7 correction (rejected for continuity)
 
 - Capture non-pausable stream input state at pause completion. At the next
   authorized Play, release only the VLC input with internal `stop()` and replay
@@ -74,10 +163,12 @@ Explicit unpause did not work. A separate prototype preconfigured a fresh
 descriptor's `start-time` instead of seeking after Playing; it did not establish
 a consistent latency advantage and is **not** the production path.
 
-The final updated `PlayerWindow` diagnostic ran in the installed strict Snap
+The historical updated `PlayerWindow` diagnostic ran in the installed strict Snap
 with **worktree code**, not a newly installed full application. Six consecutive
-cycles restored seekable position, advanced media time by at least 250 ms and
-increased LibVLC's displayed-picture counter, without playback error:
+cycles reached the requested time plus 250 ms and increased LibVLC's
+displayed-picture counter, without playback error. **This did not prove restored
+content; x7 subsequently failed user-observed continuity.** These obsolete
+timings are retained only as an audit of the rejected criterion:
 
 | Cycle | Request to restored/advancing/displayed criterion (s) |
 | --- | ---: |
@@ -95,7 +186,7 @@ perceptible delay remain explicit acceptance reservations, not attributed to
 the VM or networking without proof. The fix prevents the indefinite dead-input
 state in this diagnostic; it does not prove sufficiently fast daily use.
 
-## Automated verification
+## Historical automated verification (x7)
 
 `584 passed, 5 skipped, 28 warnings` in the final full repository pytest run.
 Ruff checks/formatting passed for changed code and probes. Warnings include the

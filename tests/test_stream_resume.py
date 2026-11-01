@@ -374,13 +374,14 @@ def test_resolution_cache_bypassed_only_for_required_refresh(monkeypatch, fresh)
 
 
 @pytest.mark.parametrize("reason", ["manual", "fullscreen", "maximized"])
-def test_server_stream_resume_without_gui(lifecycle, loop, reason):
+@pytest.mark.parametrize("pausable", [False, True])
+def test_server_stream_resume_without_gui(lifecycle, loop, reason, pausable):
     x = lifecycle
     x.seed()
     app = x.start()
     process = x.processes[-1]
     process.activate()
-    w = Window()
+    w = Window(pausable=pausable)
     process.player.config["mode"] = video.MODE_STREAM
     process.player.windows = {next(iter(process.player.windows)): w}
     loop.drain()
@@ -404,7 +405,8 @@ def test_server_stream_resume_without_gui(lifecycle, loop, reason):
     loop.drain()
     assert app.engine_snapshot["desired"] == "playing"
     assert w.is_playing()
-    assert w.input.stops == 1
+    assert w.input.stops == (0 if pausable else 1)
+    assert w.input.seeks == ([] if pausable else [4200])
     assert len(x.processes) == 1  # server/player only; no GUI involved
 
 

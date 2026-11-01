@@ -13,6 +13,21 @@ gnome = import('gnome')
 
 subdir('data')
 subdir('src')
+
+# Snapcraft exports CRAFT_PART_INSTALL during Meson configure. Keep the native
+# TCP fallback out of DEB/RPM/Flatpak builds and leave snapcraft.yaml unchanged.
+python = import('python').find_installation('python3')
+snap_build = run_command(python, '-c',
+  'import os; print(int(bool(os.environ.get("CRAFT_PART_INSTALL") or os.environ.get("SNAPCRAFT_PART_INSTALL"))))',
+  check: true).stdout().strip() == '1'
+if snap_build
+  add_languages('c', required: true)
+  cc = meson.get_compiler('c')
+  shared_library('apricus-vlc-fastopen', 'src/compat/vlc_fastopen.c',
+    dependencies: cc.find_library('dl'),
+    install: true,
+    install_dir: join_paths(get_option('prefix'), 'lib', 'apricus'))
+endif
 subdir('po')
 
 # GNOME Shell wallpaper integration: installed where the Shell looks for

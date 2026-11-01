@@ -27,6 +27,7 @@ def emit(**values):
 formats = get_formats("https://youtu.be/Z4F3AXvrLKo")
 video, _, _ = get_optimal_video(formats, 1080)
 audio = get_best_audio(formats)
+prefix = "" if os.environ.get("APRICUS_PROBE_NATIVE_HTTP") else "avio://"
 instance = vlc.Instance(_vlc_options(False, None))
 player = instance.media_player_new()
 window = Gtk.Window()
@@ -47,7 +48,7 @@ def wait_state(state, limit=15):
 
 
 def new_media():
-    media = instance.media_new("avio://" + video)
+    media = instance.media_new(prefix + video)
     media.add_option("input-repeat=65535")
     return media
 
@@ -55,11 +56,16 @@ def new_media():
 def run():
     try:
         emit(vlc=vlc.libvlc_get_version().decode())
-        for method in ("play", "set_pause", "stop_play", "set_media_only", "new_media"):
+        methods = (
+            ("play",)
+            if not prefix
+            else ("play", "set_pause", "stop_play", "set_media_only", "new_media")
+        )
+        for method in methods:
             player.stop()
             media = new_media()
             player.set_media(media)
-            player.add_slave(vlc.MediaSlaveType(1), "avio://" + audio, True)
+            player.add_slave(vlc.MediaSlaveType(1), prefix + audio, True)
             player.play()
             if not wait_state(vlc.State.Playing):
                 emit(method=method, initial=str(player.get_state()))
@@ -79,6 +85,7 @@ def run():
             )
             player.pause()
             paused = wait_state(vlc.State.Paused, 5)
+            paused_time = player.get_time()
             t0 = time.monotonic()
             if method == "play":
                 result = player.play()
@@ -94,7 +101,7 @@ def run():
                 player.stop()
                 player.set_media(new_media() if method == "new_media" else media)
                 if method != "same_media_no_slave":
-                    player.add_slave(vlc.MediaSlaveType(1), "avio://" + audio, True)
+                    player.add_slave(vlc.MediaSlaveType(1), prefix + audio, True)
                 result = player.play()
             resumed = wait_state(vlc.State.Playing)
             stamp = player.get_time()
@@ -107,6 +114,8 @@ def run():
                 result=result,
                 state=str(player.get_state()),
                 advancing=player.get_time() > stamp,
+                paused_time=paused_time,
+                first_resumed_time=stamp,
                 elapsed=round(time.monotonic() - t0, 3),
             )
             media.release()
