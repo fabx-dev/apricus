@@ -6,6 +6,31 @@ an implied pass. No external publication or privileged install is authorized.
 
 ## Local interaction implementation — acceptance gate (2026-11-02)
 
+Rev8/x13 visible acceptance also **FAILS on exit**: Done disappears and the page
+stops accepting input; server status is WALLPAPER / surface-hidden although PPE
+is playing with no reasons and the bridge remains active. A bounded private
+GNOME 50.1 reproduction using `snap run --shell apricus`, the full server/player
+source and real bridge/socket transport reproduced the failure. Copy-only trace
+instrumentation outside the repository showed Shell rollback acknowledged safe,
+then player restoration returned false: `set_title(None)` raises Gtk3's
+`Argument 1 does not allow None as a value`. Real WebWindows are initially
+untitled; earlier fixtures with an explicit title masked the defect.
+
+The one-line product correction restores `window.props.title` instead, preserving
+the exact original None through the nullable GObject property. A real Gtk3
+regression and a fake-method regression cover two restorations. **654 passed,
+5 skipped, 31 warnings**, Ruff PASS. With the corrected source in the same
+isolated strict-Snap runtime, two full server-authorized entry/exit cycles passed:
+same MetaWindow, GtkWindow and WebView, same URI hash, STARTED=1/FINISHED=1,
+original title None restored, no quarantine and interaction available again.
+This was a targeted lifecycle regression with native Shell APIs and a local real
+WebView, not mouse/keyboard/audio or installed-new-package acceptance. Evidence
+and failed/corrected traces are in `../apricus-rollback-strict-probe/`.
+All probe processes exited; installed x13's 36 sources/assets and host rev8
+extension remain unchanged. No Shell/shortcut or preference change is needed for
+this correction. The earlier visible failure remains recorded; release BLOCKED.
+No cause is inferred for the older, separate minimization anomaly.
+
 Visible acceptance has begun and is currently **FAIL at entry on rev7**, not
 PASS: Settings gating was corrected by `d2ff195` and the user confirmed the
 pause control is editable. The selected local page became visible after the
@@ -76,7 +101,7 @@ output and is copied byte-for-byte to the candidate directory.
 | Authenticated Shell owner, bridge generation, current player/window token | PASS (automated) | bridge dispatch and GJS client/controller tests |
 | Stop/Pause entry rejection and unchanged manual latches | PASS (automated) | policy eligibility tests; no policy override |
 | Policy/source/Stop/quit deferred until rollback | PASS (automated transaction) | Real integrated lifecycle still NOT TESTED |
-| Idempotent cleanup and fail-closed surface hiding | PASS (automated) | player/controller failure injection; real Mutter failure still NOT TESTED |
+| Idempotent cleanup and fail-closed surface hiding | FAIL installed x13 nullable-title restoration; corrected source PASS targeted private strict runtime | exact None title and retained window/WebView tested; installed-new-package acceptance NOT TESTED |
 | No WebView recreation on integration changes | PASS (automated) | existing object/collection identity tests and web-specific lifecycle override |
 | Done above fullscreen, dedicated temporary shortcut | FAIL on installed rev7; rev8 fix NOT TESTED installed | `trackFullscreen:false`; conflict-checked F12/F11/F10 paths pass GJS, actual binding displayed |
 | Focus/minimized-window corrections | PASS (GJS) | filtered refocus and `notify::minimized` event tests |

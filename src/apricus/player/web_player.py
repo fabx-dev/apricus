@@ -404,7 +404,11 @@ class WebPlayer(BasePlayer):
             window.set_keep_above(saved["above"])
             window.set_keep_below(saved["below"])
             window.set_decorated(saved["decorated"])
-            window.set_title(saved["title"])
+            # The original Gtk.ApplicationWindow may be untitled (None).
+            # Gtk3's GI method rejects None although its GObject property
+            # accepts it. Preserve the exact original value without hiding
+            # a successfully restored window or reloading its WebView.
+            window.props.title = saved["title"]
             Gdk.Display.get_default().flush()
         except Exception:
             window.hide()

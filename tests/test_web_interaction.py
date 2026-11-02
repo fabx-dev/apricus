@@ -211,6 +211,7 @@ def web_player(monkeypatch):
     class Window:
         def __init__(self):
             self.title = "Apricus"
+            self.props = self
             self.focus = False
             self.below = True
             self.above = False
@@ -270,6 +271,27 @@ def test_web_player_keeps_same_window_and_view_and_restores_once(web_player):
     assert list(player.windows.values()) == [window]
     with pytest.raises(ValueError, match="cancelled"):
         module.WebPlayer.web_interaction_prepare(player, token, os.getpid())
+
+
+def test_untitled_window_restores_exact_none_without_quarantine(web_player):
+    import os
+
+    module, player, window = web_player
+    window.title = None
+
+    def reject_nullable_title(title):
+        if title is None:
+            raise TypeError("Argument 1 does not allow None as a value")
+        window.title = title
+
+    window.set_title = reject_nullable_title
+    view = window._WebWindow__webview
+    for token in ("a" * 32, "b" * 32):
+        module.WebPlayer.web_interaction_prepare(player, token, os.getpid())
+        assert player.web_interaction_restore(token, True, os.getpid())
+        assert window.get_title() is None
+        assert window.visible and window._WebWindow__webview is view
+        assert not getattr(window, "_apricus_quarantined", False)
 
 
 @pytest.mark.parametrize("invalid", ["paused", "frozen", "stopped", "wrong-pid"])
