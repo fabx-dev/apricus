@@ -13,6 +13,19 @@ export class InteractionWindow {
         this.ack = () => {};
     }
 
+    _grabExitShortcut() {
+        // Mutter reserves Super+Shift+Escape for cancel-input-capture. Never
+        // replace system/user bindings; try a small bounded set and show the
+        // actual successful choice. These grabs live only for this session.
+        for (const key of ['F12', 'F11', 'F10']) {
+            const action = global.display.grab_accelerator(
+                `<Super><Control><Shift>${key}`, Meta.KeyBindingFlags.NONE);
+            if (action)
+                return {action, label: `Super+Ctrl+Shift+${key}`};
+        }
+        throw new Error('exit shortcut is unavailable');
+    }
+
     enter(request) {
         if (this.session) {
             if (this.session.token === request.token)
@@ -57,9 +70,10 @@ export class InteractionWindow {
             Main.ctrlAltTabManager.addGroup(session.done, label, 'web-browser-symbolic');
             session.groupAdded = true;
 
-            session.action = global.display.grab_accelerator('<Super><Shift>Escape', Meta.KeyBindingFlags.NONE);
-            if (!session.action)
-                throw new Error('exit shortcut is unavailable');
+            const shortcut = this._grabExitShortcut();
+            session.action = shortcut.action;
+            session.done.label = `${label}\n${shortcut.label}`;
+            session.done.set_accessible_name(`${label}, ${shortcut.label}`);
             session.binding = Meta.external_binding_name_for_action(session.action);
             Main.wm.allowKeybinding(session.binding, Shell.ActionMode.ALL);
             connect(global.display, 'accelerator-activated', (_display, action) => {

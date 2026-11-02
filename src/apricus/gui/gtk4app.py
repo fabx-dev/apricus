@@ -3649,7 +3649,9 @@ class ControlPanel(Adw.Application):
                 }
                 phases = {
                     "ENTERING": _("Preparing webpage interaction…"),
-                    "INTERACTIVE": _("Use Done — Return to desktop or Super+Shift+Esc to finish."),
+                    "INTERACTIVE": _(
+                        "Use Done — Return to desktop or the shortcut shown on that control to finish."
+                    ),
                     "EXITING": _("Returning the webpage to the desktop…"),
                 }
                 text = phases.get(

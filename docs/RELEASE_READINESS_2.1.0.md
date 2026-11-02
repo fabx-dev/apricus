@@ -6,6 +6,24 @@ an implied pass. No external publication or privileged install is authorized.
 
 ## Local interaction implementation — acceptance gate (2026-11-02)
 
+Visible acceptance has begun and is currently **FAIL at entry on rev7**, not
+PASS: Settings gating was corrected by `d2ff195` and the user confirmed the
+pause control is editable. The selected local page became visible after the
+user explicitly resumed manual STOP. Interaction then failed with Shell error
+`exit shortcut is unavailable`; the server returned to WALLPAPER and reported
+`surface-hidden`. Real mouse/keyboard interaction cycles have not passed.
+Read-only host settings confirm Mutter reserves `<Super><Shift>Escape` for
+`org.gnome.mutter.keybindings cancel-input-capture`.
+
+The local rev8 correction never grabs that binding. It tries only
+Super+Ctrl+Shift+F12, then F11/F10 if unavailable, displays the actual successful
+choice on Done and in its accessible name, and fails closed if all are reserved.
+No GSettings bindings or Snap permissions are changed. GJS covers preferred,
+fallback and all-reserved paths, cleanup and displayed choice; **652 passed,
+5 skipped, 31 warnings**, Ruff PASS. Installed rev8 acceptance remains
+**NOT TESTED**. Release stays **BLOCKED**; this is continuation of the blocked
+acceptance session, not a successful completed three-cycle test.
+
 Post-sideload x11 blocker: rev7 and bridge-carried push are active, but Settings
 cannot enable its maximized-window controls. The JSON/Snap `engine_snapshot`
 omits `window_state_source`; only the D-Bus adapter previously added it. The
@@ -60,7 +78,7 @@ output and is copied byte-for-byte to the candidate directory.
 | Policy/source/Stop/quit deferred until rollback | PASS (automated transaction) | Real integrated lifecycle still NOT TESTED |
 | Idempotent cleanup and fail-closed surface hiding | PASS (automated) | player/controller failure injection; real Mutter failure still NOT TESTED |
 | No WebView recreation on integration changes | PASS (automated) | existing object/collection identity tests and web-specific lifecycle override |
-| Done above fullscreen, dedicated temporary shortcut | PASS (stubbed Shell) | `trackFullscreen:false`, Super+Shift+Esc grab/ungrab; real acceptance NOT TESTED |
+| Done above fullscreen, dedicated temporary shortcut | FAIL on installed rev7; rev8 fix NOT TESTED installed | `trackFullscreen:false`; conflict-checked F12/F11/F10 paths pass GJS, actual binding displayed |
 | Focus/minimized-window corrections | PASS (GJS) | filtered refocus and `notify::minimized` event tests |
 | Single outstanding asynchronous Shell read, no new polling loop | PASS (code/tests) | owner and bridge-generation cancellation; existing GUI refresh reused |
 | Three cycles, real mouse/keyboard, DOM/URL/load-count identity | NOT TESTED (new code) | Must run once on new strict-Snap candidate, not x10/prototype |

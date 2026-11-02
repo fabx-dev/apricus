@@ -2,7 +2,8 @@
 
 ## 2.1.0 — unreleased
 
-- Web Page: local candidate adds same-window interaction with Shell-owned Done and temporary Super+Shift+Esc exit; no browser or WebView replacement. Final installed strict-Snap acceptance is still pending.
+- Web Page: local candidate adds same-window interaction with Shell-owned Done and a temporary exit shortcut displayed on that control (prefer Super+Ctrl+Shift+F12, with conflict-checked F11/F10 alternatives); no browser or WebView replacement. Final installed strict-Snap acceptance is still pending.
+- GNOME integration revision 8 avoids Mutter's reserved Super+Shift+Esc (cancel-input-capture) without changing system/user keybindings.
 - GNOME integration revision 7: authenticated asynchronous interaction channel, generation-scoped rollback, minimized-window notifications and narrowly scoped focus protection. No new Snap permissions.
 
 - M1: Now Playing panel with dynamic Play/Pause and separate Stop; persisted manual actions with precedence over automation.

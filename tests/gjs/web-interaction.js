@@ -33,8 +33,13 @@ const window = events({
     is_ancestor_of_transient: () => false,
 });
 const record = {window, actor};
+const grabs = [];
+let unavailable = new Set();
 const global = {display: events({
-    grab_accelerator: () => 99, ungrab_accelerator() { this.ungrabbed = true; },
+    grab_accelerator(accelerator) {
+        grabs.push(accelerator);
+        return unavailable.has(accelerator) ? 0 : 99;
+    }, ungrab_accelerator() { this.ungrabbed = true; },
     focus_default_window() { this.focus_window = null; },
 }), window_group: group(), workspace_manager: events(), get_current_time: () => 1};
 const Main = {
@@ -69,6 +74,7 @@ for (let cycle = 0; cycle < 3; cycle++) {
     controller.enter(request);
     const session = controller.session;
     assert(session && record.interactive && window.type === 0 && window.above, 'promotion');
+    assert(session.done.label.endsWith('Super+Ctrl+Shift+F12'), 'show actual dedicated shortcut');
     controller.exit('stale', true, 'b'.repeat(32));
     assert(controller.session === session, 'ignore stale exit');
     controller.exit('done');
@@ -77,6 +83,16 @@ for (let cycle = 0; cycle < 3; cycle++) {
     assert(actor.parent === bg && session.done.destroyed && global.display.ungrabbed, 'native cleanup');
     assert(window.handlers.size === 0 && global.display.handlers.size === 0, 'disconnect handlers');
 }
+assert(grabs.every(accelerator => !accelerator.includes('Escape')), 'never grab Mutter input-capture cancellation');
+unavailable = new Set(['<Super><Control><Shift>F12']);
+controller.enter(request);
+assert(controller.session.done.label.endsWith('Super+Ctrl+Shift+F11'), 'bounded conflict fallback is displayed');
+controller.exit('fallback cleanup');
+unavailable = new Set(['<Super><Control><Shift>F12', '<Super><Control><Shift>F11', '<Super><Control><Shift>F10']);
+controller.enter(request);
+assert(!controller.session && !record.interactive && window.type === 1 && !window.above, 'all shortcuts reserved: rollback without overriding bindings');
+assert(window.handlers.size === 0 && global.display.handlers.size === 0, 'failed shortcut entry leaves no handlers');
+unavailable = new Set();
 controller.enter(request);
 window.set_type = () => { throw new Error('simulated Mutter failure'); };
 controller.exit('failure');

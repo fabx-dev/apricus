@@ -49,7 +49,7 @@ const WALLPAPER_ROLE = 'apricus-wallpaper';
 
 // Bumped on every code change; logged from enable() so the journal shows
 // which revision the running shell actually loaded.
-const CODE_REVISION = 7;
+const CODE_REVISION = 8;
 
 const WINDOW_MATCH_RETRIES = 10;
 const WINDOW_MATCH_INTERVAL_MS = 100;
