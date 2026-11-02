@@ -322,3 +322,18 @@ def test_web_process_crash_exits_without_silent_interactive_reload():
     app._web_interaction_window = ("a" * 32, window, {})
     assert WebWindow._on_web_process_terminated(window, None, "crashed") is False
     assert calls == ["cancel"]
+
+
+def test_unauthorized_quit_cannot_cancel_interaction(monkeypatch):
+    from apricus.player import web_player
+
+    calls = []
+    player = SimpleNamespace(_cancel_web_interaction=lambda: calls.append("cancel"))
+
+    def deny(*args):
+        raise PermissionError("unauthorized")
+
+    monkeypatch.setattr(web_player, "_authorize", deny)
+    with pytest.raises(PermissionError):
+        web_player.WebPlayer.quit_player(player, dbus_context=object())
+    assert calls == []

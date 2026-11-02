@@ -430,6 +430,7 @@ class WebPlayer(BasePlayer):
         self._on_size_changed()
 
     def quit_player(self, restore_wallpaper=True, dbus_context=None):
+        _authorize("player.quit", dbus_context)
         self._cancel_web_interaction()
         super().quit_player(restore_wallpaper, dbus_context)
 

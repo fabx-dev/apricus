@@ -10,7 +10,7 @@ The sections below describe the earlier `e4d6223` artifacts, not certification o
 the new interaction code. Publication remains **BLOCKED**. The controlled
 prototype's PASS is not a PASS of this implementation or of an installed build.
 
-Local implementation validation: **649 passed, 5 skipped, 28 warnings**; Ruff
+Local implementation validation: **650 passed, 5 skipped, 28 warnings**; Ruff
 lint/format and diff whitespace checks pass. GJS state, status-bridge,
 window-push, adoption/refocus and interaction harnesses pass. A real private
 D-Bus round-trip also exercises the production Python bridge/coordinator with
