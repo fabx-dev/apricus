@@ -395,7 +395,12 @@ class ApricusServer:
     @property
     def engine_snapshot(self):
         """Read-only policy state for GUI diagnostics and tests."""
-        return self.policy.snapshot()
+        snapshot = dict(self.policy.snapshot())
+        # Both transports must expose the same capability evidence. Adding
+        # this only in the D-Bus Variant adapter leaves strict Snap's direct
+        # JSON/socket client unable to enable its window-policy controls.
+        snapshot["window_state_source"] = getattr(self, "_window_source", "none")
+        return snapshot
 
     def _start_environment_sensors(self):
         """Own the lock/maximized sensors (moved from the player). Best
@@ -1363,7 +1368,6 @@ class _DBusServer:
             "window_state_source": "s",
         }
         snapshot = dict(self._server.engine_snapshot)
-        snapshot["window_state_source"] = getattr(self._server, "_window_source", "none")
         return {key: GLib.Variant(signatures[key], value) for key, value in snapshot.items()}
 
 

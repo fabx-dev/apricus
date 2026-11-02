@@ -163,6 +163,66 @@ def _sensor_server(monkeypatch, fake_bus=None):
     return obj
 
 
+def test_snap_socket_snapshot_contains_verified_window_source(monkeypatch, tmp_path):
+    import threading
+    import time
+
+    from gi.repository import GLib
+
+    from apricus import snap_ipc
+    from apricus.gui.policy_support import window_policy_support
+
+    obj = _sensor_server(monkeypatch)
+    obj._window_source = "snap-bridge-push"
+    obj.config["mode"] = "MODE_NULL"
+    obj.policy.note_push_alive(True)
+    monkeypatch.setenv("XDG_RUNTIME_DIR", str(tmp_path))
+    name = "io.github.fabx_dev.Apricus.capabilitytest"
+    listener = snap_ipc.publish_service(name, obj)
+    results, errors = [], []
+
+    def client():
+        try:
+            results.append(snap_ipc.get_service(name).engine_snapshot)
+        except Exception as error:
+            errors.append(error)
+
+    thread = threading.Thread(target=client)
+    thread.start()
+    deadline = time.monotonic() + 5
+    context = GLib.MainContext.default()
+    while thread.is_alive() and time.monotonic() < deadline:
+        context.iteration(False)
+        time.sleep(0.005)
+    thread.join(1)
+    listener.close()
+    assert not thread.is_alive() and not errors
+    snapshot = results[0]
+    assert snapshot["window_state_source"] == "snap-bridge-push"
+    assert snapshot["push_alive"] is True
+    dbus_snapshot = {
+        key: value.unpack() for key, value in server_mod._DBusServer(obj).engine_snapshot.items()
+    }
+    assert dbus_snapshot == snapshot
+    verified = snapshot["push_alive"] and snapshot["window_state_source"] in (
+        "extension-push",
+        "snap-bridge-push",
+    )
+    assert window_policy_support(
+        wayland=True, gnome=True, snap=True, flatpak=False, verified=verified
+    )[0]
+
+
+def test_snapshot_without_window_sensor_does_not_claim_capability(monkeypatch):
+    obj = _sensor_server(monkeypatch)
+    assert obj.engine_snapshot["window_state_source"] == "none"
+    snapshot = obj.engine_snapshot
+    assert not (
+        snapshot["push_alive"]
+        and snapshot["window_state_source"] in ("extension-push", "snap-bridge-push")
+    )
+
+
 def test_server_owns_bridge_on_snap_and_feeds_frames_directly(monkeypatch):
     from apricus import gnome_bridge
 

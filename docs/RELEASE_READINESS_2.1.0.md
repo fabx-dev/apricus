@@ -6,6 +6,16 @@ an implied pass. No external publication or privileged install is authorized.
 
 ## Local interaction implementation — acceptance gate (2026-11-02)
 
+Post-sideload x11 blocker: rev7 and bridge-carried push are active, but Settings
+cannot enable its maximized-window controls. The JSON/Snap `engine_snapshot`
+omits `window_state_source`; only the D-Bus adapter previously added it. The
+local correction moves that read-only evidence into the shared server snapshot
+and leaves the D-Bus adapter responsible only for typing. A real socket
+round-trip regression verifies transport parity and positive capability gating,
+plus a negative test without a verified source. **652 passed, 5 skipped,
+31 warnings**, Ruff PASS. No preference override or installed-x11 patch; the
+visible acceptance remains blocked until the corrected candidate is installed.
+
 The sections below describe the earlier `e4d6223` artifacts, not certification of
 the new interaction code. Publication remains **BLOCKED**. The controlled
 prototype's PASS is not a PASS of this implementation or of an installed build.
