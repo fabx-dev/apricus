@@ -215,6 +215,7 @@ export class DesktopStateTracker {
                     'notify::fullscreen',
                     'notify::maximized-horizontally',
                     'notify::maximized-vertically',
+                    'notify::minimized',
                     'unmanaged',
                     'workspace-changed',
                 ]) {

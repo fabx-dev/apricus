@@ -134,6 +134,11 @@ def fake_bridge(monkeypatch, owners, uid=None, pid=42):
     bridge.GLib = GLib
     bridge.registration = Registration()
     bridge.window_registration = WindowRegistration()
+    from apricus.interaction import InteractionMailbox
+
+    bridge.interaction_mailbox = InteractionMailbox()
+    bridge.interaction = None
+    bridge.interaction_generation = ""
     bridge._window_notified = None
     bridge.closed = False
     bridge.epoch = 0

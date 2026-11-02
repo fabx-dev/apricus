@@ -6,6 +6,7 @@ Ownership authenticates the current Shell connection, not an extension or a
 binary cryptographically. Other code within Shell shares that identity.
 """
 
+import json
 import logging
 import os
 import secrets
@@ -302,6 +303,21 @@ XML = f"""<node><interface name="{INTERFACE}">
   <arg type="s" direction="in" name="generation"/>
   <arg type="u" direction="in" name="sequence"/>
  </method>
+ <method name="InteractionOpen"><arg type="s" direction="out" name="generation"/></method>
+ <method name="InteractionWatch">
+  <arg type="s" direction="in" name="generation"/>
+  <arg type="u" direction="in" name="revision"/>
+  <arg type="u" direction="out" name="revision"/>
+  <arg type="s" direction="out" name="request"/>
+ </method>
+ <method name="InteractionAck">
+  <arg type="s" direction="in" name="generation"/>
+  <arg type="s" direction="in" name="token"/>
+  <arg type="s" direction="in" name="phase"/>
+  <arg type="b" direction="in" name="ok"/>
+  <arg type="b" direction="out" name="accepted"/>
+ </method>
+ <method name="InteractionClose"><arg type="s" direction="in" name="generation"/></method>
 </interface></node>"""
 
 
@@ -323,6 +339,11 @@ class Bridge:
         self.epoch = 0
         self.closed = False
         self.closed_id = 0
+        from apricus.interaction import InteractionMailbox
+
+        self.interaction_mailbox = InteractionMailbox()
+        self.interaction = None
+        self.interaction_generation = ""
         self.node = Gio.DBusNodeInfo.new_for_xml(XML)
         self.name_id = Gio.bus_own_name(
             Gio.BusType.SESSION,
@@ -370,6 +391,10 @@ class Bridge:
         self.epoch += 1
         self.registration.invalidate(reason)
         self.window_registration.invalidate(reason)
+        self.interaction_mailbox.close()
+        self.interaction_generation = ""
+        if self.interaction is not None:
+            self.interaction.integration(False)
 
     def _bus_acquired(self, bus, _name):
         self.bus = bus
@@ -450,6 +475,46 @@ class Bridge:
                     reply = self.GLib.Variant("()", ())
                 elif method in ("WindowRegister", "WindowState", "WindowUnregister"):
                     reply = self._window_call(sender, method, args)
+                elif method == "InteractionOpen":
+                    if self.interaction is None:
+                        raise ValueError("interaction unavailable")
+                    self.interaction_mailbox.close()
+                    self.interaction.integration(False)
+                    self.interaction_generation = secrets.token_hex(16)
+                    reply = self.GLib.Variant("(s)", (self.interaction_generation,))
+                elif method == "InteractionWatch":
+                    if (
+                        self.interaction is None
+                        or not args[0]
+                        or args[0] != self.interaction_generation
+                    ):
+                        raise ValueError("expired interaction channel")
+                    self.interaction.integration(True)
+                    finish()  # The single held read is outside authentication/reentrancy slots.
+                    self.interaction_mailbox.watch(
+                        args[1],
+                        lambda revision, request: invocation.return_value(
+                            self.GLib.Variant("(us)", (revision, json.dumps(request)))
+                        ),
+                        lambda reason: invocation.return_dbus_error(INTERFACE + ".Closed", reason),
+                    )
+                    return
+                elif method == "InteractionAck":
+                    accepted = (
+                        self.interaction is not None
+                        and bool(args[0])
+                        and args[0] == self.interaction_generation
+                        and self.interaction.acknowledge(*args[1:])
+                    )
+                    reply = self.GLib.Variant("(b)", (accepted,))
+                elif method == "InteractionClose":
+                    if not args[0] or args[0] != self.interaction_generation:
+                        raise ValueError("expired interaction channel")
+                    self.interaction_mailbox.close()
+                    self.interaction_generation = ""
+                    if self.interaction is not None:
+                        self.interaction.integration(False)
+                    reply = self.GLib.Variant("()", ())
                 else:
                     raise ValueError("unknown method")
                 logger.debug("[GnomeBridge] accepted %s sender=%s", method, sender)
@@ -511,16 +576,22 @@ class Bridge:
                 self.bus.disconnect(self.closed_id)
         self.Gio.bus_unown_name(self.name_id)
 
+    def set_interaction(self, interaction):
+        self.interaction = interaction
+
+    def publish_interaction(self, request):
+        self.interaction_mailbox.update(request)
+
 
 _bridge = None
 
 
 def start(changed, on_window_frame=None, on_window_lost=None):
-    """Snap GUI only. Flatpak/native retain their tested detection paths."""
+    """Server-owned on GNOME Wayland; Flatpak has no ownership permission."""
     global _bridge
-    from apricus.utils import is_gnome, is_snap, is_wayland
+    from apricus.utils import is_flatpak, is_gnome, is_wayland
 
-    if _bridge is None and is_snap() and is_gnome() and is_wayland():
+    if _bridge is None and not is_flatpak() and is_gnome() and is_wayland():
         try:
             _bridge = Bridge(changed, on_window_frame, on_window_lost)
         except Exception:

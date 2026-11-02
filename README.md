@@ -147,7 +147,7 @@ make run       # launch in debug mode
 
 ## GNOME integration
 
-Apricus ships a companion extension, `apricus-integration@fabx-dev` (source in `gnome-extension/`), revision 6 in this release:
+Apricus ships a companion extension, `apricus-integration@fabx-dev` (source in `gnome-extension/`), revision 7 in the local release candidate:
 
 - Hosts wallpaper windows in the Shell background layer, below DING icons and app windows.
 - Reports fullscreen/maximized state to the server over `org.gnome.Shell.Extensions.ApricusIntegration`.
@@ -158,7 +158,7 @@ Setup:
 1. Native `.deb`/`.rpm` installs place the extension under `/usr/share/gnome-shell/extensions/`. For Snap/Flatpak, which cannot write host extension directories from their sandbox, build the ZIP with `gnome-extension/build-zip.sh` and run `gnome-extension/install-host.sh --zip <file.zip> --enable` on the host (per-user, no sudo).
 2. Enable once: `gnome-extensions enable apricus-integration@fabx-dev`.
 3. Log out and back in so the Shell loads the new code.
-4. Confirm with `journalctl --user -g apricus-integration` (expect `enabled, code revision 6`).
+4. Confirm with `journalctl --user -g apricus-integration` (expect `enabled, code revision 7`).
 
 Updating works the same way: overwrite the files, then log out/in. Removing Apricus never touches `~/.local/share/gnome-shell/extensions/`; disable and delete that directory manually if desired.
 
@@ -177,6 +177,18 @@ Package differences:
 3. Use **Now Playing** for Play/Pause, Stop, volume/mute and media details.
 4. In **Settings**, choose pause and/or mute behavior for maximized/fullscreen windows. With M3 active, changes apply to the current window state immediately.
 5. For streams, paste a link in **Streaming** and use Try 10s before applying; for web walls use **Web Page** or the Inspiration gallery.
+
+In the local candidate, **Web Page → Interact with webpage** promotes the same
+running webpage without reloading it. Finish with the native Shell control
+**Done — Return to desktop**, **Super+Shift+Esc**, or the Shell's accessible
+Ctrl+Alt+Tab group. Esc alone remains available to the webpage. This requires
+revision 7 of the GNOME integration and a running, unpaused web wallpaper;
+manual Stop/Pause and automatic pause are never overridden. GUI closure leaves
+Done available. After an unconfirmed rollback the page is hidden for safety:
+apply it again to recover. Flatpak interaction is unavailable without an existing
+server-owned bridge permission; this candidate adds no permissions. Final
+installed strict-Snap/visible-desktop acceptance is pending, not implied by the
+isolated prototype or automated tests.
 
 ---
 

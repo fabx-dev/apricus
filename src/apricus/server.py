@@ -1,3 +1,4 @@
+import json
 import logging
 import multiprocessing as mp
 import os
@@ -154,6 +155,9 @@ class ApricusServer:
         <method name="feeling_lucky"/>
         <method name='show_gui'/>
         <method name='quit'/>
+        <method name='web_interact'><arg type='b' direction='out' name='accepted'/></method>
+        <method name='web_interaction_cancel'><arg type='s' name='token' direction='in'/><arg type='b' name='accepted' direction='out'/></method>
+        <property name='web_interaction_status' type='s' access='read'/>
         <property name="mode" type="s" access="read"/>
         <property name="volume" type="i" access="readwrite"/>
         <property name="is_mute" type="b" access="readwrite"/>
@@ -265,6 +269,10 @@ class ApricusServer:
         With fresh=True the player was created seconds ago and already
         auto-started, so PLAY never re-issues start: only the mirror, an
         optional pause, and the mute switch are applied."""
+        if output.desired != PLAY and self._defer_web_exit(
+            "policy", lambda: self._apply_policy_output(self.policy.compute()), "policy"
+        ):
+            return False
         if self._last_applied is None:
             last_desired, last_mute = None, None
         else:
@@ -343,6 +351,10 @@ class ApricusServer:
 
     def _terminate_player(self):
         """Bounded teardown of the player process/session (M1 semantics)."""
+        watch = getattr(self, "_web_player_watch", None)
+        if watch is not None:
+            GLib.source_remove(watch)
+            self._web_player_watch = None
         proc = getattr(self, "player_process", None)
         if proc is None:
             return
@@ -418,17 +430,97 @@ class ApricusServer:
         self._bridge = None
         try:
             from apricus import gnome_bridge
+            from apricus.utils import is_flatpak
             from apricus.utils import is_snap as _is_snap
 
-            if _is_snap() and pushable:
+            if pushable and not is_flatpak():
                 self._bridge = gnome_bridge.start(
                     self._on_bridge_changed,
-                    self._on_bridge_window_frame,
-                    self._on_bridge_window_lost,
+                    self._on_bridge_window_frame if _is_snap() else None,
+                    self._on_bridge_window_lost if _is_snap() else None,
                 )
+                if self._bridge is not None:
+                    self._bridge.set_interaction(self._interaction())
         except Exception as e:  # noqa: BLE001 - push stays unavailable, never fatal
             logger.debug(f"[Policy] snap bridge unavailable: {e}")
             self._bridge = None
+
+    def _interaction(self):
+        from apricus.interaction import WebInteraction
+
+        if getattr(self, "_web_interaction", None) is None:
+            self._web_interaction = WebInteraction(
+                self._web_interaction_eligible,
+                self._web_player_call,
+                lambda request: (
+                    self._bridge.publish_interaction(request)
+                    if getattr(self, "_bridge", None)
+                    else None
+                ),
+                GLib.timeout_add,
+                GLib.source_remove,
+            )
+        return self._web_interaction
+
+    def _web_interaction_eligible(self):
+        if self.config.get(CONFIG_KEY_MODE) != MODE_WEBPAGE:
+            return "no-webpage"
+        if self.policy.compute().desired != PLAY:
+            return "wallpaper-paused-or-stopped"
+        proc = getattr(self, "player_process", None)
+        ready = getattr(self, "_player_ready_event", None)
+        if not proc or not proc.is_alive() or not ready or not ready.is_set():
+            return "player-not-ready"
+        interaction = getattr(self, "_web_interaction", None)
+        if interaction is not None and interaction.blocked_pid == proc.pid:
+            return "surface-hidden"
+        return ""
+
+    @property
+    def web_interaction_status(self):
+        return json.dumps(self._interaction().status())
+
+    def web_interact(self, dbus_context=None):
+        _authorize("web_interact", dbus_context)
+        proc = getattr(self, "player_process", None)
+        return bool(proc and self._interaction().begin(proc.pid))
+
+    def web_interaction_cancel(self, token, dbus_context=None):
+        _authorize("web_interaction_cancel", dbus_context)
+        interaction = getattr(self, "_web_interaction", None)
+        if interaction is None or not token or interaction.token != token:
+            return False
+        interaction.end("player-cancelled")
+        return True
+
+    def _web_player_call(self, method, args, callback):
+        from apricus.async_rpc import call
+
+        proc = getattr(self, "player_process", None)
+        if not proc or not proc.is_alive() or proc.pid != args[-1]:
+            callback(None, "player-replaced")
+            return
+
+        def replied(value, error):
+            if self.player_process is not proc:
+                callback(None, "player-replaced")
+                return
+            if method == "web_interaction_prepare" and not error:
+                try:
+                    value = json.loads(value)
+                except (ValueError, TypeError):
+                    error = "invalid-player-response"
+            callback(value, error)
+
+        call(DBUS_NAME_PLAYER, method, args, replied)
+
+    def _defer_web_exit(self, reason, callback, key):
+        from apricus.interaction import WALLPAPER
+
+        interaction = getattr(self, "_web_interaction", None)
+        if interaction is not None and interaction.state != WALLPAPER:
+            return interaction.end(reason, callback, key)
+        return False
 
     def _start_push_backend(self):
         """Prefer the extension push channel (no polling while healthy)."""
@@ -687,6 +779,12 @@ class ApricusServer:
 
     def _setup_player(self, mode, data_source=None, monitor=None, force_respawn=False):
         """Setup and run player"""
+        if self._defer_web_exit(
+            "source-changed",
+            lambda: self._setup_player(mode, data_source, monitor, force_respawn),
+            "source",
+        ):
+            return
         # The GUI shares this file: reload so we never persist a stale
         # in-memory copy over a newer on-disk config (and vice versa).
         self._load_config()
@@ -745,6 +843,10 @@ class ApricusServer:
 
         # Quit current (keep its wallpaper: the new player overwrites it)
         # then create a new player
+        watch = getattr(self, "_web_player_watch", None)
+        if watch is not None:
+            GLib.source_remove(watch)
+            self._web_player_watch = None
         if proc and proc.is_alive():
             self._quit_player(restore_wallpaper=False)
 
@@ -781,6 +883,22 @@ class ApricusServer:
             self._last_applied = None
             self._player_ready_event = ready
             self.player_process.start()
+            if mode == MODE_WEBPAGE and isinstance(
+                getattr(self.player_process, "sentinel", None), int
+            ):
+                proc = self.player_process
+
+                def exited(_fd, _condition):
+                    interaction = getattr(self, "_web_interaction", None)
+                    if self.player_process is proc:
+                        self._web_player_watch = None
+                        if interaction is not None:
+                            interaction.end("player-stopped")
+                    return False
+
+                self._web_player_watch = GLib.io_add_watch(
+                    proc.sentinel, GLib.PRIORITY_DEFAULT, GLib.IOCondition.IN, exited
+                )
             self._player_count += 1
             perf.mark(f"server: player process started [{mode}]")
             logger.info(f"[Server] player pid={self.player_process.pid}")
@@ -854,6 +972,11 @@ class ApricusServer:
         self._load_config()
         self.policy.request_manual_stop()
         self._sync_policy_persist(stop_to=True)
+        if self._defer_web_exit("stop", self._finish_stop, "stop"):
+            return
+        self._finish_stop()
+
+    def _finish_stop(self):
         self._terminate_player()
         # Old process/async callbacks are gone before changing the background.
         self._load_config()
@@ -1043,6 +1166,11 @@ class ApricusServer:
 
     def quit(self, dbus_context=None):
         _authorize("quit", dbus_context)
+        if self._defer_web_exit("quit", self._finish_quit, "quit"):
+            return
+        self._finish_quit()
+
+    def _finish_quit(self):
         try:
             from apricus import gnome_bridge
 

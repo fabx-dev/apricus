@@ -261,7 +261,7 @@ class BasePlayer(Gtk.Application):
         # guard; repeated calls are cheap no-ops once already at the bottom.
         self._lower_guard_until = time.monotonic() + 0.15
         for window in self.windows.values():
-            if window is None:
+            if window is None or getattr(window, "_apricus_interaction_token", None):
                 continue
             try:
                 gdk_win = window.get_window()
@@ -429,7 +429,7 @@ class BasePlayer(Gtk.Application):
                 self.windows[monitor] = window
             # Never present(): it sends _NET_ACTIVE_WINDOW and raises us
             # over DING. show_all() maps without activating.
-            if not window.get_visible():
+            if not window.get_visible() and not getattr(window, "_apricus_quarantined", False):
                 window.show_all()
         # Watch for the integration being toggled mid-session (event-driven
         # GSettings notify, no polling): enabling/disabling must take effect

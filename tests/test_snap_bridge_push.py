@@ -173,6 +173,9 @@ def test_server_owns_bridge_on_snap_and_feeds_frames_directly(monkeypatch):
         started["callbacks"] = (changed, on_frame, on_lost)
 
         class FakeBridge:
+            def set_interaction(self, interaction):
+                started["interaction"] = interaction
+
             def stop(self):
                 stopped.append(True)
 

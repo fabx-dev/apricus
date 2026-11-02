@@ -107,6 +107,9 @@ fi
 if [ -f "$SRC_DIR/windowPush.js" ]; then
     install_file "$SRC_DIR/windowPush.js" "$DEST_DIR/windowPush.js"
 fi
+for module in interactionClient.js interactionWindow.js; do
+    install_file "$SRC_DIR/$module" "$DEST_DIR/$module"
+done
 install_file "$SRC_DIR/extension.js" "$DEST_DIR/extension.js"
 echo "Installed $UUID to $DEST_DIR"
 

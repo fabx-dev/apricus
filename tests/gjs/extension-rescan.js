@@ -54,6 +54,14 @@ class InjectionManager {
 class Extension {
 }
 
+class InteractionWindow {
+    exit() {}
+}
+class InteractionClient {
+    ack() {}
+    stop() {}
+}
+
 const Workspace = {prototype: {}};
 const WorkspaceThumbnail = {prototype: {}};
 const SHELL_VERSION = '50.1';
@@ -216,7 +224,7 @@ function emitWindowCreated(win) {
 
 const global = Object.create(Shell.Global.prototype);
 global.display = display;
-global.workspace_manager = {connect: () => nextId++, disconnect() {}};
+global.workspace_manager = {connect: () => nextId++, disconnect() {}, get_active_workspace: () => 0};
 global.window_group = windowGroup;
 global.get_current_time = () => 424242;
 
@@ -252,9 +260,11 @@ function makeWindow({role = null, title = 'test'} = {}) {
         disconnect(id) {
             delete this._handlers[id];
         },
-        activate(_time) {
+        focus(_time) {
             TestEnv.activated.push(this);
         },
+        located_on_workspace() { return true; },
+        showing_on_its_workspace() { return true; },
     };
 }
 
@@ -303,6 +313,8 @@ function loadExtensionClass() {
         "import {StatusBridge} from './statusBridge.js';",
         "import {WindowPush} from './windowPush.js';",
         "import {DesktopStateTracker, StatePublisher} from './state.js';",
+        "import {InteractionClient} from './interactionClient.js';",
+        "import {InteractionWindow} from './interactionWindow.js';",
     ]) {
         if (!src.includes(line))
             throw new Error(`expected import line missing (harness out of date): ${line}`);
@@ -332,6 +344,7 @@ TestEnv.tabList = [videoWin, plainWin];
 
 const ext = new ExtensionClass();
 ext.uuid = 'apricus-integration@fabx-dev';
+display.focus_window = videoWin;
 ext.enable();
 
 // 1. Pre-existing wallpaper window adopted on enable, without window-created.
@@ -357,6 +370,23 @@ assert(visibleAfter.includes(plainActor), 'filter must keep normal windows');
 // 4. Refocus used the (filtered) tab list: plain window activated, video not.
 assert(TestEnv.activated.includes(plainWin), 'focus must move to a normal window');
 assert(!TestEnv.activated.includes(videoWin), 'wallpaper window must never activate');
+
+const minimized = makeWindow({title: 'minimized'});
+minimized.minimized = true;
+const invisible = makeWindow({title: 'other workspace'});
+invisible.showing_on_its_workspace = () => false;
+TestEnv.tabList = [minimized, invisible, plainWin];
+TestEnv.activated = [];
+ext._refocusNormalWindow(videoWin);
+assert(TestEnv.activated.length === 1 && TestEnv.activated[0] === plainWin,
+    'must skip minimized/invisible MRU candidates');
+ext._adopted.get(videoWin).interactive = true;
+ext._refocusNormalWindow(videoWin);
+assert(TestEnv.activated.length === 1, 'authorized WebView must retain focus');
+ext._adopted.get(videoWin).interactive = false;
+display.focus_window = plainWin;
+ext._refocusNormalWindow(videoWin);
+assert(TestEnv.activated.length === 1, 'must not steal already correct focus');
 
 // 5. Late window-created for the same window: no double adoption.
 const handlerCount = Object.keys(videoWin._handlers).length;

@@ -13,6 +13,7 @@ apricus.menu or apricus.player (they pin GTK3/Gdk3 namespaces or spawn
 playback in the panel process).
 """
 
+import json
 import logging
 import os
 import re
@@ -3242,6 +3243,18 @@ class ControlPanel(Adw.Application):
         row.append(open_btn)
         box.append(row)
         self.webpage_apply_btn = apply_btn
+        self.web_interact_btn = Gtk.Button(label=_("Interact with webpage"))
+        self.web_interact_btn.set_sensitive(False)
+        self.web_interact_btn.set_tooltip_text(
+            _("Interact with the currently applied webpage without reloading it")
+        )
+        self.web_interact_btn.connect("clicked", self._on_web_interact)
+        row.append(self.web_interact_btn)
+        self.web_interaction_label = Gtk.Label(
+            label=_("Checking webpage interaction…"), xalign=0, wrap=True
+        )
+        self.web_interaction_label.add_css_class("dim-label")
+        box.append(self.web_interaction_label)
         file_group = Adw.PreferencesGroup()
         file_group.set_title(_("Local web page"))
         self.web_file_row = Adw.ActionRow()
@@ -3599,6 +3612,70 @@ class ControlPanel(Adw.Application):
             Gio.AppInfo.launch_default_for_uri(url)
         except GLib.Error as e:
             logger.warning(f"[GUI4] Could not open browser: {e.message}")
+
+    def _refresh_web_interaction(self):
+        """Uses existing foreground refresh; never adds a polling timer."""
+        if not hasattr(self, "web_interact_btn") or getattr(
+            self, "_web_interaction_reading", False
+        ):
+            return
+        from apricus.async_rpc import call
+        from apricus.commons import DBUS_NAME_SERVER
+
+        self._web_interaction_reading = True
+
+        def received(value, error):
+            self._web_interaction_reading = False
+            try:
+                status = json.loads(value) if not error else {}
+                state = status.get("state", "WALLPAPER")
+                self.web_interact_btn.set_sensitive(bool(status.get("available")))
+                reason = status.get("reason", "integration-unavailable")
+                messages = {
+                    "no-webpage": _("Apply a webpage wallpaper to interact with it."),
+                    "wallpaper-paused-or-stopped": _(
+                        "Resume the wallpaper before interacting with it."
+                    ),
+                    "player-not-ready": _("The webpage wallpaper is not ready yet."),
+                    "integration-unavailable": _(
+                        "Webpage interaction requires the updated GNOME integration."
+                    ),
+                    "surface-hidden": _(
+                        "The webpage was hidden for safety. Apply the webpage again to restore it."
+                    ),
+                    "restore-failed": _(
+                        "Interaction could not be restored safely. The webpage may be hidden."
+                    ),
+                }
+                phases = {
+                    "ENTERING": _("Preparing webpage interaction…"),
+                    "INTERACTIVE": _("Use Done — Return to desktop or Super+Shift+Esc to finish."),
+                    "EXITING": _("Returning the webpage to the desktop…"),
+                }
+                text = phases.get(
+                    state,
+                    messages.get(
+                        reason,
+                        _("Ready to interact with the applied webpage.")
+                        if not reason
+                        else _(
+                            "Webpage interaction could not be completed. Check GNOME integration and the exit shortcut."
+                        ),
+                    ),
+                )
+                self.web_interaction_label.set_text(text)
+            except (ValueError, TypeError, AttributeError):
+                self.web_interact_btn.set_sensitive(False)
+
+        call(DBUS_NAME_SERVER, "web_interaction_status", [], received, prop=True)
+
+    def _on_web_interact(self, *_args):
+        from apricus.async_rpc import call
+        from apricus.commons import DBUS_NAME_SERVER
+
+        self.web_interact_btn.set_sensitive(False)
+        self.web_interaction_label.set_text(_("Preparing webpage interaction…"))
+        call(DBUS_NAME_SERVER, "web_interact", [], lambda *_: self._refresh_web_interaction())
 
     def on_webpage_show_in_folder(self, *_args):
         subtitle = self.web_file_row.get_subtitle()
@@ -4411,6 +4488,7 @@ class ControlPanel(Adw.Application):
 
     def _refresh_all(self):
         self._refresh_window_policy_support()
+        self._refresh_web_interaction()
         # Reload persisted selection/position so externally changed queues
         # (IPC playlist apply, player position writes, server restart) are
         # shown. playlist_paths (unsaved UI edits) is intentionally kept.

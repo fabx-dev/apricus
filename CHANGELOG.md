@@ -2,6 +2,9 @@
 
 ## 2.1.0 — unreleased
 
+- Web Page: local candidate adds same-window interaction with Shell-owned Done and temporary Super+Shift+Esc exit; no browser or WebView replacement. Final installed strict-Snap acceptance is still pending.
+- GNOME integration revision 7: authenticated asynchronous interaction channel, generation-scoped rollback, minimized-window notifications and narrowly scoped focus protection. No new Snap permissions.
+
 - M1: Now Playing panel with dynamic Play/Pause and separate Stop; persisted manual actions with precedence over automation.
 - M2: Server-owned Playback Policy Engine with pause/mute preferences, playlist-aware behavior and immediate application to current state.
 - M3: GNOME Shell extension revision 6 with `DesktopStateChanged` push channel, sender/sequence validation, reconnect reconciliation and safe freeze on loss.

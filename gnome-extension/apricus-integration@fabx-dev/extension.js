@@ -40,6 +40,8 @@ import {WorkspaceThumbnail} from 'resource:///org/gnome/shell/ui/workspaceThumbn
 import {StatusBridge} from './statusBridge.js';
 import {WindowPush} from './windowPush.js';
 import {DesktopStateTracker, StatePublisher} from './state.js';
+import {InteractionClient} from './interactionClient.js';
+import {InteractionWindow} from './interactionWindow.js';
 
 // Must match WALLPAPER_WINDOW_ROLE in src/apricus/gnome_shell.py and the
 // role set by the player before mapping (Gtk.Window.set_role).
@@ -47,7 +49,7 @@ const WALLPAPER_ROLE = 'apricus-wallpaper';
 
 // Bumped on every code change; logged from enable() so the journal shows
 // which revision the running shell actually loaded.
-const CODE_REVISION = 6;
+const CODE_REVISION = 7;
 
 const WINDOW_MATCH_RETRIES = 10;
 const WINDOW_MATCH_INTERVAL_MS = 100;
@@ -188,10 +190,16 @@ export default class ApricusIntegrationExtension extends Extension {
         }
         console.warn(`[${this.uuid}] startup scan: ${seen} windows, ${matched} wallpaper role match(es)`);
         this._operational = true;
+        this._interactionWindow = new InteractionWindow(this);
+        this._interactionClient = new InteractionClient(this._interactionWindow);
+        this._interactionWindow.ack = (...args) => this._interactionClient.ack(...args);
         this._statusBridge?.changed();
     }
 
     disable() {
+        this._interactionClient?.stop();
+        this._interactionClient = null;
+        this._interactionWindow = null;
         this._stateTracker?.stop();
         this._stateTracker = null;
         this._statePublisher?.stop();
@@ -312,7 +320,7 @@ export default class ApricusIntegrationExtension extends Extension {
             // — which would bury the video under the static wallpaper.
             this._bgChildAddedId = this._bgGroup.connect('child-added', (group, child) => {
                 for (const [, record] of this._adopted) {
-                    if (child !== record.actor)
+                    if (child !== record.actor && !record.interactive && !record.quarantined)
                         group.set_child_above_sibling(record.actor, null);
                 }
             });
@@ -329,7 +337,7 @@ export default class ApricusIntegrationExtension extends Extension {
         // Instead fight the symptom directly: whenever something hides the
         // actor, show it again immediately.
         record.visibleId = actor.connect('notify::visible', () => {
-            if (!actor.visible) {
+            if (!actor.visible && !record.interactive && !record.quarantined) {
                 try {
                     actor.show();
                 } catch (_e) {
@@ -361,7 +369,8 @@ export default class ApricusIntegrationExtension extends Extension {
         // surface covers the desktop, so desktop clicks land on it. Undo
         // both effects whenever they happen.
         record.raisedId = window.connect_after('raised', () => {
-            window.lower();
+            if (!record.interactive)
+                window.lower();
         });
         record.focusId = window.connect('focus', () => {
             this._refocusNormalWindow(window);
@@ -376,6 +385,9 @@ export default class ApricusIntegrationExtension extends Extension {
     }
 
     _pinOnTop(actor) {
+        if ([...this._adopted.values()].some(record => record.actor === actor &&
+            (record.interactive || record.quarantined)))
+            return;
         try {
             this._bgGroup.set_child_above_sibling(actor, null);
         } catch (_e) {
@@ -392,11 +404,15 @@ export default class ApricusIntegrationExtension extends Extension {
 
     _refocusNormalWindow(rendererWindow) {
         try {
+            if (global.display.focus_window !== rendererWindow || this._adopted.get(rendererWindow)?.interactive)
+                return;
+            const workspace = global.workspace_manager.get_active_workspace();
             const tabList = global.display
                 .get_tab_list(Meta.TabList.NORMAL, null)
-                .filter(w => w !== rendererWindow && !this._adopted.has(w));
+                .filter(w => w !== rendererWindow && !this._adopted.has(w) && !w.minimized &&
+                    w.located_on_workspace(workspace) && w.showing_on_its_workspace());
             if (tabList.length > 0)
-                tabList[0].activate(global.get_current_time());
+                tabList[0].focus(global.get_current_time());
         } catch (_e) {
             // Never break the shell's focus flow from a wallpaper handler.
         }

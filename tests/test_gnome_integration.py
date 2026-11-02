@@ -603,6 +603,8 @@ def test_host_zip_and_installer_roundtrip(tmp_path):
     assert names == [
         "apricus-integration@fabx-dev/",
         "apricus-integration@fabx-dev/extension.js",
+        "apricus-integration@fabx-dev/interactionClient.js",
+        "apricus-integration@fabx-dev/interactionWindow.js",
         "apricus-integration@fabx-dev/metadata.json",
         "apricus-integration@fabx-dev/state.js",
         "apricus-integration@fabx-dev/statusBridge.js",
@@ -616,6 +618,8 @@ def test_host_zip_and_installer_roundtrip(tmp_path):
         for name in (
             "metadata.json",
             "extension.js",
+            "interactionClient.js",
+            "interactionWindow.js",
             "statusBridge.js",
             "state.js",
             "windowPush.js",
@@ -636,7 +640,15 @@ def test_host_zip_and_installer_roundtrip(tmp_path):
     )
     assert proc.returncode == 0, proc.stderr
     installed = fake_home / ".local/share/gnome-shell/extensions" / EXTENSION_UUID
-    for name in ("metadata.json", "extension.js", "statusBridge.js", "state.js", "windowPush.js"):
+    for name in (
+        "metadata.json",
+        "extension.js",
+        "statusBridge.js",
+        "state.js",
+        "windowPush.js",
+        "interactionClient.js",
+        "interactionWindow.js",
+    ):
         src = (repo / "gnome-extension" / EXTENSION_UUID / name).read_bytes()
         assert (installed / name).read_bytes() == src
     # The host run also leaves a machine-readable status receipt next to
@@ -656,11 +668,21 @@ def test_host_zip_and_installer_roundtrip(tmp_path):
         env=env,
     )
     assert proc.returncode == 0, proc.stderr
-    for name in ("metadata.json", "extension.js", "statusBridge.js", "state.js", "windowPush.js"):
+    for name in (
+        "metadata.json",
+        "extension.js",
+        "statusBridge.js",
+        "state.js",
+        "windowPush.js",
+        "interactionClient.js",
+        "interactionWindow.js",
+    ):
         src = (repo / "gnome-extension" / EXTENSION_UUID / name).read_bytes()
         assert (installed / name).read_bytes() == src
     assert sorted(p.name for p in installed.iterdir()) == [
         "extension.js",
+        "interactionClient.js",
+        "interactionWindow.js",
         "metadata.json",
         "state.js",
         "statusBridge.js",

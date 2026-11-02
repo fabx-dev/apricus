@@ -270,7 +270,7 @@ function makeTracker(env, timer) {
     tracker.changed();
     timer.fireAll();
     const winSubsBefore = env.windowSubs.length;
-    assert(winSubsBefore === 5, `per-window notifies subscribed, got ${winSubsBefore}`);
+    assert(winSubsBefore === 6, `per-window notifies subscribed, got ${winSubsBefore}`);
     tracker.stop();
     assert(timer.pendingCount() === 0, 'debounce timer removed');
     assert(env.busUnsubs.length === busSubsBefore, 'every bus trigger disconnected');
@@ -284,6 +284,24 @@ function makeTracker(env, timer) {
     timer.fireAll();
     assert(env.busSubs.length === busSubsBefore * 2, 're-enable subscribes a fresh set');
     assert(env.windowSubs.length === winSubsBefore * 2, 'no double subscription per window');
+}
+
+// Minimization alone must wake and publish the settled policy snapshot.
+{
+    const env = makeEnv();
+    const timer = makeTimer();
+    const win = env.addWindow({maximizedHorizontally: true, maximizedVertically: true});
+    const {tracker, emitted} = makeTracker(env, timer);
+    tracker.changed();
+    timer.fireAll();
+    assert(emitted.at(-1).maximized, 'maximized window initially counted');
+    const seq = emitted.at(-1).seq;
+    win.minimized = true;
+    env.fireWindow(win.ref, 'notify::minimized');
+    timer.fireAll();
+    assert(!emitted.at(-1).maximized && emitted.at(-1).seq > seq,
+        'minimization notify updates policy without manually calling changed');
+    tracker.stop();
 }
 
 // 6. Publisher: export/own on start, signal on publish, cleanup on stop.

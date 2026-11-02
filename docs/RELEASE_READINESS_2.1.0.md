@@ -4,6 +4,43 @@ Local preparation, 2026-11-01/02. **NOT READY FOR PUBLICATION.**
 PASS means the stated check passed within its stated scope; NOT TESTED is not
 an implied pass. No external publication or privileged install is authorized.
 
+## Local interaction implementation — acceptance gate (2026-11-02)
+
+The sections below describe the earlier `e4d6223` artifacts, not certification of
+the new interaction code. Publication remains **BLOCKED**. The controlled
+prototype's PASS is not a PASS of this implementation or of an installed build.
+
+Local implementation validation: **648 passed, 5 skipped, 28 warnings**; Ruff
+lint/format and diff whitespace checks pass. GJS state, status-bridge,
+window-push, adoption/refocus and interaction harnesses pass. A real private
+D-Bus round-trip also exercises the production Python bridge/coordinator with
+GJS, including a pending read and asynchronous original-player restoration.
+These are not tests of Mutter, audible playback, or the installed strict Snap.
+
+| Requirement | Current result | Evidence / remaining gate |
+|---|---|---|
+| Explicit four-state transaction, duplicate/late callbacks, deadlines | PASS (automated) | `test_web_interaction.py` |
+| Authenticated Shell owner, bridge generation, current player/window token | PASS (automated) | bridge dispatch and GJS client/controller tests |
+| Stop/Pause entry rejection and unchanged manual latches | PASS (automated) | policy eligibility tests; no policy override |
+| Policy/source/Stop/quit deferred until rollback | PASS (automated transaction) | Real integrated lifecycle still NOT TESTED |
+| Idempotent cleanup and fail-closed surface hiding | PASS (automated) | player/controller failure injection; real Mutter failure still NOT TESTED |
+| No WebView recreation on integration changes | PASS (automated) | existing object/collection identity tests and web-specific lifecycle override |
+| Done above fullscreen, dedicated temporary shortcut | PASS (stubbed Shell) | `trackFullscreen:false`, Super+Shift+Esc grab/ungrab; real acceptance NOT TESTED |
+| Focus/minimized-window corrections | PASS (GJS) | filtered refocus and `notify::minimized` event tests |
+| Single outstanding asynchronous Shell read, no new polling loop | PASS (code/tests) | owner and bridge-generation cancellation; existing GUI refresh reused |
+| Three cycles, real mouse/keyboard, DOM/URL/load-count identity | NOT TESTED (new code) | Must run once on new strict-Snap candidate, not x10/prototype |
+| GUI closed, Stop/source, policy and integration-loss recovery | NOT TESTED (real GNOME) | Included in the same final session |
+| DING, visible-desktop stacking, keyboard accessibility/contrast | NOT TESTED (real GNOME) | Requires visible acceptance |
+| Playback, audible audio/mute, immediate pause and correct resume parity | NOT TESTED (new candidate) | Protected transport/video modules unchanged; state is not A/V evidence |
+| Flatpak interaction | NOT TESTED / unavailable | No new bus ownership permissions granted; disabled with clear message |
+| Release publication | BLOCKED | No remote actions, stable Store revision untouched |
+
+Failure behavior: entry timeout requests Shell rollback; missing/failed Shell
+confirmation hides only the existing Apricus surface. It does not reload the
+WebView or resume playback. A hidden/quarantined surface requires explicitly
+applying the source again. A crashed WebKit process cannot preserve its DOM.
+No cause is claimed for the original unreproduced visual minimization anomaly.
+
 ## 1. Version and candidate commits
 
 - PASS: version 2.1.0; planned tag `v2.1.0` (not created).
