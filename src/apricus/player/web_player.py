@@ -158,6 +158,14 @@ class WebWindow(Gtk.ApplicationWindow):
         return False
 
     def _on_web_process_terminated(self, _webview, reason):
+        app = self.get_application()
+        active = getattr(app, "_web_interaction_window", None)
+        if active is not None and active[1] is self:
+            # A dead web process has already lost its DOM. Do not leave an
+            # interactive frozen surface up, or silently reload beneath it.
+            app._cancel_web_interaction()
+            logger.warning("[WebPlayer] interactive web process terminated; surface hidden")
+            return False
         logger.warning(f"[WebPlayer] Web process terminated ({reason}); reloading")
         self._load_token += 1
         GLib.timeout_add_seconds(2, self._reload_after_crash)

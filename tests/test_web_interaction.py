@@ -311,3 +311,14 @@ def test_integration_change_never_recreates_webview(web_player):
     module.WebPlayer._recreate_wallpaper_windows(player)
     assert calls == ["cancel", "geometry"]
     assert list(player.windows.values()) == [window]
+
+
+def test_web_process_crash_exits_without_silent_interactive_reload():
+    from apricus.player.web_player import WebWindow
+
+    calls = []
+    app = SimpleNamespace(_cancel_web_interaction=lambda: calls.append("cancel"))
+    window = SimpleNamespace(get_application=lambda: app)
+    app._web_interaction_window = ("a" * 32, window, {})
+    assert WebWindow._on_web_process_terminated(window, None, "crashed") is False
+    assert calls == ["cancel"]

@@ -94,7 +94,20 @@ export class InteractionWindow {
         if (token && session && token !== session.token)
             return;
         if (!session) {
-            if (token && notify) this.ack(token, 'WALLPAPER', true);
+            if (token && notify) {
+                // A new extension generation cannot certify a previous
+                // controller's partial promotion. Only attest an already
+                // adopted, harmless desktop surface; otherwise quarantine.
+                let safe = false;
+                try {
+                    const record = [...this.extension._adopted.values()].find(r =>
+                        r.window.get_role() === 'apricus-wallpaper' &&
+                        r.window.get_title() === `Apricus Web [${token}]`);
+                    safe = !!record && record.window.get_window_type() === Meta.WindowType.DESKTOP &&
+                        !record.window.is_above() && record.actor.get_parent() === this.extension._bgGroup;
+                } catch (_error) { /* Fail closed on disposed/missing actors. */ }
+                this.ack(token, 'WALLPAPER', safe);
+            }
             return;
         }
         this.session = null; // Reentrant/later callbacks cannot resurrect it.

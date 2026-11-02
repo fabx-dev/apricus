@@ -10,12 +10,15 @@ The sections below describe the earlier `e4d6223` artifacts, not certification o
 the new interaction code. Publication remains **BLOCKED**. The controlled
 prototype's PASS is not a PASS of this implementation or of an installed build.
 
-Local implementation validation: **648 passed, 5 skipped, 28 warnings**; Ruff
+Local implementation validation: **649 passed, 5 skipped, 28 warnings**; Ruff
 lint/format and diff whitespace checks pass. GJS state, status-bridge,
 window-push, adoption/refocus and interaction harnesses pass. A real private
 D-Bus round-trip also exercises the production Python bridge/coordinator with
 GJS, including a pending read and asynchronous original-player restoration.
 These are not tests of Mutter, audible playback, or the installed strict Snap.
+The existing Xvfb Streaming theme test intermittently failed its width check;
+its fixture now waits up to two seconds for the same allocation assertion,
+without changing Streaming product code or weakening the geometry requirement.
 
 | Requirement | Current result | Evidence / remaining gate |
 |---|---|---|
@@ -39,6 +42,11 @@ Failure behavior: entry timeout requests Shell rollback; missing/failed Shell
 confirmation hides only the existing Apricus surface. It does not reload the
 WebView or resume playback. A hidden/quarantined surface requires explicitly
 applying the source again. A crashed WebKit process cannot preserve its DOM.
+An interactive WebKit crash explicitly cancels interaction and hides the
+surface instead of silently reloading beneath an active interaction. A new
+Shell controller cannot certify an older controller's incomplete promotion:
+missing restoration snapshots fail closed unless the surface is already an
+adopted, non-above DESKTOP in the background group.
 No cause is claimed for the original unreproduced visual minimization anomaly.
 
 ## 1. Version and candidate commits

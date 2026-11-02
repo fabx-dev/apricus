@@ -211,7 +211,13 @@ def _():
         settle()
         pop = obj.stream_info_popover
         assert pop.get_visible()
-        assert 0 < pop.get_width() < win.get_width()
+        # Visibility precedes allocation/animation completion on Xvfb under
+        # build load. Await the existing geometry requirement, never relax it.
+        deadline = time.monotonic() + 2
+        while not (0 < pop.get_width() < win.get_width()) and time.monotonic() < deadline:
+            GLib.MainContext.default().iteration(False)
+            time.sleep(0.005)
+        assert 0 < pop.get_width() < win.get_width(), (pop.get_width(), win.get_width())
         assert 0 < pop.get_height() < win.get_height()
         body = pop.get_child().get_last_child()
         assert body.get_layout().get_line_count() > 1

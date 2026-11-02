@@ -44,7 +44,7 @@ const Main = {
     }}),
     ctrlAltTabManager: {addGroup() {}, removeGroup() {}}, wm: {allowKeybinding() {}},
 };
-const Meta = {WindowType: {NORMAL: 0}, KeyBindingFlags: {NONE: 0}, external_binding_name_for_action: () => 'test'};
+const Meta = {WindowType: {NORMAL: 0, DESKTOP: 1}, KeyBindingFlags: {NONE: 0}, external_binding_name_for_action: () => 'test'};
 const Shell = {ActionMode: {ALL: 1, NONE: 0}};
 const St = {Button: class {
     constructor() { events(this); }
@@ -81,6 +81,8 @@ controller.enter(request);
 window.set_type = () => { throw new Error('simulated Mutter failure'); };
 controller.exit('failure');
 assert(record.quarantined && actor.hidden && acknowledgements.at(-1)[2] === false, 'fail closed');
+controller.exit('new controller cannot certify old promotion', true, token);
+assert(acknowledgements.at(-1)[2] === false, 'missing snapshot cannot certify NORMAL window');
 
 // Actual asynchronous client: single held read, epoch/generation guards, no retry loop.
 let appeared, vanished;
