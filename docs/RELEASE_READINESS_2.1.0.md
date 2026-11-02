@@ -20,6 +20,28 @@ The existing Xvfb Streaming theme test intermittently failed its width check;
 its fixture now waits up to two seconds for the same allocation assertion,
 without changing Streaming product code or weakening the geometry requirement.
 
+New local Snap: source **`1d525c6067fad451269170bc973d7d600fc2df34`**,
+`../apricus-web-interaction-candidate-20261102/apricus_2.1.0_amd64-web-interaction.snap`,
+SHA-256 **`f31cea0daa9d50174d34ed42d7223e249514c2bb799a054f8a34ca86ca2071c9`**.
+PASS: 36 application source/assets and both packaged copies of all seven
+extension files match source; Snap manifest/permissions and TCP helper match
+the previous candidate. Video player, HTTPS helper, yt-dlp selection and policy
+modules are byte-identical to `d864954`. A separate private-Xvfb GTK4 check
+passes command allocation, focusability, state messages and light/dark themes.
+
+Before handing off sideload instructions, the exact four recorded confined x10
+processes were checked by PID/start token; the server socket's peer PID/UID was
+verified and its normal IPC `quit` requested. PASS: zero confined Apricus
+processes remained; no external signals, sudo or installation were performed.
+Installed revision is still x10. Its 34 source/assets, the active host extension,
+enabled-extension list and production Shell owner were verified unchanged.
+Evidence, source archive, ZIP rev7, local fixture and one-session acceptance
+checklist are in the new candidate directory. The Snap is built/payload-verified,
+**not installed-candidate certified**. Other package formats have not been rebuilt
+for this implementation. Initial build attempts hit a command timeout and an
+out-of-project output restriction; the successful final build uses an in-project
+output and is copied byte-for-byte to the candidate directory.
+
 | Requirement | Current result | Evidence / remaining gate |
 |---|---|---|
 | Explicit four-state transaction, duplicate/late callbacks, deadlines | PASS (automated) | `test_web_interaction.py` |
