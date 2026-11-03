@@ -2,7 +2,7 @@
 
 Local preparation, 2026-11-01/02. **NOT READY FOR PUBLICATION.**
 PASS means the stated check passed within its stated scope; NOT TESTED is not
-an implied pass. No external publication or privileged install is authorized.
+an implied pass. No external publication or agent-performed privileged install is authorized.
 
 ## Latest visible acceptance — 2026-11-03/04
 
@@ -32,10 +32,31 @@ A small post-x14 status fix removes stale completed reasons (`policy`,
 availability messages, while retaining real unavailability and operation errors.
 Only the read-only status representation changes; policy, playback and Shell
 transitions are untouched. **668 passed, 5 skipped, 31 warnings**, Ruff PASS.
-Package provenance / installed message check for that final source still require
-verification. **Release remains BLOCKED**: no publication; final-source acceptance,
-stable metadata/date approval, final package set/provenance and earlier open
-platform/hardware/upgrade/timing gates are not implied by these functional passes.
+Final source **`c6ecfc5f3eea9b7f3c29befb7e5c5d3027dae836`** is built and installed
+by the user as **x15**. PASS: user confirms the healthy message; read-only IPC
+confirms WALLPAPER / available=true / reason empty. The full x14 A/V campaign was
+not repeated: only the read-only interaction status source differs, and protected
+runtime comparison confirms yt-dlp/EJS, Deno, libvlc/libvlccore and HTTPS helper
+are byte-identical to x14. The 36 application files and both seven-file extension
+copies match source; host integration rev8 and Snap permissions are unchanged.
+
+Artifact: `../apricus-web-interaction-status-fix/apricus_2.1.0_amd64-web-interaction-c6ecfc5.snap`.
+SHA-256: `f9f703a409f3ac49fef5201f7cdffa5b054de817b34c76a5881a4b23bcf34dbb`.
+Source archive, build log, pytest/GJS logs and verification result are in that
+directory. Installed-message acceptance is recorded separately from x14's manual
+functional tests. This report-only commit does not change packaged code.
+
+**Release remains BLOCKED**: stable metadata/date approval, rebuilding/verifying
+the final DEB/RPM/Flatpak set, real Store-2.0.7 upgrade, Fedora/platform/hardware
+checks and rigorous end-to-end timing are not implied by these functional passes.
+Formal screen-reader/contrast auditing and direct visible-session native-ID
+instrumentation remain NOT TESTED; content persistence was user-confirmed and
+native identities/load counts separately proved in the private strict regression.
+Real owner/extension-loss and monitor/workspace reconfiguration rollback have not
+been comprehensively exercised on the installed final candidate; automated fault
+coverage is not a substitute for claiming those installed paths passed.
+The known YouTube stalls remain open. No push, merge, tag, publication, Store
+upload/promotion, permission change or M4 operation has occurred.
 
 ## Local interaction implementation — acceptance gate (2026-11-02)
 

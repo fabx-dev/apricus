@@ -5,6 +5,15 @@ not assistant-observed screenshots or proof of audible playback.
 
 Candidate source: `afbbcb2516efae31c644d70ca81676ca308becc3`.
 
+Final source/status candidate: `c6ecfc5f3eea9b7f3c29befb7e5c5d3027dae836`, installed
+as **x15**. User confirms “ok funzionante”; independent read-only check confirms
+WALLPAPER / available=true / reason empty. **PASS for the final status-message
+check**. The x14 functional evidence below is retained at its original scope;
+audio/video was not redundantly rerun on x15. Only `interaction.py`'s read-only
+status representation differs in application source. Package verification
+confirms unchanged host rev8 extension, Snap permissions/manifest, HTTPS helper,
+all 1,047 yt-dlp and six EJS code/resource files, Deno, libvlc and libvlccore.
+
 | Check | Result | Evidence scope |
 |---|---|---|
 | Installed candidate | PASS | `snap list apricus` reports x14 |
@@ -29,6 +38,7 @@ Candidate source: `afbbcb2516efae31c644d70ca81676ca308becc3`.
 | Done through Ctrl+Alt+Tab and Enter | PASS (user-reported) | User: “ok” after the explicit keyboard-only group selection, focus and Enter activation test. |
 | Desktop icons / DING and Overview | PASS (user-reported) | User: “si”, confirming icons remain visible/selectable after Done and Super/Overview does not expose the wallpaper as a separate application window. |
 | Formal screen-reader and contrast accessibility | NOT TESTED comprehensively | Keyboard group/focus and visible usable Done are confirmed, but not a formal accessibility audit. |
+| Real bridge-owner loss / extension disable, monitor/workspace rollback | NOT TESTED comprehensively on installed final candidate | Automated transaction/client fault paths are covered; bounded JS failure and nullable-title recovery were exercised separately. Do not count these as direct installed acceptance of every integration-loss or display-reconfiguration case. |
 
 Earlier rev7 shortcut and rev8 nullable-title failures remain documented in
 `docs/RELEASE_READINESS_2.1.0.md`; these new passes do not retroactively certify
@@ -49,5 +59,7 @@ The post-x14 local correction now suppresses only completed non-error transition
 reasons in a healthy WALLPAPER state; actual bridge/eligibility errors and failed
 operations remain visible. It changes no policy, player or Shell transition.
 Validation: **668 passed, 5 skipped, 31 warnings**, Ruff lint/format PASS.
-Its packaged/installed status-message check remains NOT TESTED until performed;
-the functional confirmations above are specifically for installed x14.
+The package and installed status-message check have now passed on x15 as
+described above; the functional confirmations in the table remain specifically
+for installed x14. Release publication remains BLOCKED by the separate readiness
+gates, not by the corrected stale-message defect.
