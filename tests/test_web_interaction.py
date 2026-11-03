@@ -183,6 +183,49 @@ def test_mailbox_only_wakes_on_change_and_cancels_single_reader():
     assert errors == ["replaced", "closed"]
 
 
+@pytest.mark.parametrize(
+    "reason",
+    [
+        "integration-unavailable",
+        "integration-lost",
+        "policy",
+        "source-changed",
+        "stop",
+        "quit",
+        "player-cancelled",
+        "player-stopped",
+    ],
+)
+def test_successful_exit_does_not_report_a_stale_error(reason):
+    f = Fixture()
+    f.enter()
+    f.machine.end(reason)
+    f.restore()
+    assert f.machine.reason == reason  # No lifecycle or policy mutation.
+    assert f.machine.status() == {"state": WALLPAPER, "available": True, "reason": ""}
+
+
+@pytest.mark.parametrize(
+    "reason", ["enter-timeout", "prepare-failed", "entry-rejected", "restore-failed"]
+)
+def test_status_keeps_actual_operation_failures(reason):
+    f = Fixture()
+    f.machine.reason = reason
+    assert f.machine.status()["reason"] == reason
+
+
+@pytest.mark.parametrize("failure", ["integration", "manual-stop"])
+def test_stale_status_cleanup_never_hides_current_unavailability(failure):
+    f = Fixture()
+    f.machine.reason = "policy"
+    if failure == "integration":
+        f.machine.integration(False)
+        expected = "integration-unavailable"
+    else:
+        f.reason = expected = "wallpaper-paused-or-stopped"
+    assert f.machine.status() == {"state": WALLPAPER, "available": False, "reason": expected}
+
+
 def test_server_eligibility_preserves_manual_latches(monkeypatch):
     from apricus import server
     from apricus.commons import CONFIG_KEY_MODE, MODE_WEBPAGE

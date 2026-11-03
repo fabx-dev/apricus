@@ -4,6 +4,39 @@ Local preparation, 2026-11-01/02. **NOT READY FOR PUBLICATION.**
 PASS means the stated check passed within its stated scope; NOT TESTED is not
 an implied pass. No external publication or privileged install is authorized.
 
+## Latest visible acceptance — 2026-11-03/04
+
+See `WEB_INTERACTION_ACCEPTANCE_2.1.0.md` for the complete scoped matrix and
+evidence. Installed **x14**, source `afbbcb2`, with unchanged host integration
+rev8 passed the user-confirmed functional checks: repeated entry/exit, retained
+text/counter, page-dialog Esc, dedicated shortcut, fullscreen/maximized/minimized
+external windows, GUI closure with Done still usable, bounded unresponsive JS,
+Stop/explicit Resume, live source replacement, and maximized-window automatic
+pause without automatic interaction re-entry. Bounded snapshots independently
+confirm the policy/source transitions; the maximized fixture is native Wayland
+and was not focused when maximizing. User also confirmed local moving/audible
+video, mute/unmute, correct manual Pause/Resume, one already-working YouTube
+sample, and maximized/fullscreen audio/video automation with GUI closed. Done's
+Ctrl+Alt+Tab/Enter access, desktop icons and Overview were confirmed.
+
+These are scoped manual confirmations, not assistant-observed screenshots,
+instrumented sub-500 ms timing, formal accessibility certification or universal
+streaming reliability. The known YouTube stalls remain unresolved. Manual Pause
+is not offered for a running Web Page in this GUI: do not count Stop/Resume as a
+manual-Pause GUI test. Native identities/load counts were verified in the
+separate bounded private strict runtime; visible-session content persistence is
+user-confirmed, not a direct native-object-ID measurement.
+
+A small post-x14 status fix removes stale completed reasons (`policy`,
+`source-changed`, initial `integration-unavailable`, etc.) from healthy idle
+availability messages, while retaining real unavailability and operation errors.
+Only the read-only status representation changes; policy, playback and Shell
+transitions are untouched. **668 passed, 5 skipped, 31 warnings**, Ruff PASS.
+Package provenance / installed message check for that final source still require
+verification. **Release remains BLOCKED**: no publication; final-source acceptance,
+stable metadata/date approval, final package set/provenance and earlier open
+platform/hardware/upgrade/timing gates are not implied by these functional passes.
+
 ## Local interaction implementation — acceptance gate (2026-11-02)
 
 Rev8/x13 visible acceptance also **FAILS on exit**: Done disappears and the page

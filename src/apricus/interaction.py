@@ -28,10 +28,31 @@ class WebInteraction:
 
     def status(self):
         reason = self.eligible() or ("" if self.ready else "integration-unavailable")
+        last_reason = self.reason
+        if (
+            self.state == WALLPAPER
+            and self.ready
+            and not reason
+            and last_reason
+            in (
+                "integration-unavailable",
+                "integration-lost",
+                "policy",
+                "source-changed",
+                "stop",
+                "quit",
+                "player-cancelled",
+                "player-stopped",
+            )
+        ):
+            # These describe completed transitions, not a current failure.
+            # Retain the internal exit reason without presenting a successful
+            # idle/recovery state as an error. Real availability failures win.
+            last_reason = ""
         return {
             "state": self.state,
             "available": self.ready and not reason and self.state == WALLPAPER,
-            "reason": reason or self.reason,
+            "reason": reason or last_reason,
         }
 
     def request(self):
