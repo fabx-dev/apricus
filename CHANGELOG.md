@@ -2,7 +2,9 @@
 
 ## 2.1.0 — unreleased
 
-- Web Page: local candidate adds same-window interaction with Shell-owned Done and a temporary exit shortcut displayed on that control (prefer Super+Ctrl+Shift+F12, with conflict-checked F11/F10 alternatives); no browser or WebView replacement. Final installed strict-Snap acceptance is still pending.
+- Web Page: same-window interaction with Shell-owned Done and a temporary exit shortcut displayed on that control (prefer Super+Ctrl+Shift+F12, with conflict-checked F11/F10 alternatives); no browser or WebView replacement. Bounded visible strict-Snap acceptance passed on x14, followed by x15 status-message acceptance. Native and additional-platform coverage is separate.
+- Flatpak 2.1.0 displays webpage wallpapers but does not support direct interaction: exact D-Bus name permissions alone do not reconcile rev8 host-PID binding with the sandbox PID namespace. No broad permissions or identity bypass were added.
+- Preserve exact nullable GTK titles on interaction exit and clear obsolete healthy status reasons; runtime, playback and rev8 architecture remain unchanged.
 - GNOME integration revision 8 avoids Mutter's reserved Super+Shift+Esc (cancel-input-capture) without changing system/user keybindings.
 - GNOME integration revision 7: authenticated asynchronous interaction channel, generation-scoped rollback, minimized-window notifications and narrowly scoped focus protection. No new Snap permissions.
 

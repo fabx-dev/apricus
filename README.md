@@ -151,7 +151,7 @@ Apricus ships a companion extension, `apricus-integration@fabx-dev` (source in `
 
 - Hosts wallpaper windows in the Shell background layer, below DING icons and app windows.
 - Reports fullscreen/maximized state to the server over `org.gnome.Shell.Extensions.ApricusIntegration`.
-- Carries no playback logic and no window identities — only aggregate state.
+- Carries no playback policy logic. Window-state sensing reports aggregates; the separate authenticated interaction channel binds only the current wallpaper identity and generation.
 
 Setup:
 
@@ -164,9 +164,9 @@ Updating works the same way: overwrite the files, then log out/in. Removing Apri
 
 Package differences:
 
-- **Native DEB/RPM**: full M3 push channel when the extension is installed and enabled.
-- **Flatpak**: window-state access depends on verified runtime permissions; preferences stay disabled until the running server reports a healthy `extension-push` source.
-- **Strict Snap on Wayland**: window push arrives bridge-carried from the rev6 extension to the server-owned Snap bridge; direct signal subscription stays unavailable under strict confinement. No control-center dependence.
+- **Native DEB/RPM**: M3 push and same-window web interaction with the matching rev8 extension on GNOME Wayland.
+- **Flatpak**: webpage display is available, but **Interact with webpage is unavailable in 2.1.0**. Exact bridge-name permission alone cannot resolve the Shell-owner check and sandbox/host PID mismatch in rev8. No broad bus access or confinement bypass is granted. Window-state preferences stay disabled until the server positively verifies a healthy `extension-push` source.
+- **Strict Snap on Wayland**: window push and direct interaction arrive bridge-carried from rev8 to the server-owned Snap bridge; direct signal subscription stays unavailable under strict confinement. No control-center dependence.
 
 ---
 
@@ -186,10 +186,12 @@ Ctrl+Alt+Tab group. Esc alone remains available to the webpage. This requires
 revision 8 of the GNOME integration and a running, unpaused web wallpaper;
 manual Stop/Pause and automatic pause are never overridden. GUI closure leaves
 Done available. After an unconfirmed rollback the page is hidden for safety:
-apply it again to recover. Flatpak interaction is unavailable without an existing
-server-owned bridge permission; this candidate adds no permissions. Final
-installed strict-Snap/visible-desktop acceptance is pending, not implied by the
-isolated prototype or automated tests.
+apply it again to recover. Flatpak direct interaction is unavailable in 2.1.0;
+adding a bridge permission alone is insufficient. Bounded visible strict-Snap
+acceptance passed on x14; x15 passed its status-message refinement, with protected
+runtime parity verified. See `docs/WEB_INTERACTION_ACCEPTANCE_2.1.0.md` for the
+precise scope. Web Page offers Stop/Resume, not a manual GUI Pause button.
+Focusing another application intentionally ends interaction.
 
 The preferred exit shortcut is **Super+Ctrl+Shift+F12**, with F11/F10 alternatives
 only if an earlier choice is already reserved. Existing bindings are never
@@ -202,16 +204,16 @@ is not used by Apricus.
 
 | Area | Status in 2.1.0 |
 |---|---|
-| Native GNOME Wayland (Shell 50.1) | Earlier VM validation with timing/PNG reservations; final-package acceptance pending |
+| GNOME Wayland (Shell 50.1) | Strict-Snap x14/x15 bounded acceptance in the tested VM; native package and other hardware coverage are separate |
 | GNOME 49 / 51 | Shipped per static API review, not runtime-tested |
 | X11 sessions | Existing behavior retained |
-| Flatpak | Earlier package smoke tests passed; final candidate validation pending. M3 depends on verified window-state access |
+| Flatpak | Webpage display, no direct webpage interaction; M3 depends on verified window-state access |
 | Strict Snap on Wayland | Server-owned bridge push; direct signals unavailable |
 | Detection+decision latency ≤ 500 ms | NOT rigorously attested; the pre-pause fade was removed, but no final sensor-to-visible-pause bound is certified |
 | YouTube streaming | Some videos exhibit intermittent audio/video stalls; unresolved known limitation, not a guaranteed service |
 | Other desktops (KDE, XFCE, …) | Not claimed; GNOME is the supported target |
 
-On non-GNOME X11 desktops, playback works but icon stacking and static-wallpaper sync are GNOME-specific. KDE Plasma manages its own background surface and is not supported.
+Other desktop environments are not validated. Icon stacking and static-wallpaper sync are GNOME-specific. KDE Plasma manages its own background surface and is not supported. Bundled yt-dlp is deliberately unchanged: Snap 2026.10.26, DEB/RPM/Flatpak 2026.07.04; this is not a claim of identical streaming service behavior.
 
 ---
 
@@ -221,7 +223,7 @@ On non-GNOME X11 desktops, playback works but icon stacking and static-wallpaper
 - **YouTube fails or stalls**: some videos may not play reliably due to streaming service restrictions or compatibility limitations. The exact cause of the observed intermittent stalls is not established. Bundled Deno/yt-dlp and the Streaming information button do not imply the issue is fixed.
 - **Missing video deps**: install `vlc`, `ffmpeg`, `python3-vlc` and the GTK4/Libadwaita typelibs listed in `docs/dev.md`.
 - **Extension missing or stale**: Settings explains the requirement; reinstall the 2.1.0 extension files, enable, log out/in, and check `journalctl --user -g apricus-integration`.
-- **Strict Snap shows integration disabled**: with an older Snap or extension, the rows stay disabled — bridge-carried M3 needs the rev6 extension and a Snap that owns the bridge in its server process.
+- **Strict Snap shows integration disabled**: use the matching rev8 extension and a Snap that owns the bridge in its server process; reload the extension via logout/login after updating host files.
 - **Flatpak cannot see videos**: it has read-only `xdg-videos` access; keep media under Videos or grant access with Flatseal.
 
 ---

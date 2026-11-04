@@ -77,9 +77,9 @@ PY
 install -Dm755 "$WORK_DIR/deno" "$STAGE_DIR/usr/lib/apricus/deno"
 "$STAGE_DIR/usr/lib/apricus/deno" --version
 
-# Vendor the pinned yt-dlp stack (same releases as Flatpak/Snap) so
-# streaming works identically on every distro, regardless of the (often
-# stale) system yt-dlp. Pure-python wheels: arch-independent. Optional
+# Vendor the pinned native/Flatpak yt-dlp stack (Snap preserves its separately
+# accepted version). Avoid depending on the often stale system yt-dlp;
+# no universal streaming parity is asserted. Pure-python wheels: arch-independent. Optional
 # runtime deps (brotli, mutagen, ...) degrade gracefully inside yt-dlp;
 # requests/urllib3 come from the system packages.
 # shellcheck disable=SC1091

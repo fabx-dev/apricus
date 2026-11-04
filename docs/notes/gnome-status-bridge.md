@@ -1,5 +1,13 @@
 # GNOME → Apricus status bridge: protocol and validation
 
+> Historical initial GUI-owned bridge design and measurements below; not the
+> final 2.1.0 lifecycle description. In the final implementation the **server**
+> owns the bridge, independently of GUI closure, including on native installs;
+> rev8 adds authenticated generation-scoped interaction pending reads and
+> acknowledgements. Aggregate window-state push remains separate from
+> wallpaper-identity binding. See `WEB_INTERACTION_ACCEPTANCE_2.1.0.md` and
+> `FLATPAK_INTERACTION_2.1.0.md` for current evidence and package limitations.
+
 This replaces neither the player RPC nor the receipt installer. No VLC,
 actor placement, DING, fullscreen, power-control or Quick Settings behavior
 is changed. The GUI starts this endpoint **only in Snap on GNOME Wayland**;

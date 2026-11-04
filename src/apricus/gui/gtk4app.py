@@ -3637,8 +3637,10 @@ class ControlPanel(Adw.Application):
                         "Resume the wallpaper before interacting with it."
                     ),
                     "player-not-ready": _("The webpage wallpaper is not ready yet."),
-                    "integration-unavailable": _(
-                        "Webpage interaction requires the updated GNOME integration."
+                    "integration-unavailable": (
+                        _("Direct webpage interaction is not supported by this Flatpak package.")
+                        if is_flatpak()
+                        else _("Webpage interaction requires the updated GNOME integration.")
                     ),
                     "surface-hidden": _(
                         "The webpage was hidden for safety. Apply the webpage again to restore it."
