@@ -6,15 +6,17 @@ corrente le liste di gate storiche nei rapporti precedenti. Nessuna pubblicazion
 ## 1. Commit sorgente definitivo
 
 **PASS** — sorgente funzionalmente congelato e baseline comune dei pacchetti:
-`dd5c7298ca991c21939a666c67cbb1bf0d1fc4fe`, ramo locale `release-2.1.0-prep`.
-Deriva da `4daaaae` (rapporto conclusivo) e `c6ecfc5` (x15 accettata).
+`6ed08690ca9ad117bdec0086c10972855e7a28d9`, ramo locale `release-2.1.0-prep`.
+Sigilla i metadati stabili con data **2026-11-04**, confermata dal maintainer.
+Deriva dalla baseline verificata `dd5c729`, da `4daaaae` (rapporto conclusivo)
+e `c6ecfc5` (x15 accettata).
 La sola modifica applicativa successiva è un testo di indisponibilità Flatpak
 nel control center. Nessuna modifica al player, HTTPS, policy, audio,
 interazione o estensione rev8. Snap fissa esattamente le versioni yt-dlp/EJS
 già accettate su x15; non aggiorna il resolver.
 
-**NOT TESTED** — commit di pubblicazione con data AppStream stabile effettiva:
-non esiste ancora. Non confondere questa baseline locale con un tag pubblicato.
+**PASS** — data, versione e stato stabile sigillati nel commit sorgente comune.
+Nessun tag esiste o è stato creato: preparazione stabile non significa pubblicazione.
 
 ## 2. Stato della worktree e repository
 
@@ -22,7 +24,7 @@ non esiste ancora. Non confondere questa baseline locale con un tag pubblicato.
 termina senza errore. Submodule shared-modules:
 `b8236c7961e3dd447b1b9605375a54a12f9f24b6`.
 Il commit conclusivo che aggiunge questo rapporto cambia soltanto documentazione:
-non modifica la baseline applicativa/metadati/packaging `dd5c729` dei binari.
+non modifica la baseline applicativa/metadati/packaging `6ed0869` dei binari.
 Nessun tag locale `v2.1.0` creato. Nessun push, merge remoto, release,
 workflow remoto, upload, promozione o modifica di credenziali/permessi Store.
 
@@ -40,7 +42,7 @@ di integrare, senza assumere aggiornato il vecchio draft PR #1.
 
 | Verifica | Esito | Ambito |
 |---|---|---|
-| pytest sul sorgente finale | **PASS** | 668 passati, 5 saltati, 31 warning, 42,96 s |
+| pytest sulla baseline funzionale invariata | **PASS** | 668 passati, 5 saltati, 31 warning, 42,96 s su dd5c729; non ripetuti per soli metadata |
 | Test saltati | **NOT TESTED** | Non trasformati in PASS |
 | Ruff lint e format | **PASS** | src e tests; 96 file già formattati |
 | Diff whitespace | **PASS** | `git diff --check` |
@@ -49,6 +51,7 @@ di integrare, senza assumere aggiornato il vecchio draft PR #1.
 | Sensor-to-visible-pause ≤500 ms | **NOT TESTED** | Nessuna certificazione temporale rigorosa |
 | Audit screen-reader/contrasto completo | **NOT TESTED** | Tastiera Done verificata, non equivale a audit completo |
 | Perdita reale estensione/owner e riconfigurazione monitor/workspace sul pacchetto finale | **NOT TESTED** | Copertura automatica non presentata come collaudo desktop |
+| Verifiche mirate dopo sigillo data | **PASS** | Metainfo compilato/validato offline, versione/data coerenti, confronto completo payload estratti, manifest/permessi/dipendenze e checksum |
 
 Il PASS funzionale A/V e interazione appartiene a x14/`afbbcb2`, seguito dal
 PASS x15/`c6ecfc5` del messaggio di stato con parità runtime protetta verificata:
@@ -93,15 +96,26 @@ La visualizzazione delle pagine resta distinta dall'interazione; M3 viene
 esposto solo dopo una verifica runtime positiva. Dettagli tecnici in
 `docs/FLATPAK_INTERACTION_2.1.0.md`.
 
+**NOT TESTED** — decisione di pubblicazione Flatpak: separata e non autorizzata.
+App e companion locale restano nel set locale preparato, non vengono automaticamente
+inclusi in alcun futuro upload.
+
 ## 5. Pacchetti finali e checksum SHA-256
 
-**NOT TESTED** — set stabile pubblicabile: data effettiva non ancora confermata.
-I pacchetti di preparazione sotto derivano dalla stessa baseline `dd5c729`;
-incorporano esplicitamente il milestone AppStream di sviluppo, non una data
-di pubblicazione inventata. Dopo la conferma servirà il riallineamento dei
-quattro formati, senza ricompilare inutilmente dipendenze invariate.
+**PASS** — quattro formati stabili allineati al commit `6ed0869`, versione
+2.1.0, data **2026-11-04**, metainfo `type="stable"`. Ricompilato offline
+soltanto il metainfo tradotto con Meson/gettext; riconfezionati DEB, RPM, Snap
+e Flatpak dai payload già verificati. Nessuna dipendenza riscaricata o
+ricompilata. Il confronto completo dei payload estratti dagli artefatti finali
+consente una sola differenza rispetto a dd5c729: il metainfo compilato.
+Tutti gli altri file, bit di modalità, symlink e runtime rimangono identici.
+Locale Flatpak e ZIP rev8 sono riutilizzati byte per byte, non ricompilati.
+Il confronto ha scartato un primo export Flatpak dalla staging combinata,
+che includeva anche dati split Debug/Locale; il definitivo parte dal precedente
+payload app-only esportato e ammette esclusivamente il delta metainfo.
+L'intermedio scartato e i log rimangono fuori dalla directory degli artefatti finali.
 
-Directory locale dei pacchetti: `../apricus-finalization-2.1.0-20261104/packages/`
+Directory locale dei pacchetti: `../apricus-stable-2.1.0-20261104/packages/`
 (relativa alla radice del repository).
 I checksum del set locale completo sono in `packages/SHA256SUMS.txt` e riportati
 sotto. Lo ZIP host rev8 è un asset aggiuntivo; il Flatpak locale è
@@ -109,29 +123,36 @@ un companion bundle, non un quinto formato applicativo.
 
 | Formato / verifica | Esito | Ambito effettivo |
 |---|---|---|
-| DEB amd64 build/install/dipendenze | **PASS** | Ubuntu 24.04 isolato, apt risolve le dipendenze; versione 2.1.0, dpkg audit senza problemi |
-| RPM x86_64 build/install/dipendenze | **PASS** | Fedora 43 isolato con RPM Fusion free; rpm verifica payload senza modifiche |
-| DEB/RPM avvio e comandi | **PASS** | Xvfb e bus privato: server/player, Pause/Resume, Stop/Resume, sorgente web, richiesta GUI e Quit senza traceback |
+| DEB amd64 install/dipendenze, baseline dd5c729 | **PASS** | Ubuntu 24.04 isolato, apt risolve le dipendenze; versione 2.1.0, dpkg audit senza problemi |
+| RPM x86_64 install/dipendenze, baseline dd5c729 | **PASS** | Fedora 43 isolato con RPM Fusion free; rpm verifica payload senza modifiche |
+| DEB/RPM avvio e comandi, baseline dd5c729 | **PASS** | Xvfb e bus privato: server/player, Pause/Resume, Stop/Resume, sorgente web, richiesta GUI e Quit senza traceback |
 | DEB/RPM resa desktop/audio udibile | **NOT TESTED** | Nessun nuovo collaudo visivo/uditivo, né prova rev8 su Fedora |
 | Flatpak app e locale build/import | **PASS** | GNOME 50; bundle importati in repo locale vuoto, commit OSTree uguali al build per app e locale |
-| Flatpak avvio/comandi in staging | **PASS** | Payload read-only in sandbox, Xvfb e bus privato interno: server/player, trasporto, sorgente web, richiesta GUI e Quit |
+| Flatpak avvio/comandi in staging, baseline dd5c729 | **PASS** | Payload read-only in sandbox, Xvfb e bus privato interno: server/player, trasporto, sorgente web, richiesta GUI e Quit |
 | Flatpak installazione utente reale finale | **NOT TESTED** | Non installato sull'host; smoke di staging non equivale a collaudo bundle installato |
 | Flatpak parità permessi | **PASS** | Application, Context e policy D-Bus identici al precedente pacchetto; nessun permesso aggiunto |
 | Snap build/payload/runtime | **PASS** | Strict/core24; 1.047 file yt-dlp, 6 EJS, Deno, libvlc, libvlccore e helper HTTPS byte-identici a x15 |
 | Snap manifest/permessi | **PASS** | Identico a x15 dopo esclusione delle sole descrizioni aggiornate |
-| Snap installazione/avvio aggiornato | **PASS** | Upgrade locale da rev15 ufficiale nel container, nuova revisione locale x1; server/player avviati e Quit verificato |
-| Nuovo collaudo visivo Snap dd5c729 | **NOT TESTED** | Non ripetuto: nessun delta funzionale Snap rispetto a x15; x15 sull'host intatta |
+| Snap installazione/avvio aggiornato, baseline dd5c729 | **PASS** | Upgrade locale da rev15 ufficiale nel container, nuova revisione locale x1; server/player avviati e Quit verificato |
+| Nuovo collaudo visivo Snap 6ed0869 | **NOT TESTED** | Non ripetuto: nessun delta funzionale Snap rispetto a x15; x15 sull'host intatta |
 | Payload comuni | **PASS** | Tutti i 36 file applicativi e due copie da 7 file rev8 per formato identici al sorgente; schema, gresource, icone, desktop e 5 traduzioni presenti |
 | File diagnostici/privati nei payload | **PASS** | Nessun fixture temporaneo, log, pacchetto annidato o API diagnostica del prototipo aggiunto |
 | SHA-256 | **PASS** | Tutte le sei somme ricalcolate con `sha256sum -c` |
 
+Gli esiti di installazione/avvio e dello smoke nella tabella si riferiscono
+ai payload funzionali dd5c729 già accettati. **NOT TESTED** — nuova installazione
+dei contenitori 6ed0869 dopo il solo cambio metainfo: non ripetuta, perché il
+confronto completo certifica l'assenza di delta eseguibili o di permessi.
+**PASS** — validazione offline dello skeleton Snap finale; estrazione reale di
+DEB/RPM/Snap e import/checkout del nuovo bundle Flatpak per verificare i contenuti.
+
 Percorsi completi degli artefatti: directory sopra + nome esatto sotto.
 
 ```text
-26980a593504bbfbb1c9d9e7a59f75e41f7f0be6c997452a521bc818d4d1bf75  apricus_2.1.0_amd64.deb
-05ac0304bc808999441e4cd27a4d6b856a7abd0aca187c8c9dc7a4b11a3b84c2  apricus-2.1.0-1.x86_64.rpm
-8695c7dc00304ecd0db15edb6d7abb6d39f56b2d19f4c7c2105436163f29f51a  apricus_2.1.0_amd64.snap
-b67794bd077b5c7af2705a4b88504eca6f74d67619e20ef207dacfdf79d28f4d  apricus-2.1.0.flatpak
+6bea02626da43fa150cc8c999bb38b13e3ce5ab2040bed468c2e98c29e9f4f16  apricus_2.1.0_amd64.deb
+9baaf1c7611711500c49d5f22f1046bba9cae719bfb903ba43bd13fda5962ae0  apricus-2.1.0-1.x86_64.rpm
+d9dbc37e5ecf7dc97dc9ce50630fba72576e2bec0bc6bc8cf720e584f7ee10cb  apricus_2.1.0_amd64.snap
+bd1c04fd4832c95daca507b063bfe987884509ddc7f34a00b6004be39fe263e9  apricus-2.1.0.flatpak
 b7380baba3287f1f602098ef177cb14c88948757f0a77d1a738ff26727a8a3e2  apricus-locale.flatpak
 f55c5ed0c39f14873630f11b4d73c9d3a350851b29d2d83caaeff701a89ef45f  apricus-integration@fabx-dev.zip
 ```
@@ -144,6 +165,14 @@ affermazione di identità binaria globale tra questi due Deno.
 
 **PASS** — ZIP rev8 prodotto dai medesimi sette file del sorgente. La revisione
 del codice Shell (8) è distinta dalla versione pacchetto dell'estensione (2).
+
+Evidenza definitiva di questo sigillo: `logs/FINAL_VERIFICATION.json` nella
+directory `../apricus-stable-2.1.0-20261104/` (relativa alla radice repository).
+Inventari confrontati: DEB 1.317 elementi, RPM 1.317, Snap 15.655, Flatpak 4.417;
+in ogni formato il solo file differente è il metainfo compilato, identico a
+quello prodotto da Meson sul commit comune. Identità/dipendenze/script RPM,
+control DEB e permessi Snap/Flatpak verificati invariati. Nessuna API o fixture
+diagnostica introdotta nei pacchetti definitivi.
 
 Gli smoke nativi usano root soltanto nei container e l'override WebKit sandbox
 necessario a quel fixture; non prescrivono avvio root agli utenti. Lo smoke
@@ -180,6 +209,11 @@ conservato, backfill previsto di policy/manual Stop/Pause e renderer `auto`;
 nessun reset manuale indesiderato. Backup di configurazione presente e
 confrontato. Server e player confinati avviati; dopo Quit zero helper vivi.
 
+**PASS** — nessun delta di configurazione, server, player, policy o runtime
+nella Snap finale `6ed0869` rispetto a questa prova: cambia soltanto metainfo.
+**NOT TESTED** — nuova ripetizione dell'upgrade dopo il sigillo data, non necessaria
+per questo delta e non dichiarata come ulteriore prova Store.
+
 **PASS** — controllo negativo e correzione del test: il primo fixture inventava
 `playlist_position=1`, chiave assente da rev15; la 2.1.0 la normalizza correttamente
 a mappa vuota. Non è perdita di un formato rev15 valido. Conservato il fallimento,
@@ -207,15 +241,13 @@ Stop/Resume web, dipendenza dall'estensione host e limite Flatpak sono espliciti
 La vecchia nota del bridge GUI-owned è marcata storica: oggi il bridge è del
 server e sopravvive alla chiusura del control center.
 
-**PASS** — AppStream valida offline con due annotazioni informative; versione
-2.1.0 e ID `io.github.fabx_dev.Apricus` coerenti. Nessuna nuova data di rilascio
-inventata: `2026-11-01` rimane dichiaratamente milestone `development`.
-
-**FAIL** — metadati stabili finali non ancora sigillati: AppStream rifiuta una
-release stabile senza data (`release-time-missing` verificato su copia privata).
-Occorre confermare la data effettiva, aggiornare `type="stable"` e la data,
-committare e riallineare tutti gli artefatti/checksum prima della pubblicazione.
-Non è un difetto del player o un motivo per ripetere l'intero collaudo A/V.
+**PASS** — AppStream compilato valida offline con due annotazioni informative;
+versione 2.1.0, ID `io.github.fabx_dev.Apricus`, `date="2026-11-04"` e
+`type="stable"` coerenti in tutti gli artefatti. CHANGELOG datato 2026-11-04
+e note di rilascio allineate. Data autorizzata dal maintainer, non dedotta.
+La pubblicazione esterna rimane separatamente soggetta ad approvazione.
+Il precedente gate della data è chiuso; i pacchetti di sviluppo precedenti
+restano soltanto evidenza storica e non devono essere mescolati al set stabile.
 
 **NOT TESTED** — nuove schermate finali: le attuali sono illustrative/storiche.
 GNOME 49/51 hanno revisione API statica, non convalida runtime; altri hardware,
@@ -240,10 +272,10 @@ ostacolo concreto alla pubblicazione individuato in queste due occorrenze.
 
 ## 9. Problemi bloccanti e non bloccanti
 
-**FAIL** — gate reale del confezionamento: manca la data effettiva approvata
-per i metadati stabili e quindi manca il set di quattro pacchetti stabili
-sigillato su quel commit. Non sostituire i pacchetti dopo aver pubblicato i
-checksum e non taggare questo set di sviluppo come definitivo.
+**PASS** — gate di confezionamento chiuso: data approvata, metadati stabili
+e quattro formati sigillati sul medesimo sorgente. Nessun problema realmente
+bloccante individuato nelle verifiche locali. Non sostituire questi artefatti
+dopo l'approvazione dei checksum e non confonderli con i precedenti set di sviluppo.
 
 **PASS** — nessun nuovo difetto dimostrato di sicurezza, integrità dati o
 funzionamento principale nelle verifiche completate. Non si converte ogni
@@ -261,9 +293,10 @@ operativi della fase B, non PASS già ottenuti né difetti presunti.
 **NOT TESTED** — tutte le operazioni di pubblicazione seguenti restano da
 autorizzare. Nessun comando di questa sezione è stato eseguito.
 
-1. Confermare data effettiva, commit stabile e set di artefatti. Verificare
-   worktree pulita, `git fsck`, suite e payload/checksum dopo la sola modifica
-   metadata. Fissare `SOURCE_COMMIT` al commit approvato completo, non al titolo
+1. Verificare data già confermata (2026-11-04), commit stabile e set di artefatti.
+   Confermare worktree pulita, `git fsck` e verifiche mirate documentate;
+   non ripetere la campagna funzionale senza un nuovo delta applicativo.
+   Fissare `SOURCE_COMMIT` al commit approvato completo, non al titolo
    di un ramo. Conservare provenance separata da eventuali commit di rapporto.
 2. Dopo autorizzazione, `git fetch origin --prune`; verificare remote URL,
    `git log --left-right --oneline origin/master...release-2.1.0-prep` e la
@@ -284,8 +317,11 @@ autorizzare. Nessun comando di questa sezione è stato eseguito.
    `sha256sum -c SHA256SUMS.txt`; creare draft esplicito:
    `gh release create v2.1.0 --repo fabx-dev/apricus --verify-tag --draft
    --title "Apricus 2.1.0" --notes-file "$APPROVED_NOTES"`.
-   Allegare DEB, RPM, Snap, Flatpak app/locale, ZIP rev8 e somme usando una
-   lista esplicita di file, non l'intera directory diagnostica.
+   Allegare DEB, RPM, Snap, ZIP rev8 e somme usando una lista esplicita di file,
+   non l'intera directory diagnostica. Flatpak app/locale **soltanto dopo
+   decisione specifica separata**. Preparare un manifest di pubblicazione per
+   il sottoinsieme approvato, mantenendo intatto quello locale completo; le
+   somme dei file scelti devono coincidere con il manifest sigillato qui.
 6. Scaricare gli allegati draft in directory vuota con `gh release download
    v2.1.0 --repo fabx-dev/apricus --dir "$VERIFY_DIR"`; eseguire di nuovo
    `sha256sum -c SHA256SUMS.txt` e verificare tag/sorgenti/note. Solo dopo
@@ -363,7 +399,11 @@ rimozioni ampie. x15 e i sette file dell'estensione host rev8 verificati intatti
 
 ## Conclusione
 
-**BLOCKED** — data effettiva dei metadati stabili da confermare e conseguente
-set di quattro pacchetti stabili da riallineare e sigillare su quel commit.
-Le limitazioni note e i controlli non eseguiti non sono difetti inventati.
-Nessuna pubblicazione esterna autorizzata o eseguita.
+**READY FOR PUBLICATION APPROVAL**
+
+Data 2026-11-04 approvata, quattro formati stabili coerenti e checksum sigillati;
+nessun nuovo difetto realmente bloccante. Le limitazioni e i NOT TESTED sopra
+mantengono il proprio ambito. Flatpak è preparato, ma la sua pubblicazione
+richiede una decisione separata. Questo verdetto non autorizza GitHub, Store o
+Flathub: nessuna operazione remota, tag o pubblicazione è stata effettuata in
+questa finalizzazione. x15 e Snap Store stable 2.0.7 rev15 non sono stati modificati.
