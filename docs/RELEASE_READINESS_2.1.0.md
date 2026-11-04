@@ -1,5 +1,9 @@
 # Apricus 2.1.0 — Release Readiness
 
+> Il rapporto unico corrente è [FINAL RELEASE READINESS — APRICUS 2.1.0](FINAL_RELEASE_READINESS_2.1.0.md).
+> Questo documento conserva la cronologia e le limitazioni originarie; le vecchie
+> liste di gate non sostituiscono la classificazione finale di blocker/non-blocker.
+
 Local preparation, 2026-11-01/02. **NOT READY FOR PUBLICATION.**
 PASS means the stated check passed within its stated scope; NOT TESTED is not
 an implied pass. No external publication or agent-performed privileged install is authorized.
