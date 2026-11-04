@@ -23,10 +23,21 @@ Nessun tag esiste o è stato creato: preparazione stabile non significa pubblica
 **PASS** — worktree pulita dopo il commit locale; `git fsck --full --no-reflogs`
 termina senza errore. Submodule shared-modules:
 `b8236c7961e3dd447b1b9605375a54a12f9f24b6`.
-Il commit conclusivo che aggiunge questo rapporto cambia soltanto documentazione:
-non modifica la baseline applicativa/metadati/packaging `6ed0869` dei binari.
+I commit conclusivi di documentazione non modificano la baseline
+applicativa/metadati/packaging `6ed0869` dei binari.
 Nessun tag locale `v2.1.0` creato. Nessun push, merge remoto, release,
 workflow remoto, upload, promozione o modifica di credenziali/permessi Store.
+
+**PASS** — rifinitura editoriale README autorizzata dopo `5807d0d`: corretti
+policy di ripresa, novità Interact, requisiti XWayland/rev8, installazione
+Flatpak/RPM, accesso a Done e stato di finalizzazione locale. Preferiti e
+cronologia web confermati dal codice; limiti Flatpak/YouTube conservati.
+Il README della release non è incluso nei payload DEB, RPM, Snap o Flatpak:
+verificati contenuto e percorsi negli artefatti estratti. Nessuna rigenerazione
+necessaria; tutti i checksum della sezione 5 restano invariati. Le sole
+modifiche successive interessano README e questa annotazione, non eseguibili,
+metainfo, permessi o immagini. Collegamenti locali e sintassi dei comandi
+verificati senza eseguire installazioni, build o accessi remoti.
 
 **PASS** — scansione dei file tracciati: nessuna chiave privata, token GitHub,
 chiave AWS o URL media firmato riconosciuti dai pattern; nessun percorso home

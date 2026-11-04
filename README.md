@@ -22,7 +22,7 @@ Apricus turns your GNOME desktop background into a living canvas: a local clip, 
 Why Apricus:
 
 - Native GTK4 control center with Library, Playlist, Now Playing, Streaming, Web Page and Settings workspaces.
-- Playback Policy Engine: automatic pause/mute rules that always yield to your explicit Play, Pause and Stop.
+- Playback Policy Engine: manual Pause and Stop persist and are never cleared by automation; playback resumes only when the current policy permits it.
 - GNOME Wayland integration: fullscreen/maximized sensing through a small Shell extension, with preferences that apply immediately.
 - Per-monitor wallpaper selection, static-frame login continuity, and six interface languages.
 
@@ -36,7 +36,8 @@ Why Apricus:
 
 - New **Now Playing** panel with media hero, status badge, transport and media details.
 - Dynamic **Play/Pause** button plus a separate **Stop** button.
-- Explicit manual actions are persisted and always take precedence over automation.
+- Manual Pause and Stop are persisted; automatic events never clear them. Play resumes only when the current policy permits it.
+- Pause reaches VLC without the previous pre-pause fade. Compatible pausable sources retain their media across pause/resume; this does not guarantee continuity for every stream.
 
 **M2 — Playback Policy Engine**
 
@@ -51,6 +52,11 @@ Why Apricus:
 - The server validates sender and sequence, reconciles on reconnect, and freezes safely on signal loss.
 - Preferences changed in the GUI reach the running server immediately.
 
+**Interact with webpage**
+
+- Interact with the same running WebKit page and WebView, without reloading or opening a browser, then return with **Done — Return to desktop**, owned by GNOME Shell.
+- Requires GNOME Wayland with integration revision 8 on native/Snap installations; unavailable in the 2.1.0 Flatpak package.
+
 See [RELEASE_NOTES_2.1.0.md](RELEASE_NOTES_2.1.0.md) and [CHANGELOG.md](CHANGELOG.md) for the full notes.
 
 ---
@@ -60,7 +66,7 @@ See [RELEASE_NOTES_2.1.0.md](RELEASE_NOTES_2.1.0.md) and [CHANGELOG.md](CHANGELO
 - **Local video wallpapers** from your video folder, with asynchronous thumbnails and per-monitor selection.
 - **Looping playlists** with drag-and-drop reorder, shuffle and undo.
 - **Streams**: YouTube, Twitch, live and direct video links, with 10-second preview, favorites and history. Native packages bundle Deno and yt-dlp; some YouTube videos may not play reliably. The Streaming information button explains this limitation on demand.
-- **Web pages**: any URL or local `.html` file as wallpaper, with an Inspiration gallery.
+- **Web pages**: any URL or local `.html` file as wallpaper, with favorites, recent history and an Inspiration gallery.
 - **Multi-monitor**: deterministic per-monitor selection, including identical models.
 - **Now Playing**: live status, transport (Play/Pause, Stop, volume/mute), media inspector and up-next preview.
 - **Policy automation**: pause or mute when a window is fullscreen/maximized, configurable in Settings.
@@ -70,7 +76,7 @@ See [RELEASE_NOTES_2.1.0.md](RELEASE_NOTES_2.1.0.md) and [CHANGELOG.md](CHANGELO
 
 ## Screenshots
 
-Screenshots live in `res/` and illustrate the GTK4 interface; they predate final candidate acceptance:
+Screenshots live in `res/` and illustrate the GTK4 interface; they predate final release acceptance:
 
 ![Library](res/apricus-2-library.png)
 ![Now Playing](res/apricus-2-now-playing.png)
@@ -85,7 +91,7 @@ Screenshots live in `res/` and illustrate the GTK4 interface; they predate final
 
 ## Installation
 
-Published packages are attached to [GitHub Releases](https://github.com/fabx-dev/apricus/releases). **2.1.0 is currently an unpublished local candidate.** Filenames below describe the intended 2.1.0 packages, not a claim that they are already available.
+Packages are distributed through [GitHub Releases](https://github.com/fabx-dev/apricus/releases). **Apricus 2.1.0 is locally finalized with release date 2026-11-04; publication has not yet taken place and requires separate approval.** Filenames below match the prepared artifacts, not a claim that they are already available online. See the [final release readiness report](docs/FINAL_RELEASE_READINESS_2.1.0.md) for verification scope and publication gates.
 
 ### Debian / Ubuntu (`.deb`)
 
@@ -101,6 +107,8 @@ make deb
 
 ### Fedora / compatible distributions (`.rpm`)
 
+The dependency and startup smoke test used **Fedora 43 with RPM Fusion free enabled**. Enable the matching free repository using the [RPM Fusion configuration instructions](https://rpmfusion.org/Configuration) before installing; stock Fedora repositories alone may not provide all VLC dependencies. This is not a visual GNOME Wayland certification on Fedora or a claim of validation on other compatible distributions.
+
 ```bash
 sudo dnf install ./apricus-2.1.0-1.x86_64.rpm
 ```
@@ -113,11 +121,18 @@ make rpm
 
 ### Flatpak
 
+The prepared bundles require Flatpak and the **GNOME Platform 50** runtime. Configure the user Flathub remote for runtime dependencies, then install each local bundle separately:
+
 ```bash
-flatpak install --user apricus-2.1.0.flatpak apricus-locale.flatpak
+flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+flatpak install --user flathub org.gnome.Platform//50
+flatpak install --user ./apricus-2.1.0.flatpak
+flatpak install --user ./apricus-locale.flatpak
 ```
 
-Or build locally from source (pulls the GNOME 50 runtime/SDK from Flathub):
+**Flatpak publication requires a separate decision and has not been approved.** These commands describe local bundle installation, not an Apricus listing on Flathub. Webpage display is available, but **Interact with webpage is unavailable in this package**.
+
+Or build locally from source with `flatpak-builder` installed and the user Flathub remote configured (pulls the GNOME 50 runtime/SDK and installs the resulting app):
 
 ```bash
 make flatpak
@@ -129,7 +144,7 @@ make flatpak
 sudo snap install apricus
 ```
 
-This installs the currently published Store version (2.0.7 rev15 during local 2.1.0 preparation), not the unpublished candidate. For an explicitly approved local test, quit Apricus first and verify its app/helper processes have exited, then use `sudo snap install --dangerous ./apricus_2.1.0_amd64.snap`. The Snap remains strict-confined. Back up user data before replacing an installation; see the release readiness report for upgrade reservations.
+This installs the currently published Store version (2.0.7 rev15 during local 2.1.0 finalization), not the locally finalized, unpublished 2.1.0. For an explicitly approved local test, quit Apricus first and verify its app/helper processes have exited, then use `sudo snap install --dangerous ./apricus_2.1.0_amd64.snap`. The Snap remains strict-confined. Back up user data before replacing an installation; see the [final release readiness report](docs/FINAL_RELEASE_READINESS_2.1.0.md) for upgrade and rollback scope.
 
 ### From source
 
@@ -147,7 +162,9 @@ make run       # launch in debug mode
 
 ## GNOME integration
 
-Apricus ships a companion extension, `apricus-integration@fabx-dev` (source in `gnome-extension/`), revision 8 in the local release candidate:
+GNOME Wayland sessions require **XWayland**: Apricus currently uses the X11 backend for its wallpaper player. Fullscreen/maximized integration and direct webpage interaction additionally require the matching GNOME Shell extension; the tested visible session was GNOME Shell/Mutter 50.1 Wayland. See the compatibility table below for unverified environments.
+
+Apricus ships a companion extension, `apricus-integration@fabx-dev` (source in `gnome-extension/`), revision 8 in release 2.1.0:
 
 - Hosts wallpaper windows in the Shell background layer, below DING icons and app windows.
 - Reports fullscreen/maximized state to the server over `org.gnome.Shell.Extensions.ApricusIntegration`.
@@ -155,9 +172,9 @@ Apricus ships a companion extension, `apricus-integration@fabx-dev` (source in `
 
 Setup:
 
-1. Native `.deb`/`.rpm` installs place the extension under `/usr/share/gnome-shell/extensions/`. For Snap/Flatpak, which cannot write host extension directories from their sandbox, build the ZIP with `gnome-extension/build-zip.sh` and run `gnome-extension/install-host.sh --zip <file.zip> --enable` on the host (per-user, no sudo).
-2. Enable once: `gnome-extensions enable apricus-integration@fabx-dev`.
-3. Log out and back in so the Shell loads the new code.
+1. Native `.deb`/`.rpm` installs place the extension under `/usr/share/gnome-shell/extensions/`. For Snap/Flatpak, which cannot write host extension directories from their sandbox, run `./gnome-extension/build-zip.sh` from the source checkout root, then `./gnome-extension/install-host.sh --zip ./dist/apricus-integration@fabx-dev.zip --enable` on the host (per-user, no sudo). You may use the prepared extension ZIP instead, passing its actual path to `--zip`.
+2. For a newly installed extension that GNOME Shell does not recognize yet, log out and back in first; then enable once with `gnome-extensions enable apricus-integration@fabx-dev`.
+3. After updating an already loaded extension, log out and back in so the Shell loads revision 8.
 4. Confirm with `journalctl --user -g apricus-integration` (expect `enabled, code revision 8`).
 
 Updating works the same way: overwrite the files, then log out/in. Removing Apricus never touches `~/.local/share/gnome-shell/extensions/`; disable and delete that directory manually if desired.
@@ -178,22 +195,22 @@ Package differences:
 4. In **Settings**, choose pause and/or mute behavior for maximized/fullscreen windows. With M3 active, changes apply to the current window state immediately.
 5. For streams, paste a link in **Streaming** and use Try 10s before applying; for web walls use **Web Page** or the Inspiration gallery.
 
-In the local candidate, **Web Page → Interact with webpage** promotes the same
+In 2.1.0, **Web Page → Interact with webpage** promotes the same
 running webpage without reloading it. Finish with the native Shell control
-**Done — Return to desktop**, the temporary shortcut displayed on that control,
-or the Shell's accessible
-Ctrl+Alt+Tab group. Esc alone remains available to the webpage. This requires
+**Done — Return to desktop** or the temporary shortcut displayed on that control.
+Ctrl+Alt+Tab lets you reach the Shell's accessible Done control, which you then
+activate; it does not itself end interaction. Esc alone remains available to the webpage. This requires
 revision 8 of the GNOME integration and a running, unpaused web wallpaper;
 manual Stop/Pause and automatic pause are never overridden. GUI closure leaves
 Done available. After an unconfirmed rollback the page is hidden for safety:
 apply it again to recover. Flatpak direct interaction is unavailable in 2.1.0;
 adding a bridge permission alone is insufficient. Bounded visible strict-Snap
 acceptance passed on x14; x15 passed its status-message refinement, with protected
-runtime parity verified. See `docs/WEB_INTERACTION_ACCEPTANCE_2.1.0.md` for the
+runtime parity verified. See the [web interaction acceptance report](docs/WEB_INTERACTION_ACCEPTANCE_2.1.0.md) for the
 precise scope. Web Page offers Stop/Resume, not a manual GUI Pause button.
 Focusing another application intentionally ends interaction.
 
-The preferred exit shortcut is **Super+Ctrl+Shift+F12**, with F11/F10 alternatives
+The preferred exit shortcut is **Super+Ctrl+Shift+F12**, with **Super+Ctrl+Shift+F11/F10** alternatives
 only if an earlier choice is already reserved. Existing bindings are never
 changed. **Super+Shift+Esc** belongs to Mutter's input-capture cancellation and
 is not used by Apricus.
