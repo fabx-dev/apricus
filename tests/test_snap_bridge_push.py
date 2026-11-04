@@ -312,7 +312,7 @@ def test_snap_policy_support_requires_verified_bridge():
 
 def test_bridge_window_dispatch_rejects_stranger(monkeypatch):
 
-    from tests.test_gnome_bridge import Invocation, fake_bridge
+    from test_gnome_bridge import Invocation, fake_bridge
 
     bridge, bus, glib = fake_bridge(monkeypatch, [":1.14", ":1.14", ":1.14", ":1.14", ":1.14"])
     bridge.window_registration = WindowRegistration(lambda: bridge._window_changed())
@@ -395,7 +395,7 @@ def test_window_lease_lapse_rebaselines_without_reject():
 
 
 def test_cross_channel_calls_share_sender_without_false_busy(monkeypatch):
-    from tests.test_gnome_bridge import Invocation, fake_bridge
+    from test_gnome_bridge import Invocation, fake_bridge
 
     bridge, bus, glib = fake_bridge(monkeypatch, [":1.14", ":1.14", ":1.14", ":1.14", ":1.14"])
     bridge.window_registration = WindowRegistration(lambda: bridge._window_changed())
