@@ -13,6 +13,7 @@ apricus.menu or apricus.player (they pin GTK3/Gdk3 namespaces or spawn
 playback in the panel process).
 """
 
+import json
 import logging
 import os
 import re
@@ -60,6 +61,7 @@ from apricus.utils import (
     ConfigUtil,
     get_video_paths,
     init_translations,
+    is_flatpak,
     is_gnome,
     is_snap,
     is_wayland,
@@ -89,6 +91,9 @@ logger = logging.getLogger(LOGGER_NAME)
 
 APP_ID = f"{PROJECT}.gui4"
 _UNSET = object()
+# Transport auto-refresh cadence: lightweight signature check only, full
+# refresh solely on actual change. Never aggressive polling.
+_NP_POLL_SECONDS = 2
 
 
 def _capped_get(url, timeout, max_bytes):
@@ -152,11 +157,34 @@ class ControlPanel(Adw.Application):
         self.config = ConfigUtil().load()
         self.playlist_paths = list((self.config.get("playlist") or {}).get("Default", []))
 
+    def do_startup(self):
+        Adw.Application.do_startup(self)
+        # The status/window bridge is server-owned (snap): the control
+        # center only reads its snapshot over Snap IPC so M3 survives the
+        # panel being closed. Never own the well-known name here.
+        self._gnome_bridge = None
+
     def do_shutdown(self):
+        from apricus.gnome_bridge import stop
+
+        stop()
         pool = getattr(self, "_stream_thumb_pool", None)
         if pool is not None:
             pool.shutdown(wait=False, cancel_futures=True)
             self._stream_thumb_pool = None
+        subscription = getattr(self, "_integration_subscription", None)
+        if subscription is not None:
+            subscription.unsubscribe()
+        timer = getattr(self, "_integration_timer", None)
+        if timer:
+            GLib.source_remove(timer)
+        poll = getattr(self, "_np_poll_id", None)
+        if poll:
+            try:
+                GLib.source_remove(poll)
+            except Exception:  # noqa: BLE001 - shutdown never fails
+                pass
+            self._np_poll_id = None
         Gio.Application.do_shutdown(self)
 
     def do_activate(self):
@@ -203,10 +231,15 @@ class ControlPanel(Adw.Application):
             toolbar.set_content(self.toasts)
             self.window.set_content(toolbar)
             self._load_css()
+            try:
+                self.window.connect("notify::is-active", self._on_window_active_changed)
+            except Exception:  # noqa: BLE001 - activation refresh best-effort
+                pass
         self._refresh_all()
         # Dev/test aid: preselect a section (e.g. screenshots).
         initial_tab = os.environ.get("APRICUS_GTK4_TAB")
         self._select_section(initial_tab or "library")
+        self._start_np_poll()
         self.window.present()
 
     def _build_sidebar(self):
@@ -407,6 +440,19 @@ class ControlPanel(Adw.Application):
         else:
             paused = True
         icon_name, act_text = self._sidebar_activity_state(server_ok, mode, paused)
+        if server_ok:
+            try:
+                state = server.playback_state
+                if state in ("stopped", "paused", "unavailable"):
+                    playing = False
+                    act_text = {
+                        "stopped": _("Stopped"),
+                        "paused": _("Paused"),
+                        "unavailable": _("Playback unavailable"),
+                    }[state]
+                    icon_name = "media-playback-stop-symbolic" if state == "stopped" else icon_name
+            except (GLib.Error, AttributeError):
+                pass
         show_eq = bool(playing and self._animations_enabled() and eq is not None)
         if eq is not None:
             eq.set_visible(show_eq)
@@ -506,6 +552,13 @@ class ControlPanel(Adw.Application):
                 self._reload_stream_lists()
             elif row.get_name() == "webpage":
                 self._reload_web_lists()
+            elif row.get_name() == "now-playing":
+                # Coherent view after page change: reuse the full refresh so
+                # externally changed transport/title state is shown at once.
+                try:
+                    self._refresh_all()
+                except Exception:  # noqa: BLE001 - page change never breaks
+                    pass
 
     def _select_section(self, name):
         names = [section for section, _, _ in self.SECTIONS]
@@ -1308,6 +1361,11 @@ class ControlPanel(Adw.Application):
         self.np_play_btn.set_tooltip_text(_("Play / Pause"))
         self.np_play_btn.connect("clicked", self.on_play_pause)
         transport.append(self.np_play_btn)
+        self.np_stop_btn = Gtk.Button()
+        self.np_stop_btn.set_icon_name("media-playback-stop-symbolic")
+        self.np_stop_btn.set_tooltip_text(_("Stop wallpaper"))
+        self.np_stop_btn.connect("clicked", self.on_stop_resume)
+        transport.append(self.np_stop_btn)
         self.np_mute_btn = Gtk.ToggleButton()
         self.np_mute_btn.add_css_class("flat")
         self.np_mute_btn.set_tooltip_text(_("Mute / Unmute"))
@@ -1416,6 +1474,34 @@ class ControlPanel(Adw.Application):
             return _("Paused") if paused else _("Playing")
         return _("Static")
 
+    @staticmethod
+    def _playlist_current_path(queue, positions):
+        """Effective playlist item: saved position clamped into the queue.
+
+        Distinguishes the persisted selection/position from the UI editing
+        queue and from the previously playing single video. Empty queue
+        returns "" so callers fall back to data_source Default.
+        """
+        if not queue:
+            return ""
+        index = 0
+        if isinstance(positions, dict):
+            value = positions.get("Default")
+            if not (isinstance(value, int) and not isinstance(value, bool) and value >= 0):
+                for key in sorted(positions.keys()):
+                    candidate = positions[key]
+                    if (
+                        isinstance(candidate, int)
+                        and not isinstance(candidate, bool)
+                        and candidate >= 0
+                    ):
+                        value = candidate
+                        break
+                else:
+                    value = 0
+            index = value % len(queue)
+        return queue[index]
+
     def _refresh_now_playing(self, server=_UNSET, mode=None, paused=None):
         if server is _UNSET:
             server = self._server()
@@ -1425,10 +1511,13 @@ class ControlPanel(Adw.Application):
         if mode == MODE_PLAYLIST:
             # A playlist never rewrites data_source.Default, so the hero
             # would keep showing the previous single video (or nothing).
-            # Follow the queue head instead (loop restarts there).
-            queue = list(getattr(self, "playlist_paths", None) or [])
+            # Show the effective item: persisted queue at its saved
+            # position, not always the queue head nor unsaved UI edits.
+            persisted = (self.config.get("playlist") or {}).get("Default", [])
+            queue = list(persisted or getattr(self, "playlist_paths", None) or [])
             if queue:
-                current = queue[0]
+                positions = self.config.get("playlist_position")
+                current = self._playlist_current_path(queue, positions)
         if paused is None:
             paused = True
             if server is not None and mode in (MODE_VIDEO, MODE_STREAM, MODE_PLAYLIST):
@@ -1445,8 +1534,35 @@ class ControlPanel(Adw.Application):
             empty.set_visible(not has_content)
         if not has_content:
             return
-        self.np_badge.set_text(self._np_badge(mode, paused))
-        playing = not paused and mode in (MODE_VIDEO, MODE_STREAM, MODE_PLAYLIST)
+        state = None
+        if server is not None:
+            try:
+                state = server.playback_state
+            except (GLib.Error, AttributeError):
+                pass
+        stopped = state == "stopped"
+        if stopped:
+            paused = True
+        # The button must agree with the badge: it offers the action that
+        # matches the effective state, not just the manual latch. Otherwise
+        # an automatic pause (maximized/fullscreen) shows "Paused" next to
+        # a button still offering "Pause".
+        effective_paused = paused or state in ("paused", "unavailable")
+        badge = {
+            "stopped": _("Stopped"),
+            "playing": _("Playing"),
+            "paused": _("Paused"),
+            "unavailable": _("Playback unavailable"),
+        }.get(state, self._np_badge(mode, effective_paused))
+        self.np_badge.set_text(badge)
+        stop_btn = getattr(self, "np_stop_btn", None)
+        busy = getattr(self, "_transport_busy", False)
+        if stop_btn is not None:
+            # Always visible (stable layout); disabled when there is
+            # nothing to stop or an operation is already in flight.
+            stop_btn.set_visible(True)
+            stop_btn.set_sensitive(server is not None and not stopped and not busy)
+        playing = not effective_paused and mode in (MODE_VIDEO, MODE_STREAM, MODE_PLAYLIST)
         settings = Gtk.Settings.get_default()
         animations = bool(settings and settings.props.gtk_enable_animations)
         self.np_eq.set_visible(bool(playing and animations))
@@ -1456,7 +1572,12 @@ class ControlPanel(Adw.Application):
         self.np_subtitle.set_text(self._mode_text(mode))
         self.now_playing_status.set_text(self._now_playing_text(mode, current))
         self.np_play_btn.set_icon_name(
-            "media-playback-start-symbolic" if paused else "media-playback-pause-symbolic"
+            "media-playback-start-symbolic" if effective_paused else "media-playback-pause-symbolic"
+        )
+        self.np_play_btn.set_tooltip_text(_("Play") if effective_paused else _("Pause"))
+        # WebKit had no working PAUSE API; STOP/RESUME is supported in M1.
+        self.np_play_btn.set_sensitive(
+            server is not None and not busy and (mode != MODE_WEBPAGE or stopped)
         )
         is_playlist = mode == MODE_PLAYLIST
         self.np_volume.set_sensitive(not is_playlist)
@@ -1925,6 +2046,50 @@ class ControlPanel(Adw.Application):
     # page would collapse and the heroes would render at different widths.
     PAGE_MIN_WIDTH = 600
 
+    # Shared copy for the Streaming availability notice: the tooltip and the
+    # popover render the same strings, so there is a single source of truth.
+    STREAM_AVAILABILITY_TITLE = "Streaming availability"
+    STREAM_AVAILABILITY_BODY = (
+        "Some YouTube videos may not play reliably due to streaming service "
+        "restrictions or compatibility limitations."
+    )
+
+    @staticmethod
+    def _stream_availability_info():
+        """Info button + popover for the Streaming page (native GTK4 only).
+
+        A flat symbolic button: hover shows the body as tooltip, click (or
+        keyboard activation) opens a small popover with title + body. The
+        popover auto-hides on outside click / Esc; no dialogs involved.
+        """
+        info_btn = Gtk.MenuButton()
+        info_btn.set_icon_name("dialog-information-symbolic")
+        info_btn.add_css_class("flat")
+        info_btn.add_css_class("dim-label")
+        info_btn.update_property(
+            [Gtk.AccessibleProperty.LABEL], [ControlPanel.STREAM_AVAILABILITY_TITLE]
+        )
+        info_btn.set_tooltip_text(ControlPanel.STREAM_AVAILABILITY_BODY)
+        info_btn.set_valign(Gtk.Align.CENTER)
+        popover = Gtk.Popover()
+        pop_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        pop_box.set_margin_top(12)
+        pop_box.set_margin_bottom(12)
+        pop_box.set_margin_start(12)
+        pop_box.set_margin_end(12)
+        title = Gtk.Label(label=ControlPanel.STREAM_AVAILABILITY_TITLE)
+        title.add_css_class("heading")
+        title.set_xalign(0)
+        body = Gtk.Label(label=ControlPanel.STREAM_AVAILABILITY_BODY)
+        body.set_xalign(0)
+        body.set_wrap(True)
+        body.set_max_width_chars(38)
+        pop_box.append(title)
+        pop_box.append(body)
+        popover.set_child(pop_box)
+        info_btn.set_popover(popover)
+        return info_btn, popover
+
     def _build_hero(self, icon_name, title, subtitle):
         """Shared Streaming/Web Page hero: identical structure and geometry.
 
@@ -1986,7 +2151,12 @@ class ControlPanel(Adw.Application):
         self.stream_entry.connect("activate", self.on_stream_apply)
         self.stream_entry.connect("icon-press", self._on_stream_icon_press)
         self.stream_entry.connect("changed", self._on_stream_entry_changed)
-        box.append(self.stream_entry)
+        self.stream_entry.set_hexpand(True)
+        url_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        url_row.append(self.stream_entry)
+        self.stream_info_btn, self.stream_info_popover = self._stream_availability_info()
+        url_row.append(self.stream_info_btn)
+        box.append(url_row)
         self.stream_type_row = Adw.ActionRow()
         self.stream_type_row.set_title(_("Detected"))
         self.stream_type_row.set_subtitle(_("Paste a link to detect its type"))
@@ -3073,6 +3243,18 @@ class ControlPanel(Adw.Application):
         row.append(open_btn)
         box.append(row)
         self.webpage_apply_btn = apply_btn
+        self.web_interact_btn = Gtk.Button(label=_("Interact with webpage"))
+        self.web_interact_btn.set_sensitive(False)
+        self.web_interact_btn.set_tooltip_text(
+            _("Interact with the currently applied webpage without reloading it")
+        )
+        self.web_interact_btn.connect("clicked", self._on_web_interact)
+        row.append(self.web_interact_btn)
+        self.web_interaction_label = Gtk.Label(
+            label=_("Checking webpage interaction…"), xalign=0, wrap=True
+        )
+        self.web_interaction_label.add_css_class("dim-label")
+        box.append(self.web_interaction_label)
         file_group = Adw.PreferencesGroup()
         file_group.set_title(_("Local web page"))
         self.web_file_row = Adw.ActionRow()
@@ -3431,6 +3613,74 @@ class ControlPanel(Adw.Application):
         except GLib.Error as e:
             logger.warning(f"[GUI4] Could not open browser: {e.message}")
 
+    def _refresh_web_interaction(self):
+        """Uses existing foreground refresh; never adds a polling timer."""
+        if not hasattr(self, "web_interact_btn") or getattr(
+            self, "_web_interaction_reading", False
+        ):
+            return
+        from apricus.async_rpc import call
+        from apricus.commons import DBUS_NAME_SERVER
+
+        self._web_interaction_reading = True
+
+        def received(value, error):
+            self._web_interaction_reading = False
+            try:
+                status = json.loads(value) if not error else {}
+                state = status.get("state", "WALLPAPER")
+                self.web_interact_btn.set_sensitive(bool(status.get("available")))
+                reason = status.get("reason", "integration-unavailable")
+                messages = {
+                    "no-webpage": _("Apply a webpage wallpaper to interact with it."),
+                    "wallpaper-paused-or-stopped": _(
+                        "Resume the wallpaper before interacting with it."
+                    ),
+                    "player-not-ready": _("The webpage wallpaper is not ready yet."),
+                    "integration-unavailable": (
+                        _("Direct webpage interaction is not supported by this Flatpak package.")
+                        if is_flatpak()
+                        else _("Webpage interaction requires the updated GNOME integration.")
+                    ),
+                    "surface-hidden": _(
+                        "The webpage was hidden for safety. Apply the webpage again to restore it."
+                    ),
+                    "restore-failed": _(
+                        "Interaction could not be restored safely. The webpage may be hidden."
+                    ),
+                }
+                phases = {
+                    "ENTERING": _("Preparing webpage interaction…"),
+                    "INTERACTIVE": _(
+                        "Use Done — Return to desktop or the shortcut shown on that control to finish."
+                    ),
+                    "EXITING": _("Returning the webpage to the desktop…"),
+                }
+                text = phases.get(
+                    state,
+                    messages.get(
+                        reason,
+                        _("Ready to interact with the applied webpage.")
+                        if not reason
+                        else _(
+                            "Webpage interaction could not be completed. Check GNOME integration and the exit shortcut."
+                        ),
+                    ),
+                )
+                self.web_interaction_label.set_text(text)
+            except (ValueError, TypeError, AttributeError):
+                self.web_interact_btn.set_sensitive(False)
+
+        call(DBUS_NAME_SERVER, "web_interaction_status", [], received, prop=True)
+
+    def _on_web_interact(self, *_args):
+        from apricus.async_rpc import call
+        from apricus.commons import DBUS_NAME_SERVER
+
+        self.web_interact_btn.set_sensitive(False)
+        self.web_interaction_label.set_text(_("Preparing webpage interaction…"))
+        call(DBUS_NAME_SERVER, "web_interact", [], lambda *_: self._refresh_web_interaction())
+
     def on_webpage_show_in_folder(self, *_args):
         subtitle = self.web_file_row.get_subtitle()
         folder = os.path.dirname(subtitle.split(" — ")[0])
@@ -3707,16 +3957,16 @@ class ControlPanel(Adw.Application):
         if not is_gnome():
             self.static_row.set_subtitle(_("Only on GNOME"))
         self.static_switch.connect("state-set", self._on_settings_flag, CONFIG_KEY_STATIC_WALLPAPER)
-        wayland = is_wayland()
+        policy_sensitive, policy_subtitle = self._window_policy_support()
         self.pause_max_row, self.pause_max_switch = self._settings_switch_row(
             behaviour,
             _("Pause when maximized"),
             _("Pause playback when a window is maximized"),
             bool(config.get(CONFIG_KEY_PAUSE_WHEN_MAXIMIZED, True)),
-            sensitive=not wayland,
+            sensitive=policy_sensitive,
         )
-        if wayland:
-            self.pause_max_row.set_subtitle(_("Requires X11"))
+        if policy_subtitle:
+            self.pause_max_row.set_subtitle(_(policy_subtitle))
         self.pause_max_switch.connect(
             "state-set", self._on_settings_flag, CONFIG_KEY_PAUSE_WHEN_MAXIMIZED
         )
@@ -3725,14 +3975,76 @@ class ControlPanel(Adw.Application):
             _("Mute when maximized"),
             _("Mute audio when a window is maximized"),
             bool(config.get(CONFIG_KEY_MUTE_WHEN_MAXIMIZED, False)),
-            sensitive=not wayland,
+            sensitive=policy_sensitive,
         )
-        if wayland:
-            self.mute_max_row.set_subtitle(_("Requires X11"))
+        if policy_subtitle:
+            self.mute_max_row.set_subtitle(_(policy_subtitle))
         self.mute_max_switch.connect(
             "state-set", self._on_settings_flag, CONFIG_KEY_MUTE_WHEN_MAXIMIZED
         )
         box.append(behaviour)
+        if is_gnome() and is_wayland():
+            icons = Adw.PreferencesGroup()
+            icons.set_title(_("Desktop icons"))
+            self.integ_row = Adw.ActionRow()
+            self.integ_row.set_title(_("Keep icons above video"))
+            self.integ_switch = Gtk.Switch()
+            self.integ_switch.set_valign(Gtk.Align.CENTER)
+            self.integ_switch.connect("state-set", self._on_integration_toggled)
+            self.integ_row.add_suffix(self.integ_switch)
+            icons.add(self.integ_row)
+            self._host_cmd = None
+            self.prep_row = Adw.ActionRow()
+            self.prep_row.set_title(_("Prepare host installation"))
+            self.prep_row.set_subtitle(
+                _("Export the extension files, then run one command on the host")
+            )
+            self.prep_btn = Gtk.Button(label=_("Prepare"))
+            self.prep_btn.set_valign(Gtk.Align.CENTER)
+            self.prep_btn.connect("clicked", self._on_prepare_host_install)
+            self.prep_row.add_suffix(self.prep_btn)
+            verify_btn = Gtk.Button(label=_("Verify status"))
+            verify_btn.set_valign(Gtk.Align.CENTER)
+            verify_btn.connect(
+                "clicked", lambda button: self._on_prepare_host_install(button, verify=True)
+            )
+            self.prep_row.add_suffix(verify_btn)
+            icons.add(self.prep_row)
+            self.cmd_row = Adw.ActionRow()
+            self.cmd_row.set_title(_("Run on the host"))
+            self.cmd_row.set_subtitle(_("Log out and back in afterwards"))
+            self.cmd_row.set_subtitle_selectable(True)
+            self.copy_btn = Gtk.Button(label=_("Copy"))
+            self.copy_btn.set_valign(Gtk.Align.CENTER)
+            self.copy_btn.connect("clicked", self._on_copy_host_command)
+            self.cmd_row.add_suffix(self.copy_btn)
+            self.check_btn = Gtk.Button(label=_("Check again"))
+            self.check_btn.set_valign(Gtk.Align.CENTER)
+            self.check_btn.connect("clicked", self._on_check_integration)
+            self.cmd_row.add_suffix(self.check_btn)
+            icons.add(self.cmd_row)
+            box.append(icons)
+            self._refresh_integration_row()
+            window = getattr(self, "window", None)
+            if window is not None:
+                window.connect("notify::is-active", lambda *_: self._refresh_integration_row())
+            stack = getattr(self, "stack", None)
+            if stack is not None:
+                stack.connect(
+                    "notify::visible-child-name", lambda *_: self._refresh_integration_row()
+                )
+            # Also update receipt expiry while Settings stays open.
+            self._integration_timer = GLib.timeout_add_seconds(30, self._poll_integration)
+            if not (is_snap() or is_flatpak()):
+                try:
+                    self._integration_subscription = SessionBus().subscribe(
+                        sender="org.gnome.Shell.Extensions",
+                        object="/org/gnome/Shell/Extensions",
+                        signal="ExtensionStateChanged",
+                        signal_fired=lambda *_: self._refresh_integration_row(),
+                    )
+                except Exception as e:
+                    logger.debug("[GUI4] Integration subscription unavailable: %s", e)
         startup = Adw.PreferencesGroup()
         startup.set_title(_("Startup"))
         self.autostart_row, self.autostart_switch = self._settings_switch_row(
@@ -3777,6 +4089,256 @@ class ControlPanel(Adw.Application):
         info.add(about_row)
         box.append(info)
         return self._scroll_page(self._clamp_page(box))
+
+    def _poll_integration(self):
+        window = getattr(self, "window", None)
+        stack = getattr(self, "stack", None)
+        if window is not None and stack is not None and window.is_active():
+            if stack.get_visible_child_name() == "settings":
+                self._refresh_integration_row()
+        return True
+
+    def _remote_bridge_status(self):
+        """Server-owned bridge snapshot (snap IPC); ("unknown", {}) when absent."""
+        try:
+            server = self._server()
+        except Exception:  # noqa: BLE001 - panel without server stays unknown
+            return "unknown", {}
+        if server is None:
+            return "unknown", {}
+        try:
+            remote = server.gnome_bridge_status()
+        except Exception:  # noqa: BLE001 - transient IPC; fall back below
+            return "unknown", {}
+        if not remote:
+            return "unknown", {}
+        try:
+            return remote[0], dict(remote[1])
+        except Exception:  # noqa: BLE001 - malformed payload is not a state
+            return "unknown", {}
+
+    def _refresh_integration_row(self):
+        """Show the GNOME Shell integration state (never raises)."""
+        self._refresh_window_policy_support()
+        row = getattr(self, "integ_row", None)
+        switch = getattr(self, "integ_switch", None)
+        if row is None:
+            return
+        try:
+            from apricus.gnome_shell import EXTENSION_UUID, integration_status
+
+            if is_snap():
+                state, detail = self._remote_bridge_status()
+                if state == "unknown" and not detail:
+                    state, detail = integration_status()
+            else:
+                state, detail = integration_status()
+        except Exception:  # noqa: BLE001 - status must never break settings
+            from apricus.gnome_shell import EXTENSION_UUID
+
+            state, detail = "unknown", {}
+        switch_on, sensitive = False, False
+        if state == "active":
+            subtitle = _("Active — icons stay above the video")
+            switch_on, sensitive = True, True
+        elif state == "loaded":
+            subtitle = _("Loaded — integration is not operational")
+        elif state == "disabled":
+            if is_snap() or is_flatpak():
+                subtitle = (
+                    _("Installed but disabled — enable it manually: gnome-extensions enable")
+                    + f" {EXTENSION_UUID}"
+                )
+            else:
+                subtitle = _("Installed but disabled — turn on to keep icons above video")
+                switch_on, sensitive = False, True
+        elif state == "needs_logout":
+            subtitle = _("Enabled — log out and back in to activate it")
+            switch_on, sensitive = True, True
+        elif state == "not_discovered":
+            subtitle = _("Installed — log out and back in so GNOME finds it")
+            switch_on, sensitive = False, True
+        elif state == "not_installed":
+            subtitle = _("Not installed — native packages include it; see README")
+        elif state == "incompatible":
+            supported = ", ".join(detail.get("supported") or []) or "?"
+            subtitle = _("Unsupported GNOME {shell} (supports {supported})").format(
+                shell=detail.get("shell") or "?", supported=supported
+            )
+        elif state == "error":
+            subtitle = _("Failed to load — check the journal for errors")
+        elif state == "stale":
+            receipt = detail.get("receipt", {})
+            last = (
+                _("Active")
+                if receipt.get("loaded")
+                else (_("Enabled") if receipt.get("enabled") else _("Disabled"))
+            )
+            subtitle = _("Verification expired — last result: {status}").format(status=last)
+        else:
+            subtitle = _("Status unavailable")
+        receipt = detail.get("receipt")
+        if detail.get("bridge") and state == "active":
+            subtitle += " · " + _("Wallpaper windows adopted: {count}").format(
+                count=detail.get("adopted", 0)
+            )
+        if receipt and isinstance(receipt.get("checked_at"), (int, float)):
+            stamp = time.strftime("%d/%m %H:%M", time.localtime(receipt["checked_at"]))
+            subtitle += " · " + _("Last host check: {time}").format(time=stamp)
+        if (is_snap() or is_flatpak()) and state in ("active", "disabled", "needs_logout"):
+            action = "disable" if switch_on else "enable"
+            subtitle += (
+                " · " + _("Run on the host") + f": gnome-extensions {action} {EXTENSION_UUID}"
+            )
+        row.set_subtitle(subtitle)
+        if switch is not None:
+            self._integration_updating = True
+            try:
+                switch.set_active(switch_on)
+                switch.set_state(switch_on)
+                switch.set_sensitive(sensitive and not (is_snap() or is_flatpak()))
+            finally:
+                self._integration_updating = False
+        self._refresh_host_install_rows(state)
+
+    def _refresh_host_install_rows(self, state):
+        """Show the guided host install only where the sandbox needs it."""
+        prep = getattr(self, "prep_row", None)
+        cmd_row = getattr(self, "cmd_row", None)
+        if prep is None or cmd_row is None:
+            return
+        # Sandbox note: inside Snap/Flatpak the host extension dir is
+        # invisible, so a genuinely missing extension and an unreachable
+        # Shell look identical ("unknown"). Keep Prepare available where
+        # the user may still need the host command (missing, unknown,
+        # expired receipt, or installed-but-disabled); hide it once the
+        # flow is complete (active, waiting for login) or when it cannot
+        # help (error, incompatible).
+        show = (is_snap() or is_flatpak()) and state in (
+            "not_installed",
+            "unknown",
+            "stale",
+            "disabled",
+        )
+        prep.set_visible(show)
+        cmd = getattr(self, "_host_cmd", None)
+        export_dir = getattr(self, "_host_export_dir", None)
+        if (
+            cmd
+            and export_dir
+            and state in ("active", "disabled", "needs_logout", "stale", "error", "incompatible")
+        ):
+            from apricus.gnome_shell import host_verify_command
+
+            cmd = self._host_cmd = host_verify_command(export_dir)
+        cmd_row.set_visible(bool(show and cmd))
+        if cmd:
+            cmd_row.set_subtitle(cmd)
+        prep.set_subtitle(
+            _("Prepare exports installation and verification commands; run them on the host")
+        )
+
+    def _on_prepare_host_install(self, _button, verify=False):
+        """Export ZIP + installer for the host (never executes anything)."""
+        try:
+            from apricus.gnome_shell import (
+                host_verify_command,
+                integration_status,
+                prepare_host_install,
+            )
+
+            _export_dir, cmd = prepare_host_install()
+            self._host_export_dir = _export_dir
+            state, detail = integration_status()
+            installed = state in (
+                "active",
+                "disabled",
+                "needs_logout",
+                "stale",
+                "error",
+                "incompatible",
+            )
+            if "receipt" in detail:
+                installed = detail["receipt"].get("installed", False)
+            if verify or installed:
+                cmd = host_verify_command(_export_dir)
+        except Exception as e:  # noqa: BLE001 - show the failure inline
+            self._toast(_("Could not prepare installation files ({err})").format(err=e))
+            return
+        self._host_cmd = cmd
+        self._refresh_integration_row()
+        self._toast(_("Files ready — run the command on the host"))
+
+    def _on_copy_host_command(self, _button):
+        cmd = getattr(self, "_host_cmd", None)
+        if not cmd:
+            return
+        try:
+            display = Gdk.Display.get_default()
+            if display is None:
+                raise RuntimeError("no display")
+            clipboard = display.get_clipboard()
+            set_text = getattr(clipboard, "set_text", None)
+            if set_text is not None:
+                set_text(cmd)
+            else:
+                # Some Gtk4 bindings (observed on 4.22) do not expose
+                # GdkClipboard.set_text: offer plain text via a provider.
+                provider = Gdk.ContentProvider.new_for_bytes(
+                    "text/plain;charset=utf-8", GLib.Bytes(cmd.encode("utf-8"))
+                )
+                clipboard.set_content(provider)
+        except Exception as e:  # noqa: BLE001 - clipboard best effort
+            self._toast(_("Could not copy ({err})").format(err=e))
+            return
+        self._toast(_("Command copied"))
+
+    def _on_check_integration(self, _button):
+        """Re-read the real extension status (e.g. after a host install)."""
+        self._host_cmd = getattr(self, "_host_cmd", None)
+        self._refresh_integration_row()
+        if is_snap() or is_flatpak():
+            self._toast(
+                _(
+                    "Reads the last host check; run the verification command on the host to update it"
+                )
+            )
+
+    def _on_integration_toggled(self, switch, state):
+        """Enable/disable the Shell extension on explicit user action."""
+        if getattr(self, "_integration_updating", False):
+            return True
+        if is_snap() or is_flatpak():
+            self._refresh_integration_row()
+            return True
+        want = bool(state)
+        self._integration_updating = True
+        failure = None
+        try:
+            from apricus.gnome_shell import EXTENSION_UUID
+            from apricus.utils import gnome_extension_set_disable, gnome_extension_set_enable
+
+            operation = gnome_extension_set_enable if want else gnome_extension_set_disable
+            if not operation(EXTENSION_UUID):
+                raise RuntimeError("Shell did not confirm")
+        except Exception as e:
+            failure = e
+            logger.warning("[GUI4] Integration toggle failed: %s", e)
+        finally:
+            self._integration_updating = False
+        # Only the observed Shell state controls the displayed position.
+        self._refresh_integration_row()
+        if failure is not None:
+            action = "enable" if want else "disable"
+            self.integ_row.set_subtitle(
+                _(
+                    "Could not switch automatically; run on the host: gnome-extensions {action} {uuid}"
+                ).format(action=action, uuid=EXTENSION_UUID)
+            )
+        elif not want:
+            self._toast(_("Integration disabled — using basic stacking"))
+        # Suppress GTK's default handler, which would overwrite our refresh.
+        return True
 
     @staticmethod
     def _short_config_path():
@@ -3833,10 +4395,58 @@ class ControlPanel(Adw.Application):
         CONFIG_KEY_MUTE_WHEN_MAXIMIZED: "is_mute_when_maximized",
     }
 
+    def _window_policy_support(self):
+        from .policy_support import window_policy_support
+
+        try:
+            server = self._server()
+            snapshot = server.engine_snapshot if server is not None else {}
+            if snapshot.get("push_alive") and snapshot.get("window_state_source") in (
+                "extension-push",
+                "snap-bridge-push",
+            ):
+                self._window_policy_verified = True
+        except Exception:  # noqa: BLE001 - temporary service absence is not incapability
+            pass
+        enabled, message = window_policy_support(
+            wayland=is_wayland(),
+            gnome=is_gnome(),
+            snap=is_snap(),
+            flatpak=is_flatpak(),
+            verified=getattr(self, "_window_policy_verified", False),
+        )
+        messages = {
+            "Requires GNOME on Wayland": _("Requires GNOME on Wayland"),
+            "Window policies are not available in Snap on Wayland": _(
+                "Window policies are not available in Snap on Wayland"
+            ),
+            "Window-state access has not been verified in Flatpak": _(
+                "Window-state access has not been verified in Flatpak"
+            ),
+            "Requires the Apricus GNOME extension on Wayland": _(
+                "Requires the Apricus GNOME extension on Wayland"
+            ),
+        }
+        return enabled, messages.get(message, message)
+
+    def _refresh_window_policy_support(self):
+        # Best effort: policy rows must never break integration refresh.
+        try:
+            sensitive, subtitle = self._window_policy_support()
+        except Exception:  # noqa: BLE001 - keep last known row state
+            return
+        for name in ("pause_max", "mute_max"):
+            switch = getattr(self, f"{name}_switch", None)
+            row = getattr(self, f"{name}_row", None)
+            if switch is not None:
+                switch.set_sensitive(sensitive)
+            if row is not None and subtitle:
+                row.set_subtitle(_(subtitle))
+
     def _on_settings_flag(self, switch, _state, key):
         if getattr(self, "_syncing_flags", False):
             return False
-        want = bool(switch.get_active())
+        want = bool(_state)
         server = self._server()
         if server is not None:
             try:
@@ -3846,6 +4456,13 @@ class ControlPanel(Adw.Application):
         self.config = ConfigUtil().load()
         self.config[key] = want
         ConfigUtil().save(self.config)
+        if key == CONFIG_KEY_STATIC_WALLPAPER and want:
+            if self.config.get(CONFIG_KEY_MODE) == MODE_NULL or self.config.get(
+                "is_stopped", False
+            ):
+                self._toast(_("No video playing — static wallpaper will apply to the next video"))
+            else:
+                self._toast(_("Preparing static wallpaper…"))
         return False
 
     def _on_open_config(self, *_args):
@@ -3874,6 +4491,15 @@ class ControlPanel(Adw.Application):
     # -- refresh + handlers ---------------------------------------------
 
     def _refresh_all(self):
+        self._refresh_window_policy_support()
+        self._refresh_web_interaction()
+        # Reload persisted selection/position so externally changed queues
+        # (IPC playlist apply, player position writes, server restart) are
+        # shown. playlist_paths (unsaved UI edits) is intentionally kept.
+        try:
+            self.config = ConfigUtil().load()
+        except Exception:  # noqa: BLE001 - keep last known config
+            pass
         server = self._server()
         mode = server.mode if server is not None else self.config.get(CONFIG_KEY_MODE)
         paused = True
@@ -3906,6 +4532,100 @@ class ControlPanel(Adw.Application):
                 p_banner.set_title(_(p_err))
             p_banner.set_revealed(bool(p_err and server is not None))
         self._refresh_sidebar_status(server, mode, paused=paused)
+        try:
+            self._last_poll_sig = self._transport_signature(server, mode, paused)
+        except Exception:  # noqa: BLE001 - signature cache never breaks refresh
+            pass
+
+    def _transport_signature(self, server=_UNSET, mode=None, paused=None):
+        """Lightweight actual-state signature for external-change detection.
+
+        Single read per property, no full refresh. Includes the effective
+        playlist item so queue advancement also triggers an update.
+        """
+        if server is _UNSET:
+            server = self._server()
+        if mode is None:
+            mode = server.mode if server is not None else self.config.get(CONFIG_KEY_MODE)
+        if paused is None:
+            paused = True
+            if server is not None and mode in (MODE_VIDEO, MODE_STREAM, MODE_PLAYLIST):
+                try:
+                    paused = bool(server.is_paused_by_user)
+                except Exception:  # noqa: BLE001
+                    paused = True
+        try:
+            state = server.playback_state if server is not None else None
+        except Exception:  # noqa: BLE001
+            state = None
+        if mode == MODE_PLAYLIST:
+            persisted = (self.config.get("playlist") or {}).get("Default", [])
+            queue = list(persisted or getattr(self, "playlist_paths", None) or [])
+            current = self._playlist_current_path(queue, self.config.get("playlist_position"))
+        else:
+            current = (self.config.get(CONFIG_KEY_DATA_SOURCE) or {}).get("Default", "")
+        return (mode, bool(paused), state, current)
+
+    def _on_window_active_changed(self, window, _pspec=None):
+        """Immediate refresh on return to foreground.
+
+        The periodic poll is intentionally gated on window.is_active() to
+        avoid background churn. Without this hook the user would see stale
+        transport/title for up to _NP_POLL_SECONDS after re-activating (or
+        be forced to change page). Activation therefore reconciles at once
+        with the existing full refresh; failures never break the window.
+        """
+        try:
+            if window is not None and window.is_active():
+                self._refresh_all()
+        except Exception:  # noqa: BLE001 - activation refresh never breaks
+            pass
+
+    def _start_np_poll(self):
+        if getattr(self, "_np_poll_id", None):
+            return
+        try:
+            self._last_poll_sig = self._transport_signature()
+        except Exception:  # noqa: BLE001
+            self._last_poll_sig = None
+        try:
+            self._np_poll_id = GLib.timeout_add_seconds(_NP_POLL_SECONDS, self._poll_now_playing)
+        except Exception:  # noqa: BLE001 - polling is best-effort
+            self._np_poll_id = None
+
+    def _poll_now_playing(self):
+        """Auto-refresh on external transport/selection changes only.
+
+        Runs every _NP_POLL_SECONDS while the panel is active; performs at
+        most three lightweight property reads plus a config file read, and
+        calls the existing full refresh solely when the actual state moved.
+        """
+        try:
+            window = getattr(self, "window", None)
+            if window is None:
+                return True
+            try:
+                if not window.is_active():
+                    return True
+            except Exception:  # noqa: BLE001 - headless/test safety
+                pass
+            try:
+                fresh_config = ConfigUtil().load()
+            except Exception:  # noqa: BLE001
+                fresh_config = None
+            if fresh_config is not None:
+                self.config = fresh_config
+            server = self._server()
+            sig = self._transport_signature(server)
+            if sig != getattr(self, "_last_poll_sig", None):
+                self._refresh_all()
+                try:
+                    self._last_poll_sig = self._transport_signature()
+                except Exception:  # noqa: BLE001
+                    self._last_poll_sig = sig
+        except Exception:  # noqa: BLE001 - polling never crashes the panel
+            pass
+        return True
 
     @staticmethod
     def _playback_error(server):
@@ -3946,17 +4666,67 @@ class ControlPanel(Adw.Application):
         self._on_lib_selection()
 
     def on_play_pause(self, *_args):
+        # Ignore repeated clicks while a transport operation is in flight:
+        # each click must map to exactly one server call.
+        if getattr(self, "_transport_busy", False):
+            return
         server = self._server()
         if server is None:
             self._show_server_missing()
             return
-        prev = server.is_paused_by_user
-        server.is_paused_by_user = not prev
-        if not prev:
-            server.pause_playback()
-        else:
-            server.start_playback()
-        self._refresh_all()
+        if getattr(server, "playback_state", None) == "stopped":
+            self.on_stop_resume()
+            return
+        self._transport_busy = True
+        self.np_play_btn.set_sensitive(False)
+        self.np_stop_btn.set_sensitive(False)
+        try:
+            # Act on the EFFECTIVE state, not just the manual latch: the
+            # button offers Play whenever nothing is playing (including
+            # automatic pauses), and Pause only while actually playing.
+            try:
+                playing = server.playback_state == "playing"
+            except Exception:  # noqa: BLE001 - assume playing, act, reconcile
+                playing = True
+            if playing:
+                server.is_paused_by_user = True
+                server.pause_playback()
+            else:
+                server.is_paused_by_user = False
+                server.start_playback()
+        finally:
+            self._transport_busy = False
+            # Reconcile with the real server state even on IPC failure:
+            # never display a success that did not happen.
+            self._refresh_all()
+
+    def on_stop_resume(self, *_args):
+        # Same single-flight guard as on_play_pause: the button is already
+        # insensitive, but keyboard/mnemonic activation could re-enter.
+        if getattr(self, "_transport_busy", False):
+            return
+        server = self._server()
+        if server is None:
+            self._show_server_missing()
+            return
+        self._transport_busy = True
+        self.np_play_btn.set_sensitive(False)
+        self.np_stop_btn.set_sensitive(False)
+
+        def work():
+            try:
+                if server.playback_state == "stopped":
+                    server.resume_playback()
+                else:
+                    server.stop_playback()
+            except (GLib.Error, AttributeError) as error:
+                logger.warning("[GUI4] Stop/Resume failed: %s", error)
+                GLib.idle_add(self._toast, _("Could not change wallpaper playback."))
+            finally:
+                self._transport_busy = False
+                GLib.idle_add(self._refresh_all)
+
+        threading.Thread(target=work, daemon=True).start()
 
     def on_playlist_apply(self, *_args):
         self._apply_queue()

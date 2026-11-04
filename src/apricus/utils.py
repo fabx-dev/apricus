@@ -6,6 +6,7 @@ import os
 import shutil
 import subprocess
 import sys
+from contextlib import contextmanager
 from pprint import pformat
 
 import gi
@@ -41,6 +42,10 @@ from apricus.commons import (
     CONFIG_KEY_FADE_INTERVAL,
     CONFIG_KEY_MUTE_WHEN_MAXIMIZED,
     CONFIG_KEY_PLAYLIST,
+    CONFIG_KEY_PLAYLIST_POS,
+    CONFIG_KEY_POLICY_PAUSE,
+    CONFIG_KEY_POLICY_VERSION,
+    CONFIG_KEY_RENDERER,
     CONFIG_KEY_SHUFFLE,
     CONFIG_KEY_STREAM_FAVORITES,
     CONFIG_KEY_STREAM_HISTORY,
@@ -53,8 +58,11 @@ from apricus.commons import (
     CONFIG_VERSION,
     LEGACY_CONFIG_PATH,
     LOGGER_NAME,
+    MODE_PLAYLIST,
     MODE_VIDEO,
+    RENDERER_AUTO,
     TRANSLATION_DOMAIN,
+    VALID_RENDERERS,
     ensure_template_monitors,
 )
 
@@ -902,6 +910,26 @@ class ConfigUtil:
                     # video_dir was added after v4 without a version bump:
                     # default it instead of wiping the whole config.
                     config.setdefault(CONFIG_KEY_VIDEO_DIR, None)
+                    # M2 manual-pause latch and engine schema version: same
+                    # no-bump backfill policy.
+                    config.setdefault(CONFIG_KEY_POLICY_PAUSE, False)
+                    config.setdefault(CONFIG_KEY_POLICY_VERSION, 1)
+                    config["is_stopped"] = config.get("is_stopped") is True
+                    # Stored renderer id (same no-bump policy): no UI
+                    # exposes it anymore, but old configs may carry it —
+                    # sanitize to a known id, defaulting to automatic.
+                    if config.get(CONFIG_KEY_RENDERER) not in VALID_RENDERERS:
+                        config[CONFIG_KEY_RENDERER] = RENDERER_AUTO
+                    # Per-monitor playlist positions: same no-bump backfill,
+                    # sanitized to non-negative ints.
+                    pos = config.get(CONFIG_KEY_PLAYLIST_POS)
+                    if not isinstance(pos, dict):
+                        pos = {}
+                    config[CONFIG_KEY_PLAYLIST_POS] = {
+                        str(k): v
+                        for k, v in pos.items()
+                        if isinstance(v, int) and not isinstance(v, bool) and v >= 0
+                    }
                     # Stream pick-list, same no-bump policy (sanitized).
                     config[CONFIG_KEY_STREAM_HISTORY] = self._sanitize_stream_entries(
                         config.get(CONFIG_KEY_STREAM_HISTORY)
@@ -976,7 +1004,68 @@ class ConfigUtil:
         config[CONFIG_KEY_FADE_DURATION_SEC] = min(5.0, max(0.0, duration))
         return config
 
-    def save(self, config):
+    def save(self, config, *, manual_stop=None, manual_pause=None):
+        """Serialize writers; only explicit server commands may change the
+        STOP/PAUSE latches.
+
+        A GUI/playlist save can race STOP (or PAUSE) even after reloading
+        config. Preserve the on-disk latches under the same lock as the
+        atomic write, unless this is an explicit command carrying the new
+        latch state. Existing callers remain compatible.
+
+        Playlist positions are player-owned too: ordinary saves preserve
+        them. save_playlist_position updates only one monitor atomically.
+        """
+        with self._write_lock():
+            self._save_locked(config, manual_stop, manual_pause)
+
+    @contextmanager
+    def _write_lock(self):
+        import fcntl
+
+        os.makedirs(CONFIG_DIR, mode=0o700, exist_ok=True)
+        with open(CONFIG_PATH + ".lock", "a") as lock:
+            os.chmod(CONFIG_PATH + ".lock", 0o600)
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            yield
+
+    def save_playlist_position(self, key, index, expected_queue, *, model=None):
+        """Update just one monitor under the config lock, never a stale snapshot.
+
+        Discard a late callback if STOP or a new selection superseded it.
+        Ordinary saves cannot change these player-owned positions.
+        """
+        if not isinstance(key, str) or not key:
+            return None
+        if not isinstance(index, int) or isinstance(index, bool) or index < 0:
+            return None
+        with self._write_lock():
+            try:
+                with open(CONFIG_PATH) as f:
+                    current = json.load(f)
+            except (OSError, ValueError):
+                return None
+            if not isinstance(current, dict) or current.get("mode") != MODE_PLAYLIST:
+                return None
+            if current.get("is_stopped", False):
+                return None
+            playlist = current.get(CONFIG_KEY_PLAYLIST) or {}
+            if not isinstance(playlist, dict):
+                return None
+            queue = next(
+                (
+                    playlist[k]
+                    for k in (key, model, "Default")
+                    if isinstance(playlist.get(k), list) and playlist[k]
+                ),
+                [],
+            )
+            if queue != expected_queue:
+                return None
+            self._save_locked(current, None, playlist_positions={key: index})
+            return dict(current[CONFIG_KEY_PLAYLIST_POS])
+
+    def _save_locked(self, config, manual_stop, manual_pause=None, *, playlist_positions=None):
         old_config = None
         old_raw = None
         if os.path.isfile(CONFIG_PATH):
@@ -984,6 +1073,21 @@ class ConfigUtil:
                 json_str = f.read()
                 try:
                     old_config = json.loads(json_str)
+                    if isinstance(old_config, dict) and "is_stopped" in old_config:
+                        if manual_stop is None:
+                            config["is_stopped"] = old_config["is_stopped"] is True
+                    if isinstance(old_config, dict) and CONFIG_KEY_POLICY_PAUSE in old_config:
+                        if manual_pause is None:
+                            config[CONFIG_KEY_POLICY_PAUSE] = bool(
+                                old_config[CONFIG_KEY_POLICY_PAUSE]
+                            )
+                    if isinstance(old_config, dict) and CONFIG_KEY_PLAYLIST_POS in old_config:
+                        positions = old_config[CONFIG_KEY_PLAYLIST_POS]
+                        config[CONFIG_KEY_PLAYLIST_POS] = {
+                            k: v
+                            for k, v in (positions.items() if isinstance(positions, dict) else [])
+                            if isinstance(v, int) and not isinstance(v, bool) and v >= 0
+                        }
                     if not self._check(old_config):
                         # Valid JSON but outdated (e.g. pre-backfill): keep
                         # the raw text for backup, so the first save after a
@@ -993,6 +1097,12 @@ class ConfigUtil:
                         old_config = None
                 except json.decoder.JSONDecodeError:
                     old_config = None
+        if manual_stop is not None:
+            config["is_stopped"] = bool(manual_stop)
+        if manual_pause is not None:
+            config[CONFIG_KEY_POLICY_PAUSE] = bool(manual_pause)
+        if playlist_positions is not None:
+            config.setdefault(CONFIG_KEY_PLAYLIST_POS, {}).update(playlist_positions)
         # Skip if the config is identical
         if old_config == config:
             return

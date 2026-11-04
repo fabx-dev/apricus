@@ -331,11 +331,12 @@ def test_web_player_proxy_without_vlc_methods_never_breaks_server_transitions(mo
 
     monkeypatch.setattr(srv, "get_instance", lambda _name: _WebPlayerProxy())
     s = srv.ApricusServer.__new__(srv.ApricusServer)
+    _attach_policy(s, {})
     s.player_process = type("P", (), {"is_alive": lambda self: True})()
     srv.ApricusServer._preview_static(srv.MODE_VIDEO, "/tmp/v.mp4")
     srv.ApricusServer._preview_static(srv.MODE_STREAM, "https://example.com/v")
     assert s._try_switch_media(srv.MODE_VIDEO) is False
-    assert s.is_paused_by_user is None
+    assert s.is_paused_by_user is False
     assert s.playback_error == ""
 
 
@@ -386,6 +387,73 @@ def test_snap_ipc_roundtrip_methods_and_properties(tmp_path, monkeypatch):
     assert obj.seen == [("/a.mp4", "HDMI-1")]
 
 
+def test_snap_ipc_roundtrip_dict_property(tmp_path, monkeypatch):
+    """Dict-valued properties (like engine_snapshot) must survive the Unix
+    socket JSON round trip unchanged."""
+    from gi.repository import GLib
+
+    from apricus import snap_ipc
+
+    monkeypatch.setenv("XDG_RUNTIME_DIR", str(tmp_path))
+
+    class _FakeServer:
+        mode = "MODE_VIDEO"
+        snapshot = {
+            "desired": "paused",
+            "wanted_mute": True,
+            "manual_stop": False,
+            "manual_pause": True,
+            "manual_mute": False,
+            "active_reasons": ["fullscreen"],
+            "push_alive": True,
+            "generation": 7,
+            "policy_version": 1,
+            "debounced": False,
+        }
+
+        @property
+        def engine_snapshot(self):
+            return dict(self.snapshot)
+
+    obj = _FakeServer()
+    sock = snap_ipc.publish_service("io.github.fabx_dev.Apricus.testdict", obj)
+    ctx = GLib.MainContext.default()
+    results = {}
+
+    def _client():
+        proxy = snap_ipc.get_service("io.github.fabx_dev.Apricus.testdict")
+        assert proxy is not None
+        results["snapshot"] = proxy.engine_snapshot
+
+    import threading
+    import time
+
+    t = threading.Thread(target=_client)
+    t.start()
+    deadline = time.monotonic() + 5
+    while t.is_alive() and time.monotonic() < deadline:
+        ctx.iteration(False)
+        time.sleep(0.01)
+    t.join(timeout=1)
+    sock.close()
+    assert results["snapshot"] == obj.snapshot
+
+
+def _attach_policy(obj, disk=None):
+    """Give a bare `__new__` server a real engine synced from `disk`/config."""
+    from apricus.policy import PlaybackPolicyEngine
+
+    cfg = disk if isinstance(disk, dict) else (getattr(obj, "config", None) or {})
+    obj.policy = PlaybackPolicyEngine()
+    obj.policy.load_latches(
+        manual_stop=bool(cfg.get("is_stopped", False)),
+        manual_pause=bool(cfg.get("policy_manual_pause", False)),
+        manual_mute=bool(cfg.get("is_mute", False)),
+    )
+    obj._last_applied = None
+    obj._auto_fed = {}
+
+
 def test_pause_flag_roundtrips_in_playlist_mode():
     """In MODE_PLAYLIST the pause flag must round-trip like other modes.
 
@@ -397,6 +465,9 @@ def test_pause_flag_roundtrips_in_playlist_mode():
     from unittest.mock import patch
 
     s = srv.ApricusServer.__new__(srv.ApricusServer)
+    s.config = {"policy_manual_pause": False, "is_mute": False}
+    s._save_config = lambda **_: None
+    _attach_policy(s, s.config)
 
     class _Player:
         mode = "MODE_PLAYLIST"
@@ -412,13 +483,17 @@ def test_pause_flag_roundtrips_in_playlist_mode():
         assert player.is_paused_by_user is False
 
 
-def test_pause_flag_still_none_without_player():
+def test_pause_flag_defaults_false_without_player():
     from unittest.mock import patch
 
     s = srv.ApricusServer.__new__(srv.ApricusServer)
+    s.config = {}
+    s._save_config = lambda **_: None
+    _attach_policy(s, {})
     with patch.object(srv, "get_instance", return_value=None):
-        assert s.is_paused_by_user is None
-        s.is_paused_by_user = True  # must not raise
+        assert s.is_paused_by_user is False
+        s.is_paused_by_user = True  # must not raise; latches engine-side
+        assert s.is_paused_by_user is True
 
 
 def test_server_property_setters_persist_to_disk(monkeypatch):
@@ -434,7 +509,8 @@ def test_server_property_setters_persist_to_disk(monkeypatch):
         srv.CONFIG_KEY_PAUSE_WHEN_MAXIMIZED: True,
         srv.CONFIG_KEY_MUTE_WHEN_MAXIMIZED: False,
     }
-    s._save_config = lambda: saved.append(dict(s.config))
+    _attach_policy(s, s.config)
+    s._save_config = lambda **_: saved.append(dict(s.config))
 
     s.is_mute = True
     s.volume = 75
@@ -443,3 +519,129 @@ def test_server_property_setters_persist_to_disk(monkeypatch):
     assert saved[-1][srv.CONFIG_KEY_MUTE] is True
     assert saved[-1][srv.CONFIG_KEY_VOLUME] == 75
     assert saved[-1][srv.CONFIG_KEY_STATIC_WALLPAPER] is False
+
+
+def test_respawn_player_forces_fresh_process():
+    """respawn_player() must rebuild the player even for the same mode."""
+    calls = []
+
+    s = srv.ApricusServer.__new__(srv.ApricusServer)
+    s.config = {"mode": "MODE_VIDEO", "data_source": {"Default": "/a.mp4"}}
+    s._load_config = lambda: None
+
+    def fake_setup(mode, data_source=None, monitor=None, force_respawn=False):
+        calls.append((mode, force_respawn))
+
+    s._setup_player = fake_setup
+    assert s.respawn_player() is True
+    assert calls == [("MODE_VIDEO", True)]
+
+
+def test_respawn_player_noop_without_media_mode():
+    """respawn_player() does nothing when no player can run."""
+    s = srv.ApricusServer.__new__(srv.ApricusServer)
+    s.config = {"mode": "MODE_NULL"}
+    s._load_config = lambda: None
+    called = []
+    s._setup_player = lambda *a, **k: called.append((a, k))
+    assert s.respawn_player() is False
+    assert called == []
+
+
+def test_respawn_player_rejects_unknown_mode():
+    """respawn_player() refuses invalid modes instead of spawning."""
+    s = srv.ApricusServer.__new__(srv.ApricusServer)
+    s.config = {"mode": "BOGUS"}
+    s._load_config = lambda: None
+    called = []
+    s._setup_player = lambda *a, **k: called.append((a, k))
+    assert s.respawn_player() is False
+    assert called == []
+
+
+def _static_flag_server(static=False):
+    s = srv.ApricusServer.__new__(srv.ApricusServer)
+    s.config = {srv.CONFIG_KEY_STATIC_WALLPAPER: static}
+    s._save_config = lambda: None
+    return s
+
+
+def test_static_flag_on_triggers_player_refresh():
+    """Enabling static mid-playback must apply the current frame: the
+    player setup path only covers fresh (re)starts."""
+    from unittest.mock import patch
+
+    s = _static_flag_server(False)
+
+    class _Player:
+        mode = "MODE_VIDEO"
+        refreshed = 0
+
+        def reload_config(self):
+            pass
+
+        def refresh_static(self):
+            self.refreshed += 1
+
+    player = _Player()
+    with patch.object(srv, "get_instance", return_value=player):
+        s.is_static_wallpaper = True
+    assert s.config[srv.CONFIG_KEY_STATIC_WALLPAPER] is True
+    assert player.refreshed == 1
+
+
+def test_static_flag_off_never_refreshes():
+    from unittest.mock import patch
+
+    s = _static_flag_server(True)
+
+    class _Player:
+        mode = "MODE_VIDEO"
+        refreshed = 0
+
+        def reload_config(self):
+            pass
+
+        def refresh_static(self):
+            self.refreshed += 1
+
+    player = _Player()
+    with patch.object(srv, "get_instance", return_value=player):
+        s.is_static_wallpaper = False
+    assert player.refreshed == 0
+
+
+def test_static_flag_on_tolerates_absent_or_idle_player():
+    """No player, MODE_NULL, or a failing refresh must never break the
+    toggle: the flag persists and the next setup applies it as before."""
+    from unittest.mock import patch
+
+    from gi.repository import GLib
+
+    s = _static_flag_server(False)
+    with patch.object(srv, "get_instance", return_value=None):
+        s.is_static_wallpaper = True  # must not raise
+
+    class _IdlePlayer:
+        mode = "MODE_NULL"
+        refreshed = 0
+
+        def reload_config(self):
+            pass
+
+        def refresh_static(self):
+            self.refreshed += 1
+
+    idle = _IdlePlayer()
+    with patch.object(srv, "get_instance", return_value=idle):
+        s.is_static_wallpaper = True
+    assert idle.refreshed == 0
+
+    class _FailingPlayer(_IdlePlayer):
+        mode = "MODE_VIDEO"
+
+        def refresh_static(self):
+            raise GLib.Error("bus unavailable")
+
+    with patch.object(srv, "get_instance", return_value=_FailingPlayer()):
+        s.is_static_wallpaper = True  # must not raise

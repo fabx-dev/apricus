@@ -1847,15 +1847,164 @@ def settings_flag_persists_and_calls_server():
         obj, _ = _panel(_base_config(), [])
         server = _Server()
         obj._server = lambda: server
-        obj._on_settings_flag(_Switch(True), None, "is_static_wallpaper")
+        obj._on_settings_flag(_Switch(False), True, "is_static_wallpaper")
         assert server.is_static_wallpaper is True
         assert store.config["is_static_wallpaper"] is True
         # Server absent: still persists locally.
         obj._server = lambda: None
-        obj._on_settings_flag(_Switch(False), None, "is_pause_when_maximized")
+        obj._on_settings_flag(_Switch(True), False, "is_pause_when_maximized")
         assert store.config["is_pause_when_maximized"] is False
     finally:
         appmod.ConfigUtil = old
+
+
+@check
+def window_policy_capability_survives_disconnect():
+    from types import SimpleNamespace
+
+    app.is_wayland = lambda: True
+    app.is_gnome = lambda: True
+    app.is_snap = lambda: False
+    app.is_flatpak = lambda: False
+    obj, _ = _panel(_base_config(), [])
+    for name in ('pause_max', 'mute_max'):
+        switch = SimpleNamespace(active=True, sensitive=None)
+        switch.set_sensitive = lambda value, target=switch: setattr(target, 'sensitive', value)
+        setattr(obj, name + '_switch', switch)
+    def check_sensitivity(enabled):
+        obj._refresh_window_policy_support()
+        assert obj.pause_max_switch.sensitive is enabled
+        assert obj.mute_max_switch.sensitive is enabled
+        assert obj.pause_max_switch.active and obj.mute_max_switch.active
+
+    obj._server = lambda: None
+    assert obj._window_policy_support()[0]  # native capability, extension may be absent
+    check_sensitivity(True)
+    app.is_flatpak = lambda: True
+    assert not obj._window_policy_support()[0]  # no assumed sandbox permission
+    check_sensitivity(False)
+    class Server:
+        engine_snapshot = {"window_state_source": "extension-push", "push_alive": True}
+    server = Server()
+    obj._server = lambda: server
+    assert obj._window_policy_support()[0]
+    check_sensitivity(True)
+    server.engine_snapshot = {"window_state_source": "null", "push_alive": False}
+    assert obj._window_policy_support()[0]  # temporary loss preserves capability
+    check_sensitivity(True)
+    obj._server = lambda: None
+    assert obj._window_policy_support()[0]
+    app.is_snap = lambda: True
+    app.is_flatpak = lambda: False
+    obj._window_policy_verified = False
+    assert not obj._window_policy_support()[0]  # unverified snap stays disabled
+    check_sensitivity(False)
+    server.engine_snapshot = {"window_state_source": "snap-bridge-push", "push_alive": True}
+    obj._server = lambda: server
+    assert obj._window_policy_support()[0]  # bridge-carried push enables Snap M3
+    check_sensitivity(True)
+    app.is_wayland = lambda: False
+    assert obj._window_policy_support()[0]  # unchanged X11
+
+
+@check
+def remote_bridge_status_survives_absent_server():
+    obj, _ = _panel(_base_config(), [])
+    obj._server = lambda: None
+    assert obj._remote_bridge_status() == ("unknown", {})
+
+    class Server:
+        def gnome_bridge_status(self):
+            return ["active", {"bridge": True, "adopted": 2}]
+
+    obj._server = lambda: Server()
+    assert obj._remote_bridge_status() == ("active", {"bridge": True, "adopted": 2})
+
+    class Broken:
+        def gnome_bridge_status(self):
+            raise RuntimeError("ipc down")
+
+    obj._server = lambda: Broken()
+    assert obj._remote_bridge_status() == ("unknown", {})
+
+
+@check
+def play_button_matches_effective_state_not_just_manual_latch():
+    """Badge said Paused while the button still offered Pause: the icon
+    must follow the effective playback state (manual or automatic)."""
+    obj, _ = _panel(_base_config(), [])
+    icons, tooltips = {}, {}
+
+    class _W:
+        def __init__(self, name):
+            self._name = name
+
+        def set_text(self, text):
+            pass
+
+        def set_visible(self, visible):
+            pass
+
+        def set_icon_name(self, name):
+            icons[self._name] = name
+
+        def set_tooltip_text(self, text):
+            tooltips[self._name] = text
+
+        def set_sensitive(self, value):
+            pass
+
+        def set_value(self, value):
+            pass
+
+        def get_value(self):
+            return 50
+
+        def get_active(self):
+            return False
+
+        def set_active(self, value):
+            pass
+
+    class _Any:
+        def __getattr__(self, name):
+            return _W(name)
+
+    obj.__dict__.update(
+        {key: _W(key) for key in (
+            "np_content", "np_empty", "np_badge", "np_title",
+            "np_subtitle", "np_play_btn", "np_eq", "np_volume",
+            "np_mute_btn", "np_mute_icon", "np_mute_label",
+        )}
+    )
+    obj.now_playing_status = _W("status")
+    obj.np_play_btn = _W("play")
+
+    class _Srv:
+        mode = "MODE_VIDEO"
+        is_paused_by_user = False  # no manual latch...
+        playback_state = "paused"  # ...but automatically paused
+
+    obj._server = lambda: _Srv()
+    obj.config = {
+        "mode": "MODE_VIDEO",
+        "data_source": {"Default": "/v/a.mp4"},
+        "playlist": {"Default": []},
+        "playlist_shuffle": False,
+        "video_dir": None,
+        "is_mute": False,
+        "audio_volume": 50,
+    }
+    obj.playlist_paths = []
+    obj._np_current_path = None
+    obj.np_generation = 0
+    obj._load_np_hero = lambda path, generation: None
+    obj._refresh_np_transport = lambda server: None
+    obj._refresh_np_details = lambda mode, current: None
+    obj._refresh_np_queue = lambda mode: None
+    obj._refresh_now_playing()
+    assert icons["play"] == "media-playback-start-symbolic", icons
+    assert tooltips["play"] == "Play", tooltips
 
 
 @check
@@ -2392,6 +2541,1110 @@ def shell_refresh_reveals_banner_and_badges():
     assert obj._app_logo_image(28).get_pixel_size() == 28
 
 
+@check
+def integration_row_reflects_status():
+    from unittest.mock import patch
+    import apricus.gui.gtk4app as appmod
+    import apricus.gnome_shell as shell
+
+    class Row:
+        def set_subtitle(self, text):
+            self.subtitle = text
+
+    class Switch:
+        active = False
+        sensitive = True
+        events = 0
+
+        def set_active(self, active):
+            if self.active != active:
+                self.active = active
+                self.events += 1
+                assert self.events < 20, "recursive signal loop"
+                # Gtk emits state-set for programmatic changes as well.
+                result = obj._on_integration_toggled(self, active)
+                assert result is True
+
+        def set_state(self, state):
+            pass
+
+        def set_sensitive(self, sensitive):
+            self.sensitive = sensitive
+
+    obj = appmod.ControlPanel.__new__(appmod.ControlPanel)
+    obj.integ_row, obj.integ_switch = Row(), Switch()
+    obj._toast = lambda text: None
+    current = ["active", {}]
+    with patch.object(shell, "integration_status", side_effect=lambda: tuple(current)), patch.object(
+        appmod, "is_snap", return_value=False
+    ), patch.object(appmod, "is_flatpak", return_value=False), patch(
+        "apricus.utils.gnome_extension_set_enable"
+    ) as enable, patch("apricus.utils.gnome_extension_set_disable") as disable:
+        # Refresh must never send enable/disable, including the initial ON.
+        for status, on, sensitive in [
+            ("active", True, True), ("disabled", False, True),
+            ("needs_logout", True, True), ("not_discovered", False, True),
+            ("not_installed", False, False), ("incompatible", False, False),
+            ("error", False, False), ("unknown", False, False), ("stale", False, False),
+        ]:
+            current[:] = [status, {}]
+            obj._refresh_integration_row()
+            assert obj.integ_switch.active is on
+            assert obj.integ_switch.sensitive is sensitive
+        enable.assert_not_called()
+        disable.assert_not_called()
+
+        def enabled(uuid):
+            current[:] = ["active", {}]
+            return True
+
+        enable.side_effect = enabled
+        # Requested signal state matters, even when get_active is unavailable.
+        assert obj._on_integration_toggled(obj.integ_switch, True) is True
+        enable.assert_called_once_with(shell.EXTENSION_UUID)
+        assert obj.integ_switch.active is True
+
+        def disabled(uuid):
+            current[:] = ["disabled", {}]
+            return True
+
+        disable.side_effect = disabled
+        assert obj._on_integration_toggled(obj.integ_switch, False) is True
+        disable.assert_called_once_with(shell.EXTENSION_UUID)
+        assert obj.integ_switch.active is False
+        enable.reset_mock()
+        disable.reset_mock()
+        enable.side_effect = RuntimeError("denied")
+        obj._on_integration_toggled(obj.integ_switch, True)
+        assert obj.integ_switch.active is False
+        assert "gnome-extensions enable" in obj.integ_row.subtitle
+        enable.assert_called_once()
+        disable.assert_not_called()
+
+        # Sandboxes never pretend the switch can control the host Shell.
+        with patch.object(appmod, "is_snap", return_value=True):
+            current[:] = ["active", {}]
+            obj._refresh_integration_row()
+            assert obj.integ_switch.active is True
+            assert obj.integ_switch.sensitive is False
+            obj._on_integration_toggled(obj.integ_switch, False)
+            disable.assert_not_called()
+            current[:] = ["stale", {"receipt": {"loaded": True, "checked_at": 12345}}]
+            obj._refresh_integration_row()
+            assert "expired" in obj.integ_row.subtitle
+            assert "Last host check" in obj.integ_row.subtitle
+
+
+@check
+def host_install_rows_guide_sandbox_setup():
+    import sys
+    import types
+    from unittest.mock import patch
+
+    import apricus.gui.gtk4app as appmod
+
+    states = {}
+
+    class _Row:
+        def __init__(self, name):
+            self._name = name
+
+        def set_subtitle(self, text):
+            states[self._name] = text
+
+        def set_visible(self, visible):
+            states[self._name + ":visible"] = visible
+
+    class _Switch:
+        def set_active(self, active):
+            states["active"] = active
+
+        def set_state(self, state):
+            pass
+
+        def set_sensitive(self, sensitive):
+            states["sensitive"] = sensitive
+
+    def _toasts(self, message):
+        states.setdefault("toasts", []).append(message)
+
+    fake_shell = types.ModuleType("apricus.gnome_shell")
+    fake_shell.EXTENSION_UUID = "apricus-integration@fabx-dev"
+    fake_shell.integration_status = lambda: states["status"]
+    fake_shell.prepare_host_install = lambda: ("/tmp/x", "bash /tmp/x/install.sh")
+    fake_shell.host_verify_command = lambda path: "bash /tmp/x/install.sh --check"
+    old_mod = sys.modules.get("apricus.gnome_shell")
+    sys.modules["apricus.gnome_shell"] = fake_shell
+    try:
+        obj = appmod.ControlPanel.__new__(appmod.ControlPanel)
+        obj.integ_row, obj.integ_switch = _Row("statusline"), _Switch()
+        obj.prep_row, obj.cmd_row = _Row("prepline"), _Row("cmdline")
+        obj._toast = _toasts.__get__(obj)
+        with patch.object(appmod, "is_snap", return_value=True), patch.object(
+            appmod, "is_flatpak", return_value=False
+        ):
+            # Missing extension in a sandbox: prepare row shown, no command yet.
+            states["status"] = ("not_installed", {})
+            obj._host_cmd = None
+            obj._refresh_integration_row()
+            assert states["prepline:visible"] is True
+            assert states["cmdline:visible"] is False
+            # Verification is available even with unknown/missing host state.
+            obj._on_prepare_host_install(None, verify=True)
+            assert states["cmdline"].endswith("--check")
+            # Prepare exports files and reveals the exact host command.
+            obj._on_prepare_host_install(None)
+            assert states["cmdline"] == "bash /tmp/x/install.sh"
+            assert states["cmdline:visible"] is True
+            assert any("host" in t for t in states.get("toasts", []))
+            # Copy without a display reports the failure instead of crashing.
+            with patch.object(appmod.Gdk.Display, "get_default", return_value=None):
+                obj._on_copy_host_command(None)
+            assert any("copy" in t.lower() for t in states.get("toasts", []))
+            # Copy with a clipboard lacking set_text (Gtk 4.22 bindings)
+            # falls back to a bytes content provider and succeeds.
+            class _ClipboardNoSetText:
+                def __init__(self):
+                    self.provider = None
+
+                def set_content(self, provider):
+                    self.provider = provider
+
+            class _DisplayWithClipboard:
+                def __init__(self):
+                    self.clipboard = _ClipboardNoSetText()
+
+                def get_clipboard(self):
+                    return self.clipboard
+
+            states["toasts"] = []
+            with patch.object(appmod.Gdk.Display, "get_default", return_value=_DisplayWithClipboard()):
+                obj._on_copy_host_command(None)
+            assert states.get("toasts") == ["Command copied"], states.get("toasts")
+            # Unknown in a sandbox also offers Prepare (host dir invisible:
+            # missing and unverifiable look the same, export is harmless).
+            states["status"] = ("unknown", {})
+            with patch.object(appmod, "is_snap", return_value=True):
+                obj._refresh_integration_row()
+                assert states["prepline:visible"] is True
+            # Verification stays available after installation.
+            states["status"] = ("disabled", {})
+            obj._refresh_integration_row()
+            assert states["prepline:visible"] is True
+            assert states["cmdline:visible"] is True
+            obj._on_prepare_host_install(None)
+            assert states["cmdline"].endswith("--check")
+            # Once the flow is complete (or only a login is pending) the
+            # guided rows get out of the way.
+            states["status"] = ("active", {})
+            obj._host_cmd = None
+            obj._refresh_integration_row()
+            assert states["prepline:visible"] is False
+            assert states["cmdline:visible"] is False
+            states["status"] = ("needs_logout", {})
+            obj._refresh_integration_row()
+            assert states["prepline:visible"] is False
+        # Outside a sandbox the rows never appear.
+        with patch.object(appmod, "is_snap", return_value=False), patch.object(
+            appmod, "is_flatpak", return_value=False
+        ):
+            states["status"] = ("not_installed", {})
+            obj._host_cmd = None
+            obj._refresh_integration_row()
+            assert states["prepline:visible"] is False
+    finally:
+        if old_mod is not None:
+            sys.modules["apricus.gnome_shell"] = old_mod
+        else:
+            sys.modules.pop("apricus.gnome_shell", None)
+
+
+@check
+def integration_timer_uses_gtk4_window_api():
+    from types import SimpleNamespace
+
+    assert hasattr(app.Gtk.Window, "is_active")
+    assert not hasattr(app.Gtk.Window, "get_is_active")
+    state = {"active": True, "page": "settings", "refreshes": 0}
+    def refresh():
+        state["refreshes"] += 1
+    obj = SimpleNamespace(
+        window=SimpleNamespace(is_active=lambda: state["active"]),
+        stack=SimpleNamespace(get_visible_child_name=lambda: state["page"]),
+        _refresh_integration_row=refresh,
+    )
+    for _ in range(5):
+        assert app.ControlPanel._poll_integration(obj) is True
+    assert state["refreshes"] == 5
+    state["active"] = False
+    assert app.ControlPanel._poll_integration(obj) is True
+    state["active"] = True
+    state["page"] = "library"
+    assert app.ControlPanel._poll_integration(obj) is True
+    obj.window = None
+    assert app.ControlPanel._poll_integration(obj) is True
+    assert state["refreshes"] == 5
+
+
+@check
+def static_flag_toasts_and_persists():
+    from types import SimpleNamespace
+
+    import apricus.gui.gtk4app as appmod
+
+    for mode, expected in (
+        ("MODE_VIDEO", "Preparing static wallpaper…"),
+        ("MODE_NULL", "No video playing — static wallpaper will apply to the next video"),
+    ):
+        config = _base_config()
+        config["mode"] = mode
+        store = _ConfigStore(config)
+        old = _patch_config(None, store)
+        try:
+            obj, _server = _panel(dict(config), [])
+            seen = []
+            obj._toast = seen.append
+            switch = SimpleNamespace(get_active=lambda: True)
+            assert (
+                obj._on_settings_flag(switch, True, appmod.CONFIG_KEY_STATIC_WALLPAPER)
+                is False
+            )
+            assert store.config["is_static_wallpaper"] is True
+            assert seen == [expected], (mode, seen)
+        finally:
+            appmod.ConfigUtil = old
+
+
+class _NPBtn:
+    """Recording stand-in for a Now Playing transport button.
+
+    Deliberately WITHOUT set_label: the STOP affordance must stay an
+    icon button in every state (a set_label call would raise here).
+    """
+
+    def __init__(self):
+        self.visible = None
+        self.sensitive = None
+        self.icon = None
+        self.tooltip = None
+
+    def set_visible(self, value):
+        self.visible = value
+
+    def set_sensitive(self, value):
+        self.sensitive = value
+
+    def set_icon_name(self, name):
+        self.icon = name
+
+    def set_tooltip_text(self, text):
+        self.tooltip = text
+
+
+class _NPText:
+    def __init__(self):
+        self.text = None
+        self.visible = None
+
+    def set_text(self, text):
+        self.text = text
+
+    def set_visible(self, value):
+        self.visible = value
+
+    def set_icon_name(self, name):
+        pass
+
+    def set_tooltip_text(self, text):
+        pass
+
+    def set_sensitive(self, value):
+        pass
+
+
+class _NPScale:
+    def __init__(self):
+        self.sensitive = None
+        self._value = 50.0
+
+    def set_sensitive(self, value):
+        self.sensitive = value
+
+    def get_value(self):
+        return self._value
+
+    def set_value(self, value):
+        self._value = value
+
+
+class _NPMute(_NPText):
+    def __init__(self):
+        super().__init__()
+        self._active = False
+
+    def get_active(self):
+        return self._active
+
+    def set_active(self, value):
+        self._active = value
+
+
+class _NPServer:
+    """Fake server with a controllable playback state."""
+
+    def __init__(self, state="playing", paused=False):
+        self.playback_state = state
+        self.is_paused_by_user = paused
+        self.mode = "MODE_VIDEO"
+        self.volume = 50
+        self.is_mute = False
+        self.calls = []
+
+    def pause_playback(self):
+        self.calls.append("pause")
+
+    def start_playback(self):
+        self.calls.append("start")
+
+    def stop_playback(self):
+        self.calls.append("stop")
+
+    def resume_playback(self):
+        self.calls.append("resume")
+
+
+def _npanel(state="playing", paused=False, server="stub"):
+    obj, srv = _panel(_base_config(), [])
+    srv = _NPServer(state, paused) if server == "stub" else server
+    obj._server = lambda: srv
+    obj.config = {
+        "mode": "MODE_VIDEO",
+        "data_source": {"Default": "/v/a.mp4"},
+        "playlist": {"Default": []},
+        "playlist_shuffle": False,
+        "video_dir": None,
+        "is_mute": False,
+        "audio_volume": 50,
+    }
+    obj.playlist_paths = []
+    obj.np_content = _NPText()
+    obj.np_empty = _NPText()
+    obj.np_badge = _NPText()
+    obj.np_title = _NPText()
+    obj.np_subtitle = _NPText()
+    obj.now_playing_status = _NPText()
+    obj.np_play_btn = _NPBtn()
+    obj.np_stop_btn = _NPBtn()
+    obj.np_eq = _NPText()
+    obj.np_volume = _NPScale()
+    obj.np_mute_btn = _NPMute()
+    obj.np_mute_icon = _NPText()
+    obj.np_mute_label = _NPText()
+    obj._np_current_path = None
+    obj.np_generation = 0
+    obj._load_np_hero = lambda path, generation: None
+    obj._refresh_np_transport = lambda server: None
+    obj._refresh_np_details = lambda mode, current: None
+    obj._refresh_np_queue = lambda mode: None
+    obj._refresh_all_calls = []
+    obj._refresh_all = lambda: obj._refresh_all_calls.append(1)
+    return obj, srv
+
+
+@check
+def transport_stop_button_always_visible_and_state_gated():
+    for state, paused, server, want_sensitive in (
+        ("playing", False, "stub", True),
+        ("paused", True, "stub", True),
+        ("stopped", True, "stub", False),
+        ("playing", False, None, False),
+    ):
+        obj, _ = _npanel(state, paused, server=None if server is None else "stub")
+        if server is None:
+            obj._server = lambda: None
+        obj._refresh_now_playing()
+        assert obj.np_stop_btn.visible is True, (state, server)
+        assert obj.np_stop_btn.sensitive is want_sensitive, (state, server)
+    # Busy in-flight operation disables both buttons even when playing.
+    obj, _ = _npanel("playing", False)
+    obj._transport_busy = True
+    obj._refresh_now_playing()
+    assert obj.np_stop_btn.sensitive is False
+    assert obj.np_play_btn.sensitive is False
+
+
+@check
+def transport_play_tooltip_follows_state():
+    cases = [
+        ("playing", False, "media-playback-pause-symbolic", "Pause"),
+        ("paused", True, "media-playback-start-symbolic", "Play"),
+        ("paused", False, "media-playback-start-symbolic", "Play"),
+        ("stopped", True, "media-playback-start-symbolic", "Play"),
+    ]
+    for state, paused, icon, tip in cases:
+        obj, _ = _npanel(state, paused)
+        obj._refresh_now_playing()
+        assert obj.np_play_btn.icon == icon, (state, obj.np_play_btn.icon)
+        assert obj.np_play_btn.tooltip == tip, (state, obj.np_play_btn.tooltip)
+    # No server: both transport buttons disabled, no crash.
+    obj, _ = _npanel("playing", False, server=None)
+    obj._server = lambda: None
+    obj._refresh_now_playing()
+    assert obj.np_play_btn.sensitive is False
+    assert obj.np_stop_btn.sensitive is False
+
+
+@check
+def play_pause_acts_on_effective_state_not_just_latch():
+    # Auto-paused (no manual latch): the Play-labeled button must attempt
+    # a resume, not silently add a manual hold.
+    obj, srv = _npanel("paused", False)
+    obj.on_play_pause()
+    assert srv.calls == ["start"], srv.calls
+    assert srv.is_paused_by_user is False
+    # Actually playing: the Pause-labeled button holds playback.
+    obj, srv = _npanel("playing", False)
+    obj.on_play_pause()
+    assert srv.calls == ["pause"], srv.calls
+    assert srv.is_paused_by_user is True
+    # Manually paused: the Play-labeled button releases the hold.
+    obj, srv = _npanel("paused", True)
+    obj.on_play_pause()
+    assert srv.calls == ["start"], srv.calls
+    assert srv.is_paused_by_user is False
+
+
+@check
+def play_pause_honours_single_flight():
+    import threading
+
+    obj, srv = _npanel("playing", False)
+    obj.on_play_pause()
+    assert srv.calls == ["pause"], srv.calls
+    assert getattr(obj, "_transport_busy", False) is False
+    assert obj._refresh_all_calls == [1]
+    # A second click while busy is ignored instead of queuing IPC.
+    obj._transport_busy = True
+    obj.on_play_pause()
+    assert srv.calls == ["pause"], srv.calls
+
+
+@check
+def play_pause_when_stopped_delegates_to_resume_once():
+    import threading
+    import time
+
+    gate = threading.Event()
+    started = threading.Event()
+
+    class _Blocking(_NPServer):
+        def resume_playback(self):
+            started.set()
+            assert gate.wait(timeout=10)
+            self.calls.append("resume")
+
+    obj, _ = _npanel("stopped", True, server=None)
+    blocker = _Blocking("stopped", True)
+    obj._server = lambda: blocker
+    obj.on_play_pause()
+    assert started.wait(timeout=10), "resume worker never started"
+    obj.on_play_pause()  # re-entrant click while busy: ignored
+    gate.set()
+    deadline = time.monotonic() + 10
+    while getattr(obj, "_transport_busy", True) and time.monotonic() < deadline:
+        time.sleep(0.02)
+    assert blocker.calls == ["resume"], blocker.calls
+
+
+@check
+def stop_resume_single_flight_and_state_gating():
+    import threading
+    import time
+
+    gate = threading.Event()
+    started = threading.Event()
+
+    class _Blocking(_NPServer):
+        def stop_playback(self):
+            started.set()
+            assert gate.wait(timeout=10)
+            self.calls.append("stop")
+
+    obj, _ = _npanel("playing", False)
+    blocker = _Blocking("playing", False)
+    obj._server = lambda: blocker
+    obj.on_stop_resume()
+    assert started.wait(timeout=10), "stop worker never started"
+    obj.on_stop_resume()  # duplicate click while in flight: ignored
+    gate.set()
+    deadline = time.monotonic() + 10
+    while getattr(obj, "_transport_busy", True) and time.monotonic() < deadline:
+        time.sleep(0.02)
+    assert blocker.calls == ["stop"], blocker.calls
+    # Server gone: explains itself, touches no IPC, leaves no busy latch.
+    obj2, _ = _npanel("playing", False, server=None)
+    obj2._server = lambda: None
+    shown = []
+    obj2._show_server_missing = lambda: shown.append("missing")
+    obj2.on_stop_resume()
+    assert shown == ["missing"], shown
+    assert getattr(obj2, "_transport_busy", False) is False
+
+
+@check
+def external_pause_shows_play():
+    obj, srv = _npanel("playing", False)
+    obj._refresh_now_playing()
+    assert obj.np_play_btn.icon == "media-playback-pause-symbolic"
+    srv.is_paused_by_user = True
+    srv.playback_state = "paused"
+    obj._refresh_now_playing()
+    assert obj.np_play_btn.icon == "media-playback-start-symbolic", obj.np_play_btn.icon
+    assert obj.np_play_btn.tooltip == "Play", obj.np_play_btn.tooltip
+    assert obj.np_stop_btn.sensitive is True
+
+
+@check
+def external_play_shows_pause():
+    obj, srv = _npanel("paused", True)
+    obj._refresh_now_playing()
+    assert obj.np_play_btn.icon == "media-playback-start-symbolic"
+    srv.is_paused_by_user = False
+    srv.playback_state = "playing"
+    obj._refresh_now_playing()
+    assert obj.np_play_btn.icon == "media-playback-pause-symbolic", obj.np_play_btn.icon
+    assert obj.np_play_btn.tooltip == "Pause", obj.np_play_btn.tooltip
+
+
+@check
+def external_stop_shows_play_and_disables_stop():
+    obj, srv = _npanel("playing", False)
+    obj._refresh_now_playing()
+    assert obj.np_stop_btn.sensitive is True
+    srv.playback_state = "stopped"
+    srv.is_paused_by_user = True
+    obj._refresh_now_playing()
+    assert obj.np_play_btn.icon == "media-playback-start-symbolic"
+    assert obj.np_play_btn.tooltip == "Play"
+    assert obj.np_stop_btn.sensitive is False, obj.np_stop_btn.sensitive
+
+
+@check
+def page_change_refreshes_now_playing():
+    obj, _ = _npanel("playing", False)
+    seen = []
+    obj._refresh_all = lambda: seen.append(1)
+    obj._reload_stream_lists = lambda: None
+    obj._reload_web_lists = lambda: None
+
+    class _Stack:
+        def __init__(self):
+            self.names = []
+
+        def set_visible_child_name(self, name):
+            self.names.append(name)
+
+    class _Row:
+        def __init__(self, name):
+            self._name = name
+
+        def get_name(self):
+            return self._name
+
+    obj.stack = _Stack()
+    obj._on_sidebar_selected(None, _Row("now-playing"))
+    assert obj.stack.names == ["now-playing"], obj.stack.names
+    assert seen == [1], seen
+
+
+@check
+def playlist_second_item_title():
+    obj, srv = _npanel("playing", False)
+    srv.mode = "MODE_PLAYLIST"
+    obj.config = {
+        "mode": "MODE_PLAYLIST",
+        "data_source": {"Default": "/v/old.mp4"},
+        "playlist": {"Default": ["/v/a.mp4", "/v/b.mp4"]},
+        "playlist_position": {"Default": 1},
+        "playlist_shuffle": False,
+        "video_dir": None,
+        "is_mute": False,
+        "audio_volume": 50,
+    }
+    obj.playlist_paths = ["/v/a.mp4", "/v/b.mp4"]
+    obj._refresh_now_playing()
+    assert obj.np_title.text == "b.mp4", obj.np_title.text
+
+
+@check
+def element_change_updates_title():
+    obj, srv = _npanel("playing", False)
+    srv.mode = "MODE_PLAYLIST"
+    obj.config = {
+        "mode": "MODE_PLAYLIST",
+        "data_source": {"Default": "/v/old.mp4"},
+        "playlist": {"Default": ["/v/a.mp4", "/v/b.mp4"]},
+        "playlist_position": {"Default": 0},
+        "playlist_shuffle": False,
+        "video_dir": None,
+        "is_mute": False,
+        "audio_volume": 50,
+    }
+    obj.playlist_paths = ["/v/a.mp4", "/v/b.mp4"]
+    loaded = []
+    obj._load_np_hero = lambda path, generation: loaded.append(path)
+    obj._refresh_now_playing()
+    assert obj.np_title.text == "a.mp4", obj.np_title.text
+    obj.config = dict(obj.config, playlist_position={"Default": 1})
+    obj._refresh_now_playing()
+    assert obj.np_title.text == "b.mp4", obj.np_title.text
+    assert loaded[-1] == "/v/b.mp4", loaded
+
+
+@check
+def paused_playlist_keeps_effective_title():
+    obj, srv = _npanel("paused", True)
+    srv.mode = "MODE_PLAYLIST"
+    srv.playback_state = "paused"
+    obj.config = {
+        "mode": "MODE_PLAYLIST",
+        "data_source": {"Default": "/v/old.mp4"},
+        "playlist": {"Default": ["/v/a.mp4", "/v/b.mp4"]},
+        "playlist_position": {"Default": 1},
+        "playlist_shuffle": False,
+        "video_dir": None,
+        "is_mute": False,
+        "audio_volume": 50,
+    }
+    obj.playlist_paths = ["/v/a.mp4", "/v/b.mp4"]
+    obj._refresh_now_playing()
+    assert obj.np_title.text == "b.mp4", obj.np_title.text
+    assert obj.np_play_btn.icon == "media-playback-start-symbolic"
+
+
+@check
+def poll_no_excess_no_duplicate():
+    import apricus.gui.gtk4app as app
+
+    assert app._NP_POLL_SECONDS >= 2, app._NP_POLL_SECONDS
+
+    class _Counting:
+        def __init__(self):
+            self.counts = {"mode": 0, "paused": 0, "state": 0}
+            self._mode = "MODE_VIDEO"
+            self._paused = False
+            self._state = "playing"
+
+        @property
+        def mode(self):
+            self.counts["mode"] += 1
+            return self._mode
+
+        @property
+        def is_paused_by_user(self):
+            self.counts["paused"] += 1
+            return self._paused
+
+        @property
+        def playback_state(self):
+            self.counts["state"] += 1
+            return self._state
+
+        @property
+        def volume(self):
+            return 50
+
+        @property
+        def is_mute(self):
+            return False
+
+    obj, _ = _npanel("playing", False)
+    counting = _Counting()
+    obj._server = lambda: counting
+    obj._refresh_now_playing()
+    assert counting.counts == {"mode": 1, "paused": 1, "state": 1}, counting.counts
+
+    refreshed = []
+    obj._refresh_all = lambda: refreshed.append(1)
+    obj.window = type("W", (), {"is_active": lambda self: True})()
+
+    class _FakeConfigUtil:
+        def load(self):
+            return dict(obj.config)
+
+    app.ConfigUtil = _FakeConfigUtil
+    obj._last_poll_sig = obj._transport_signature(counting)
+    assert obj._poll_now_playing() is True
+    assert refreshed == [], refreshed
+    counting._paused = True
+    counting._state = "paused"
+    assert obj._poll_now_playing() is True
+    assert refreshed == [1], refreshed
+
+
+@check
+def poll_timer_registered_and_periodic():
+    import apricus.gui.gtk4app as app
+
+    assert app._NP_POLL_SECONDS >= 2
+    calls = []
+    real_add = app.GLib.timeout_add_seconds
+    app.GLib.timeout_add_seconds = lambda secs, cb, *a: calls.append((secs, cb)) or 999
+    try:
+        obj, _ = _npanel("playing", False)
+        obj.window = type("W", (), {"is_active": lambda self: True})()
+
+        class _FakeConfigUtil:
+            def load(self):
+                return dict(obj.config)
+
+        app.ConfigUtil = _FakeConfigUtil
+        obj._start_np_poll()
+        assert calls, "timer never registered"
+        secs, cb = calls[0]
+        assert secs >= 2, secs
+        assert getattr(cb, "__func__", cb) == obj._poll_now_playing.__func__
+        # Callback keeps the source alive and performs no refresh when idle.
+        refreshed = []
+        obj._refresh_all = lambda: refreshed.append(1)
+        assert cb() is True
+        assert refreshed == [], refreshed
+    finally:
+        app.GLib.timeout_add_seconds = real_add
+
+
+@check
+def poll_external_transport_via_poll():
+    import apricus.gui.gtk4app as app
+
+    class _Counting:
+        def __init__(self):
+            self._mode = "MODE_VIDEO"
+            self._paused = False
+            self._state = "playing"
+            self.actuations = []
+
+        @property
+        def mode(self):
+            return self._mode
+
+        @property
+        def is_paused_by_user(self):
+            return self._paused
+
+        @property
+        def playback_state(self):
+            return self._state
+
+        @property
+        def volume(self):
+            return 50
+
+        @property
+        def is_mute(self):
+            return False
+
+        def pause_playback(self):
+            self.actuations.append("pause")
+
+        def start_playback(self):
+            self.actuations.append("start")
+
+        def stop_playback(self):
+            self.actuations.append("stop")
+
+        def resume_playback(self):
+            self.actuations.append("resume")
+
+    obj, _ = _npanel("playing", False)
+    counting = _Counting()
+    obj._server = lambda: counting
+    refreshed = []
+    obj._refresh_all = lambda: (refreshed.append(1), obj._refresh_now_playing())
+    obj.window = type("W", (), {"is_active": lambda self: True})()
+
+    class _FakeConfigUtil:
+        def load(self):
+            return dict(obj.config)
+
+    app.ConfigUtil = _FakeConfigUtil
+    obj._last_poll_sig = obj._transport_signature(counting)
+    # External PAUSE → Play icon, Stop stays enabled.
+    counting._paused = True
+    counting._state = "paused"
+    assert obj._poll_now_playing() is True
+    assert refreshed == [1], refreshed
+    assert obj.np_play_btn.icon == "media-playback-start-symbolic"
+    assert obj.np_stop_btn.sensitive is True
+    # External PLAY → Pause icon.
+    counting._paused = False
+    counting._state = "playing"
+    assert obj._poll_now_playing() is True
+    assert obj.np_play_btn.icon == "media-playback-pause-symbolic"
+    # External STOP → Play icon, Stop disabled.
+    counting._state = "stopped"
+    counting._paused = True
+    assert obj._poll_now_playing() is True
+    assert obj.np_play_btn.icon == "media-playback-start-symbolic"
+    assert obj.np_stop_btn.sensitive is False
+    assert counting.actuations == [], counting.actuations
+
+
+@check
+def poll_inactive_does_no_ipc():
+    import apricus.gui.gtk4app as app
+
+    class _Counting:
+        def __init__(self):
+            self.calls = []
+
+        @property
+        def mode(self):
+            self.calls.append("mode")
+            return "MODE_VIDEO"
+
+        @property
+        def is_paused_by_user(self):
+            self.calls.append("paused")
+            return False
+
+        @property
+        def playback_state(self):
+            self.calls.append("state")
+            return "playing"
+
+    obj, _ = _npanel("playing", False)
+    counting = _Counting()
+    obj._server = lambda: counting
+    refreshed = []
+    obj._refresh_all = lambda: refreshed.append(1)
+    obj.window = type("W", (), {"is_active": lambda self: False})()
+    loaded = []
+    orig_load = app.ConfigUtil.load
+    app.ConfigUtil.load = lambda self: loaded.append(1) or {}
+    try:
+        assert obj._poll_now_playing() is True
+    finally:
+        app.ConfigUtil.load = orig_load
+    assert refreshed == [], refreshed
+    assert counting.calls == [], counting.calls
+    assert loaded == [], loaded
+
+
+@check
+def activation_immediate_refresh():
+    obj, _ = _npanel("playing", False)
+    refreshed = []
+    obj._refresh_all = lambda: refreshed.append(1)
+
+    class _W:
+        def __init__(self, active):
+            self._active = active
+
+        def is_active(self):
+            return self._active
+
+    obj._on_window_active_changed(_W(False))
+    assert refreshed == [], refreshed
+    obj._on_window_active_changed(_W(True))
+    assert refreshed == [1], refreshed
+    # A failing refresh never breaks the activation signal.
+    obj._refresh_all = lambda: (_ for _ in ()).throw(RuntimeError("boom"))
+    obj._on_window_active_changed(_W(True))
+
+
+@check
+def timer_survives_page_change():
+    import apricus.gui.gtk4app as app
+
+    obj, _ = _npanel("playing", False)
+    registrations = []
+    real_add = app.GLib.timeout_add_seconds
+    app.GLib.timeout_add_seconds = lambda secs, cb, *a: registrations.append(secs) or 777
+    try:
+        obj._start_np_poll()
+        obj._start_np_poll()
+        assert registrations == [app._NP_POLL_SECONDS], registrations
+        assert obj._np_poll_id == 777
+    finally:
+        app.GLib.timeout_add_seconds = real_add
+    seen = []
+    obj._refresh_all = lambda: seen.append(1)
+    obj._reload_stream_lists = lambda: None
+    obj._reload_web_lists = lambda: None
+
+    class _Stack:
+        def __init__(self):
+            self.names = []
+
+        def set_visible_child_name(self, name):
+            self.names.append(name)
+
+    class _Row:
+        def __init__(self, name):
+            self._name = name
+
+        def get_name(self):
+            return self._name
+
+    obj.stack = _Stack()
+    obj._on_sidebar_selected(None, _Row("playlist"))
+    obj._on_sidebar_selected(None, _Row("now-playing"))
+    assert obj.stack.names == ["playlist", "now-playing"]
+    assert seen == [1], seen
+    assert obj._np_poll_id == 777, "page change must not duplicate the timer"
+
+
+@check
+def signature_detects_item_change():
+    obj, srv = _npanel("playing", False)
+    srv.mode = "MODE_PLAYLIST"
+    base = {
+        "mode": "MODE_PLAYLIST",
+        "data_source": {"Default": "/v/old.mp4"},
+        "playlist": {"Default": ["/v/a.mp4", "/v/b.mp4"]},
+        "playlist_position": {"Default": 0},
+        "playlist_shuffle": False,
+        "video_dir": None,
+        "is_mute": False,
+        "audio_volume": 50,
+    }
+    obj.config = dict(base)
+    obj.playlist_paths = ["/v/a.mp4", "/v/b.mp4"]
+    before = obj._transport_signature(srv)
+    obj.config = dict(base, playlist_position={"Default": 1})
+    after = obj._transport_signature(srv)
+    assert before != after, (before, after)
+    assert after[-1] == "/v/b.mp4", after
+
+
+@check
+def poll_exception_survives():
+    import apricus.gui.gtk4app as app
+    from gi.repository import GLib as _GLib
+
+    obj, _ = _npanel("playing", False)
+    obj.window = type("W", (), {"is_active": lambda self: True})()
+
+    class _Boom:
+        @property
+        def mode(self):
+            raise _GLib.Error("down")
+
+    obj._server = lambda: _Boom()
+    refreshed = []
+    obj._refresh_all = lambda: refreshed.append(1)
+    assert obj._poll_now_playing() is True
+    assert refreshed == [], refreshed
+
+    class _Counting:
+        @property
+        def mode(self):
+            return "MODE_VIDEO"
+
+        @property
+        def is_paused_by_user(self):
+            return False
+
+        @property
+        def playback_state(self):
+            return "playing"
+
+        @property
+        def volume(self):
+            return 50
+
+        @property
+        def is_mute(self):
+            return False
+
+    counting = _Counting()
+    obj._server = lambda: counting
+
+    class _FakeConfigUtil:
+        def load(self):
+            return dict(obj.config)
+
+    app.ConfigUtil = _FakeConfigUtil
+    obj._last_poll_sig = ("MODE_VIDEO", True, "paused", "/v/a.mp4")
+    refreshed.clear()
+    obj._refresh_all = lambda: refreshed.append(1)
+    assert obj._poll_now_playing() is True
+    assert refreshed == [1], refreshed
+
+
+@check
+def poll_never_actuates():
+    import apricus.gui.gtk4app as app
+
+    class _Counting:
+        def __init__(self):
+            self._paused = False
+            self._state = "playing"
+            self.actuations = []
+            self.reads = 0
+
+        @property
+        def mode(self):
+            self.reads += 1
+            return "MODE_VIDEO"
+
+        @property
+        def is_paused_by_user(self):
+            self.reads += 1
+            return self._paused
+
+        @property
+        def playback_state(self):
+            self.reads += 1
+            return self._state
+
+        @property
+        def volume(self):
+            return 50
+
+        @property
+        def is_mute(self):
+            return False
+
+        def pause_playback(self):
+            self.actuations.append("pause")
+
+        def start_playback(self):
+            self.actuations.append("start")
+
+        def stop_playback(self):
+            self.actuations.append("stop")
+
+        def resume_playback(self):
+            self.actuations.append("resume")
+
+    obj, _ = _npanel("playing", False)
+    counting = _Counting()
+    obj._server = lambda: counting
+    refreshed = []
+    obj._refresh_all = lambda: refreshed.append(1)
+    obj.window = type("W", (), {"is_active": lambda self: True})()
+
+    class _FakeConfigUtil:
+        def load(self):
+            return dict(obj.config)
+
+    app.ConfigUtil = _FakeConfigUtil
+    obj._last_poll_sig = obj._transport_signature(counting)
+    reads_before = counting.reads
+    for paused, state in ((True, "paused"), (False, "playing"), (True, "stopped")):
+        counting._paused = paused
+        counting._state = state
+        assert obj._poll_now_playing() is True
+    assert counting.actuations == [], counting.actuations
+    # Bounded lightweight reads only: 3 for the check plus 3 for the
+    # post-refresh re-signature on each changed poll (stubbed _refresh_all
+    # performs no reads itself). No refresh storms, no actuations.
+    assert counting.reads - reads_before == 18, counting.reads
+    assert refreshed == [1, 1, 1], refreshed
+
+
 def main():
     name = sys.argv[1]
     try:
@@ -2432,6 +3685,14 @@ def _run(check):
 
 def test_apply_sends_edited_queue_not_stale_config():
     _run("apply_sends_edited_queue")
+
+
+def test_integration_timer_uses_gtk4_window_api():
+    _run("integration_timer_uses_gtk4_window_api")
+
+
+def test_static_flag_toasts_and_persists():
+    _run("static_flag_toasts_and_persists")
 
 
 def test_apply_empty_queue_sends_nothing():
@@ -2633,6 +3894,18 @@ def test_settings_flag_persists_and_calls_server():
     _run("settings_flag_persists_and_calls_server")
 
 
+def test_window_policy_capability_survives_disconnect():
+    _run("window_policy_capability_survives_disconnect")
+
+
+def test_remote_bridge_status_survives_absent_server():
+    _run("remote_bridge_status_survives_absent_server")
+
+
+def test_play_button_matches_effective_state():
+    _run("play_button_matches_effective_state_not_just_manual_latch")
+
+
 def test_settings_has_no_mute_volume_or_lucky():
     _run_display("settings_has_no_mute_volume_or_lucky")
 
@@ -2763,3 +4036,99 @@ def test_toast_records_message():
 
 def test_shell_refresh_reveals_banner_and_badges():
     _run_display("shell_refresh_reveals_banner_and_badges")
+
+
+def test_integration_row_reflects_status():
+    _run("integration_row_reflects_status")
+
+
+def test_host_install_rows_guide_sandbox_setup():
+    _run("host_install_rows_guide_sandbox_setup")
+
+
+def test_transport_stop_button_always_visible_and_state_gated():
+    _run("transport_stop_button_always_visible_and_state_gated")
+
+
+def test_transport_play_tooltip_follows_state():
+    _run("transport_play_tooltip_follows_state")
+
+
+def test_play_pause_acts_on_effective_state():
+    _run("play_pause_acts_on_effective_state_not_just_latch")
+
+
+def test_play_pause_honours_single_flight():
+    _run("play_pause_honours_single_flight")
+
+
+def test_play_pause_when_stopped_delegates_to_resume_once():
+    _run("play_pause_when_stopped_delegates_to_resume_once")
+
+
+def test_stop_resume_single_flight_and_state_gating():
+    _run("stop_resume_single_flight_and_state_gating")
+
+
+def test_external_pause_shows_play():
+    _run("external_pause_shows_play")
+
+
+def test_external_play_shows_pause():
+    _run("external_play_shows_pause")
+
+
+def test_external_stop_shows_play_and_disables_stop():
+    _run("external_stop_shows_play_and_disables_stop")
+
+
+def test_page_change_refreshes_now_playing():
+    _run("page_change_refreshes_now_playing")
+
+
+def test_playlist_second_item_title():
+    _run("playlist_second_item_title")
+
+
+def test_element_change_updates_title():
+    _run("element_change_updates_title")
+
+
+def test_paused_playlist_keeps_effective_title():
+    _run("paused_playlist_keeps_effective_title")
+
+
+def test_poll_no_excess_no_duplicate():
+    _run("poll_no_excess_no_duplicate")
+
+
+def test_poll_timer_registered_and_periodic():
+    _run("poll_timer_registered_and_periodic")
+
+
+def test_poll_external_transport_via_poll():
+    _run("poll_external_transport_via_poll")
+
+
+def test_poll_inactive_does_no_ipc():
+    _run("poll_inactive_does_no_ipc")
+
+
+def test_activation_immediate_refresh():
+    _run("activation_immediate_refresh")
+
+
+def test_timer_survives_page_change():
+    _run("timer_survives_page_change")
+
+
+def test_signature_detects_item_change():
+    _run("signature_detects_item_change")
+
+
+def test_poll_exception_survives():
+    _run("poll_exception_survives")
+
+
+def test_poll_never_actuates():
+    _run("poll_never_actuates")

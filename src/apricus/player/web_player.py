@@ -3,7 +3,9 @@ import hashlib
 import logging
 import os
 import pathlib
+import re
 import sys
+from collections import deque
 
 import gi
 
@@ -75,6 +77,7 @@ def setup_render_device():
 class WebWindow(Gtk.ApplicationWindow):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.set_accept_focus(False)
         # Transparent until the first paint: the desktop wallpaper behind
         # (user photo or cached static frame) stays visible instead of the
         # theme-gray flash. The page paints over it once loaded.
@@ -155,6 +158,14 @@ class WebWindow(Gtk.ApplicationWindow):
         return False
 
     def _on_web_process_terminated(self, _webview, reason):
+        app = self.get_application()
+        active = getattr(app, "_web_interaction_window", None)
+        if active is not None and active[1] is self:
+            # A dead web process has already lost its DOM. Do not leave an
+            # interactive frozen surface up, or silently reload beneath it.
+            app._cancel_web_interaction()
+            logger.warning("[WebPlayer] interactive web process terminated; surface hidden")
+            return False
         logger.warning(f"[WebPlayer] Web process terminated ({reason}); reloading")
         self._load_token += 1
         GLib.timeout_add_seconds(2, self._reload_after_crash)
@@ -222,6 +233,20 @@ class WebWindow(Gtk.ApplicationWindow):
     def reload(self):
         self.__webview.reload()
 
+    def set_frozen(self, frozen):
+        """Visually freeze the page without touching the web process.
+
+        A hidden widget stops compositing new frames (rAF-driven animation
+        halts on hide); the transparent window then reveals the applied
+        static frame underneath — the same visual language as STOPPED,
+        without tearing the renderer down. JS timers may continue, same
+        cost class as paused VLC allocations.
+        """
+        if frozen:
+            self.__webview.hide()
+        else:
+            self.__webview.show()
+
     def _on_button_press_event(self, widget, event):
         if event.type == Gdk.EventType.BUTTON_PRESS and event.button == 3:
             if not self.menu:
@@ -243,6 +268,17 @@ class WebPlayer(BasePlayer):
         <method name='reload_config'/>
         <method name='pause_playback'/>
         <method name='start_playback'/>
+        <method name='web_interaction_prepare'>
+            <arg type='s' name='token' direction='in'/>
+            <arg type='u' name='pid' direction='in'/>
+            <arg type='s' name='descriptor' direction='out'/>
+        </method>
+        <method name='web_interaction_restore'>
+            <arg type='s' name='token' direction='in'/>
+            <arg type='b' name='safe' direction='in'/>
+            <arg type='u' name='pid' direction='in'/>
+            <arg type='b' name='restored' direction='out'/>
+        </method>
         <method name='quit_player'>
             <arg type='b' name='restore_wallpaper' direction='in'/>
         </method>
@@ -253,6 +289,7 @@ class WebPlayer(BasePlayer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.config = None
+        self._paused = False
         self.wallpaper = create_wallpaper_backend()
         self.reload_config()
 
@@ -262,19 +299,144 @@ class WebPlayer(BasePlayer):
         return os.path.join(CONFIG_DIR, f"static-{digest}.png")
 
     def _save_web_snapshot(self, raw_source, pixbuf):
+        latest = ConfigUtil().load()
+        if latest.get("is_stopped", False):
+            return
+        if (
+            latest.get(CONFIG_KEY_MODE) != MODE_WEBPAGE
+            or raw_source not in (latest.get(CONFIG_KEY_DATA_SOURCE) or {}).values()
+        ):
+            return
         try:
             os.makedirs(CONFIG_DIR, exist_ok=True)
             cached = self._static_cache_path(raw_source)
             tmp = f"{cached}.tmp.png"
             pixbuf.savev(tmp, "png", [], [])
             os.replace(tmp, cached)
-            if (
-                self.config.get(CONFIG_KEY_STATIC_WALLPAPER, True)
-                and self.wallpaper.supports_static
-            ):
+            if latest.get(CONFIG_KEY_STATIC_WALLPAPER, True) and self.wallpaper.supports_static:
                 self.wallpaper.apply_static(cached)
         except Exception as e:  # noqa: BLE001
             logger.debug(f"[WebPlayer] static save failed: {e}")
+
+    def web_interaction_prepare(self, token, pid, dbus_context=None):
+        """Prepare our existing primary window; never navigate or remap it."""
+        import json
+
+        _authorize("web_interaction_prepare", dbus_context)
+        if (
+            pid != os.getpid()
+            or not isinstance(token, str)
+            or not re.fullmatch(r"[0-9a-f]{32}", token)
+        ):
+            raise ValueError("invalid interaction identity")
+        if token in getattr(self, "_interaction_cancelled", ()):
+            raise ValueError("cancelled interaction")
+        active = getattr(self, "_web_interaction_window", None)
+        if active:
+            if active[0] == token:
+                return json.dumps({"pid": pid, "title": active[1].get_title()})
+            raise ValueError("interaction already active")
+        if (
+            self._paused
+            or getattr(self, "_closing", False)
+            or ConfigUtil().load().get("is_stopped", False)
+        ):
+            raise ValueError("wallpaper paused or stopped")
+        window = next(
+            (w for m, w in self.windows.items() if m.is_primary() and w is not None), None
+        )
+        if window is None:
+            window = next((w for w in self.windows.values() if w is not None), None)
+        if window is None or not window.get_visible() or not window.get_realized():
+            raise ValueError("live web window unavailable")
+        view = window._WebWindow__webview
+        if not view.get_visible() or not view.get_uri():
+            raise ValueError("webview frozen or unavailable")
+        state = window.get_window().get_state()
+        saved = {
+            "title": window.get_title(),
+            "focus": window.get_accept_focus(),
+            "decorated": window.get_decorated(),
+            "below": bool(state & Gdk.WindowState.BELOW),
+            "above": bool(state & Gdk.WindowState.ABOVE),
+        }
+        self._web_interaction_window = (token, window, saved)
+        window._apricus_interaction_token = token
+        try:
+            window.set_decorated(False)
+            window.set_title(f"Apricus Web [{token}]")
+            window.set_keep_below(False)
+            window.set_accept_focus(True)
+            view.grab_focus()
+            Gdk.Display.get_default().flush()
+        except Exception:
+            self.web_interaction_restore(token, False, pid)
+            raise
+        return json.dumps({"pid": pid, "title": window.get_title()})
+
+    def web_interaction_restore(self, token, safe, pid, dbus_context=None):
+        _authorize("web_interaction_restore", dbus_context)
+        if (
+            pid != os.getpid()
+            or not isinstance(token, str)
+            or not re.fullmatch(r"[0-9a-f]{32}", token)
+            or type(safe) is not bool
+        ):
+            raise ValueError("invalid interaction identity")
+        if not hasattr(self, "_interaction_cancelled"):
+            self._interaction_cancelled = deque(maxlen=32)
+        if token not in self._interaction_cancelled:
+            self._interaction_cancelled.append(token)
+        active = getattr(self, "_web_interaction_window", None)
+        if active is None or active[0] != token:
+            return True
+        self._web_interaction_window = None
+        _, window, saved = active
+        window._apricus_interaction_token = None
+        if not safe:
+            # No Shell acknowledgement: remove only our surface from input/
+            # rendering. Keep its widget and WebView alive; never reload it.
+            window.hide()
+            window._apricus_quarantined = True
+            self._interaction_quarantined = True
+        try:
+            window.set_accept_focus(saved["focus"])
+            window.set_keep_above(saved["above"])
+            window.set_keep_below(saved["below"])
+            window.set_decorated(saved["decorated"])
+            # The original Gtk.ApplicationWindow may be untitled (None).
+            # Gtk3's GI method rejects None although its GObject property
+            # accepts it. Preserve the exact original value without hiding
+            # a successfully restored window or reloading its WebView.
+            window.props.title = saved["title"]
+            Gdk.Display.get_default().flush()
+        except Exception:
+            window.hide()
+            window._apricus_quarantined = True
+            self._interaction_quarantined = True
+            return False
+        return True
+
+    def _cancel_web_interaction(self):
+        active = getattr(self, "_web_interaction_window", None)
+        if active is not None:
+            from apricus.async_rpc import call
+            from apricus.commons import DBUS_NAME_SERVER
+
+            token = active[0]
+            self.web_interaction_restore(token, False, os.getpid())
+            call(DBUS_NAME_SERVER, "web_interaction_cancel", [token], lambda *_: None)
+
+    def _recreate_wallpaper_windows(self):
+        # Shell enable() already scans existing role-marked windows. Recreating
+        # a WebWindow here would throw away DOM/session state and reload it.
+        self._cancel_web_interaction()
+        self._on_size_changed()
+
+    def quit_player(self, restore_wallpaper=True, dbus_context=None):
+        _authorize("player.quit", dbus_context)
+        self._cancel_web_interaction()
+        super().quit_player(restore_wallpaper, dbus_context)
 
     def new_window(self, gdk_monitor):
         return WebWindow(application=self)
@@ -283,6 +445,12 @@ class WebPlayer(BasePlayer):
         self._preapply_cached_static()
         super().do_activate()
         self.data_source = self.config[CONFIG_KEY_DATA_SOURCE]["Default"]
+        if self._paused:
+            self.pause_playback()
+        ready = getattr(self, "_policy_ready", None)
+        if ready is not None:
+            ready.set()
+            self._policy_ready = None
 
     def _preapply_cached_static(self):
         """Paint the cached frame before windows map.
@@ -395,23 +563,39 @@ class WebPlayer(BasePlayer):
 
     @property
     def is_playing(self):
-        return True
+        return not self._paused
 
     def pause_playback(self, dbus_context=None):
         _authorize("player.pause_playback", dbus_context)
+        self._cancel_web_interaction()
+        self._paused = True
+        for window in self.windows.values():
+            if window is not None:
+                window.set_frozen(True)
 
     def start_playback(self, dbus_context=None):
         _authorize("player.start_playback", dbus_context)
+        if getattr(self, "_closing", False) or ConfigUtil().load().get("is_stopped", False):
+            return
+        self._paused = False
+        for window in self.windows.values():
+            if window is not None:
+                window.set_frozen(False)
 
     def reload_config(self, dbus_context=None):
         _authorize("player.reload_config", dbus_context)
         self.config = ConfigUtil().load()
 
 
-def main():
+def main(ready=None, initially_paused=False):
     setup_logging()
     setup_render_device()
     app = WebPlayer()
+    app._paused = initially_paused
+    app._policy_ready = ready
+    import signal
+
+    GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGTERM, lambda: app.quit_player(False))
     try:
         from apricus.utils import is_snap
 

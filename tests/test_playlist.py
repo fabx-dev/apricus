@@ -83,7 +83,20 @@ def test_v4_to_v5_migration(tmp_path, monkeypatch):
     cu.save = lambda cfg: None
     cfg = {"version": 4, "mode": "MODE_NULL", "data_source": {"Default": ""}}
     with patch("apricus.monitor.MonitorInfo.monitors", return_value=[]):
-        cu._migrateV4To5(cfg)
+        # Seed the per-process template keys explicitly: migration reads
+        # CONFIG_TEMPLATE, which stays None until ensure_template_monitors()
+        # runs (deliberately not at import, to avoid pinning a Gdk
+        # namespace). Relying on a previous test to have seeded it makes
+        # this test order-dependent; restore the previous state afterwards
+        # so this test leaks no global state either.
+        ds_key, pl_key = commons.CONFIG_KEY_DATA_SOURCE, commons.CONFIG_KEY_PLAYLIST
+        old_ds, old_pl = commons.CONFIG_TEMPLATE[ds_key], commons.CONFIG_TEMPLATE[pl_key]
+        try:
+            commons.ensure_template_monitors()
+            cu._migrateV4To5(cfg)
+        finally:
+            commons.CONFIG_TEMPLATE[ds_key] = old_ds
+            commons.CONFIG_TEMPLATE[pl_key] = old_pl
     assert cfg["version"] == 5
     assert cfg["playlist"]["Default"] == []
     assert cfg["playlist_shuffle"] is False

@@ -5,6 +5,7 @@ import sys
 
 from apricus import perf, server  # perf first: import captures process-start T0
 from apricus.commons import LOGGER_NAME
+from apricus.snap_vlc import prepare_snap_vlc
 from apricus.utils import (
     is_flatpak,
     is_gnome,
@@ -18,6 +19,7 @@ logger = logging.getLogger(LOGGER_NAME)
 
 # TODO: Add locale support
 def main(version="devel", pkgdatadir="/usr/share/apricus", localedir="/usr/share/locale"):
+    prepare_snap_vlc()
     # Make sure that X11 is the backend. Revert Wayland to XWayland.
     os.environ["GDK_BACKEND"] = "x11"
     # Suppress VLC Log
