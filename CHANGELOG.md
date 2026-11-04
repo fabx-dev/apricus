@@ -1,6 +1,6 @@
 # Changelog
 
-## 2.1.0 — unreleased
+## 2.1.0 — 2026-11-04
 
 - Web Page: same-window interaction with Shell-owned Done and a temporary exit shortcut displayed on that control (prefer Super+Ctrl+Shift+F12, with conflict-checked F11/F10 alternatives); no browser or WebView replacement. Bounded visible strict-Snap acceptance passed on x14, followed by x15 status-message acceptance. Native and additional-platform coverage is separate.
 - Flatpak 2.1.0 displays webpage wallpapers but does not support direct interaction: exact D-Bus name permissions alone do not reconcile rev8 host-PID binding with the sandbox PID namespace. No broad permissions or identity bypass were added.

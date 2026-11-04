@@ -41,10 +41,8 @@
   </screenshots>
 
   <releases>
-    <!-- Existing development-milestone date, NOT a publication date. Before a
-         stable release, confirm the actual publication date, change this entry
-         to stable and repackage all formats from that same metadata commit. -->
-    <release version="2.1.0" date="2026-11-01" type="development">
+    <!-- Release date confirmed by the maintainer; publication is separately authorized. -->
+    <release version="2.1.0" date="2026-11-04" type="stable">
       <description>
         <ul>
           <li>Now Playing panel with dynamic Play/Pause and separate Stop, with correct manual-action handling</li>

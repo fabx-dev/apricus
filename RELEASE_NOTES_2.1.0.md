@@ -1,6 +1,6 @@
 # Apricus 2.1.0 release notes
 
-Status: unpublished local candidate. The release date and publication require separate approval.
+Release date: **2026-11-04** (confirmed by the maintainer). Status: locally prepared, not published. External publication requires separate approval.
 
 Apricus 2.1.0 closes the M1–M3 cycle: playback controls, a server-owned policy engine, and GNOME Wayland fullscreen/maximized sensing. It does not include suspend/resume (M4) behavior.
 
@@ -42,4 +42,4 @@ Apricus 2.1.0 closes the M1–M3 cycle: playback controls, a server-owned policy
 - `apricus --help` (the description), the startup log or the About/Settings row must report 2.1.0. There is no `--version` option.
 - Native installs: extension revision 8 loaded, `DesktopStateChanged` received, policy `extension-push`, preferences editable.
 - Strict Snap: without rev8, direct interaction is unavailable. Bridge-carried M3 requires a compatible extension and a Snap whose server owns the bridge; prefer the matching rev8 shipped with 2.1.0.
-- Publication date remains unassigned. AppStream's existing development date denotes the development milestone, not a released stable version. Confirm the effective date and repackage stable metadata before publication; never substitute a guessed date.
+- The maintainer confirmed 2026-11-04 as the release date. AppStream metadata is stable and all four formats are prepared from the same final source baseline; publication itself remains separately approval-gated.
