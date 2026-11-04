@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Snap bridge-carried M3 push: auth, sequencing, policy feed, no manifest change."""
 
+from unittest.mock import Mock
+
 import pytest
 
 from apricus import server as server_mod
@@ -55,9 +57,16 @@ def test_window_registration_new_generation_rebaselines():
 
 
 def _stubbed_server(monkeypatch):
+    from apricus import backends as backends_mod
     from apricus import utils as utils_mod
 
     monkeypatch.setattr(utils_mod, "is_snap", lambda: True)
+    # Unit tests must not select a real display backend when the bridge is lost.
+    monkeypatch.setattr(
+        backends_mod,
+        "create_window_state_backend",
+        Mock(side_effect=backends_mod.NullWindowStateBackend),
+    )
     obj = server_mod.ApricusServer.__new__(server_mod.ApricusServer)
     obj.config = {"is_pause_when_maximized": True, "is_mute_when_maximized": False}
     obj.policy = PlaybackPolicyEngine()
@@ -90,6 +99,17 @@ def test_bridge_frame_feeds_policy_without_second_debounce(monkeypatch):
 
 
 def test_bridge_loss_freezes_without_auto_resume(monkeypatch):
+    from apricus import backends as backends_mod
+    from apricus import utils as utils_mod
+
+    monkeypatch.delenv("DISPLAY", raising=False)
+    monkeypatch.delenv("WAYLAND_DISPLAY", raising=False)
+    monkeypatch.setattr(backends_mod, "is_wayland", lambda: False)
+
+    def unexpected_wnck():
+        pytest.fail("Bridge unit test must not access real Wnck")
+
+    monkeypatch.setattr(utils_mod, "wnck", unexpected_wnck)
     obj = _stubbed_server(monkeypatch)
     applied = []
     obj._apply_policy_output = applied.append
@@ -102,6 +122,8 @@ def test_bridge_loss_freezes_without_auto_resume(monkeypatch):
     assert len(applied) == count
     # Unknown generation is ignored.
     assert obj.window_push_lost("c" * 32) is False
+    backends_mod.create_window_state_backend.assert_called_once_with(obj._on_window_state_changed)
+    assert isinstance(obj._window_state, backends_mod.NullWindowStateBackend)
 
 
 def test_bridge_frame_rejected_off_snap_and_malformed(monkeypatch):
